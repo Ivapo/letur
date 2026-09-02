@@ -1,6 +1,5 @@
 {
   "productName": "Letur",
-  "version": "0.1.0",
   "identifier": "dev.letur.desktop",
   "build": {
     "frontendDist": "dist"

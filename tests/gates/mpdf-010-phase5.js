@@ -23,7 +23,7 @@
      await __gate.figure()     <- clauses 1, 2, 3
      await __gate.geometry()   <- clause 4
      await __gate.ways()       <- clause 5
-     open samples/showcase/showcase.md
+     open tests/fixtures/samples/showcase/showcase.md
      await __gate.fit()        <- clauses 6, 7
      __gate.report()
 
@@ -359,12 +359,12 @@
           `edited ${state.edited}, main ${state.main}`
       )
 
-      note('now open samples/showcase/showcase.md, then run: await __gate.fit()')
+      note('now open tests/fixtures/samples/showcase/showcase.md, then run: await __gate.fit()')
       return tally('ways')
     },
 
     async fit() {
-      heading('samples/showcase/ — a figure with a shape, in a column narrow enough to bind')
+      heading('tests/fixtures/samples/showcase/ — a figure with a shape, in a column narrow enough to bind')
       await settled()
       basis = text.style.flexBasis
 
@@ -429,7 +429,7 @@
   console.log(
     '%c__gate ready%c  —  run __gate.arm() now, before opening anything.\n' +
       'Then: open tests/fixtures/panel/sections/text.md → figure() → geometry() → ways() →\n' +
-      'open samples/showcase/showcase.md → fit() → report().',
+      'open tests/fixtures/samples/showcase/showcase.md → fit() → report().',
     'font-weight:bold;color:#1a73e8',
     'color:inherit'
   )

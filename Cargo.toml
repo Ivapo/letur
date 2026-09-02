@@ -1,0 +1,19 @@
+[workspace]
+members = ["app"]
+resolver = "3"
+
+# **`version` is deliberately not here.** It left the workspace table when
+# `mpdf-011` Phase 1 split this repository off the engine: a library version
+# means *this API* and a product version means *this release*, and the two
+# cannot be one number. `app/Cargo.toml` carries Letur's own, and
+# `app/tauri.conf.json` no longer carries a second — Tauri reads the crate's.
+[workspace.package]
+edition = "2024"
+license = "MIT"
+
+# The embedded Typst compiler dominates the binary size. These settings cut
+# the release binary roughly in half; they change nothing about behaviour.
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1

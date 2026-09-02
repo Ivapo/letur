@@ -1744,11 +1744,16 @@ mod tests {
     /// a master is never below its own sections. `project_root` answers
     /// "above"; this answers "at"; below is somebody else's document.
     ///
-    /// **The real tree, not a fixture**, because the defect was that the
-    /// fixtures were all tidier than the repository the app is developed in.
+    /// **The shape of a real tree, not a tidy fixture**, because the defect was
+    /// that the fixtures were all tidier than the repository the app is
+    /// developed in. It was the engine's own `samples/` until `mpdf-011`
+    /// Phase 1; it is now a frozen copy of it under
+    /// `tests/fixtures/samples/`, holding exactly what makes the case — one
+    /// single-file document at the top and one whole project one level down.
     #[test]
     fn a_master_in_a_subdirectory_is_not_this_roots_master() {
-        let samples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples");
+        let samples =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/samples");
 
         assert!(
             samples.join("showcase/showcase.md").is_file(),
@@ -1772,6 +1777,49 @@ mod tests {
             discover_main(&showcase, &showcase.join("sections/text.md")),
             "showcase.md"
         );
+    }
+
+    /// **`mpdf-011` Phase 1's exit gate, clause 4: the page does not move.**
+    ///
+    /// The split carried this app into a repository of its own and made the
+    /// engine a dependency by revision rather than a sibling by path. What that
+    /// could silently break is the *bytes* — a font that stops being found, a
+    /// look whose bytes the crate no longer embeds — and nothing else in this
+    /// suite would say so, because every other test here asserts what the app
+    /// does with a document rather than what the document compiles to.
+    ///
+    /// So this writes the showcase's PDF where a shell can hash it, and the
+    /// gate compares that hash against the engine's own `md2pdf` over the
+    /// engine's own `samples/showcase/showcase.md` at the split commit. The
+    /// identity is sound to key a gate to: `PdfOptions::default()` carries no
+    /// timestamp and an `Auto` document id, and nothing in the looks sets a
+    /// date.
+    ///
+    /// **`md_to_pdf`, and the two passes in `cli/src/main.rs:run`'s order** —
+    /// sections first, then the assets — because the CLI on the other side of
+    /// the comparison is what this has to agree with. [`render_with`] calls
+    /// `md_to_pdf_with_anchors` instead, which is a different question.
+    ///
+    /// `#[ignore]`d and run deliberately, as the page test's own blessing
+    /// counterpart is: it writes a file, and a gate rather than a suite is what
+    /// reads it.
+    #[test]
+    #[ignore = "writes the showcase PDF for mpdf-011 Phase 1's gate; run with --ignored"]
+    fn the_showcase_compiles_to_the_bytes_the_engine_writes() {
+        let showcase = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/samples/showcase");
+        let document = showcase.join("showcase.md");
+        let markdown = std::fs::read_to_string(&document).unwrap();
+
+        let sections =
+            read_sections_with(&markdown, &showcase, |file| std::fs::read(file)).unwrap();
+        let assets =
+            read_assets_with(&markdown, sections, &showcase, |file| std::fs::read(file)).unwrap();
+        let pdf = md2pdf_core::md_to_pdf(&markdown, &assets).unwrap();
+
+        let out = std::env::temp_dir().join("letur-mpdf-011-phase1-showcase.pdf");
+        std::fs::write(&out, &pdf).unwrap();
+        println!("{}", out.display());
     }
 
     /// Clause 3's discovery half. The store is read by the session, not here;

@@ -1,7 +1,12 @@
 [package]
 name = "letur"
 description = "Letur — the desktop front end for md2pdf-core: it shows the PDF while you write."
-version.workspace = true
+# **Letur's own version, inline rather than inherited.** `mpdf-011` Phase 1 took
+# `version` out of the workspace table: a product versions by release and the
+# engine it depends on versions by API, so one number cannot serve both.
+# `app/tauri.conf.json` carries no `"version"` key either — Tauri falls back to
+# this one, which is the duplication removed rather than guarded against.
+version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 
@@ -36,7 +41,11 @@ tauri-build = { version = "2.6.3", features = [] }
 # inherits. No `target.'cfg(...)'` table, because this binary is macOS only by
 # construction and `src/main.rs` says so.
 [dependencies]
-md2pdf-core = { path = "../core" }
+# **The engine, by git revision until it is on the registry.** `mpdf-011` Phase 3
+# publishes `md2pdf-core` and this becomes `md2pdf-core = "0.1"`; until then the
+# revision is the split commit on the engine's `main`, which is an ordinary Cargo
+# shape and a documented seam rather than a workaround.
+md2pdf-core = { git = "https://github.com/Ivapo/md2pdf", rev = "0338da1b8247d17ffafd70458d485d24da02ad7a" }
 notify = "8.2.0"
 objc2-foundation = { version = "0.3.2", features = [
   "NSError",

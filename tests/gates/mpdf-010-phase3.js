@@ -20,7 +20,7 @@
    `tests/fixtures/panel/` is fully tracked and enumerated to eleven rows by
    `app/src/document.rs:the_listing_is_the_disk_and_what_the_master_names`, so a
    twelfth row would fail that test on the next `cargo test`;
-   `samples/showcase/` is tracked too; and **there is no delete in this app
+   `tests/fixtures/samples/showcase/` is tracked too; and **there is no delete in this app
    until Phase 4**, so nothing here could undo either. Remaking the copy is what
    makes the run re-runnable, which Phase 2's gate made an explicit property and
    this one keeps. `git status` is clean before and after.

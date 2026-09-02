@@ -1319,9 +1319,16 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, Instant};
 
+    /// A file from the frozen copy of the engine's `samples/`.
+    ///
+    /// **Frozen at `mpdf-011` Phase 1, and a copy on purpose.** These tests
+    /// assert what the *app* does with a document, not what the dialect does
+    /// with it, so a fixture that stopped tracking the engine costs them
+    /// nothing — and one that went on tracking it would move this app's
+    /// measured numbers on every dialect phase.
     fn sample(name: &str) -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../samples")
+            .join("../tests/fixtures/samples")
             .join(name)
     }
 

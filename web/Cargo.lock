@@ -1385,6 +1385,7 @@ dependencies = [
 [[package]]
 name = "md2pdf-core"
 version = "0.1.0"
+source = "git+https://github.com/Ivapo/md2pdf?rev=0338da1b8247d17ffafd70458d485d24da02ad7a#0338da1b8247d17ffafd70458d485d24da02ad7a"
 dependencies = [
  "hayagriva",
  "mitex",

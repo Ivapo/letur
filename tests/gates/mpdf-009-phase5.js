@@ -15,7 +15,7 @@
      await __gate.wide()   <- P3 clauses 1 (page), 2, 5, 7 — then narrow it back
      open tests/fixtures/near.md
      await __gate.near()   <- P5 clause 11, P3 clause 9
-     open samples/showcase/showcase.md
+     open tests/fixtures/samples/showcase/showcase.md
      await __gate.showcase()  <- P5 clause 1's geometry, P3 clause 10
    P5 clauses 12 and 13 are driven by __gate.long() and named at the end.
    P3 clause 11 is `cargo test --workspace`, outside this script.            */

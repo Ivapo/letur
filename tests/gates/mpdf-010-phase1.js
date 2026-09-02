@@ -20,12 +20,12 @@
      open tests/fixtures/panel/sections/text.md
      await __gate.project()    <- clauses 1, 2, 3, 4
      await __gate.setMain()    <- clauses 5, 6
-     open samples/article.md
+     open tests/fixtures/samples/article.md
      await __gate.article()    <- clauses 7, 8, 9
      __gate.report()
 
    Clause 7 is `mpdf-008` Phase 4's gate case (2) inverted deliberately: that
-   phase asserted `samples/article.md` draws NO panel. Run this script against
+   phase asserted `tests/fixtures/samples/article.md` draws NO panel. Run this script against
    the build before this phase and clause 7 is the one that fails.            */
 ;(() => {
   const files = document.getElementById('files')
@@ -247,12 +247,12 @@
         (await invoke('status')).main === before.main,
         `${after.main} -> ${(await invoke('status')).main}`)
 
-      note('now open samples/article.md, then run: await __gate.article()')
+      note('now open tests/fixtures/samples/article.md, then run: await __gate.article()')
       return tally('set main')
     },
 
     async article() {
-      heading('samples/article.md — a document that names no section')
+      heading('tests/fixtures/samples/article.md — a document that names no section')
       await settled()
       const state = await invoke('status')
       const rows = drawn()
@@ -263,7 +263,7 @@
         !files.hidden && !toggle.hidden && rows.length > 0,
         `${rows.length} rows, main ${state.main}`)
 
-      /* **`samples/` is the case a tidy fixture could not have caught**: a
+      /* **The shape of a real tree, which a tidy fixture could not have caught**: a
          single-file document sits there beside the whole `showcase/` project, so
          a discovery that recursed found `showcase/showcase.md`, called it the
          one master, and compiled it for an author who opened `article.md`. A
@@ -287,6 +287,6 @@
   console.log(
     '%c__gate ready%c  —  run __gate.arm() now, before opening anything.\n' +
       'Then: open tests/fixtures/panel/sections/text.md → project() → setMain() → ' +
-      'open samples/article.md → article() → report().',
+      'open tests/fixtures/samples/article.md → article() → report().',
     'font-weight:bold;color:#1a73e8', 'color:inherit')
 })()

@@ -12,7 +12,7 @@
    about the size of your window or its pixel ratio.
 
    **It writes to a tracked file and puts it back.** Clause 4 types one character
-   into `samples/showcase/sections/notes-and-sources.md`, because `caretPage` is
+   into `tests/fixtures/samples/showcase/sections/notes-and-sources.md`, because `caretPage` is
    consulted only on a status carrying a new `revision` — a caret move alone
    scrolls nothing, so the gate has to say what makes the redraw happen. Clause 6
    then takes the discard the switch's refusal names, which both restores the
@@ -21,7 +21,7 @@
 
    ORDER:
      __gate.arm()              <- BEFORE opening anything, from the empty state
-     open samples/showcase/showcase.md
+     open tests/fixtures/samples/showcase/showcase.md
      await __gate.opened()     <- clauses 1, 2
      await __gate.click()      <- clauses 3, 4, 5
      await __gate.refuse()     <- clauses 6, 7
@@ -181,12 +181,12 @@
       ok(0, 'the empty state draws no panel', files.hidden && list.children.length === 0,
         `files.hidden ${files.hidden}, ${list.children.length} rows`)
 
-      console.log('%carmed%c  — now open samples/showcase/showcase.md, then run: await __gate.opened()',
+      console.log('%carmed%c  — now open tests/fixtures/samples/showcase/showcase.md, then run: await __gate.opened()',
         'font-weight:bold;color:#1a73e8', 'color:inherit')
     },
 
     async opened() {
-      heading('samples/showcase/showcase.md — opened, so the two files are one')
+      heading('tests/fixtures/samples/showcase/showcase.md — opened, so the two files are one')
       await settled()
       const state = await invoke('status')
 
@@ -330,6 +330,6 @@
 
   console.log(
     '%c__gate ready%c  —  run __gate.arm() now, before opening anything.\n' +
-      'Then: open samples/showcase/showcase.md → opened() → click() → refuse() → report().',
+      'Then: open tests/fixtures/samples/showcase/showcase.md → opened() → click() → refuse() → report().',
     'font-weight:bold;color:#1a73e8', 'color:inherit')
 })()

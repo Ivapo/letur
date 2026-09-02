@@ -16,7 +16,17 @@
    **The scratch directory is outside `app/dist/`.** `generate_context!` walks
    `frontendDist` recursively into the shipped binary, so anything written under
    `dist/` is embedded in the app. The precedent is `app/.mirror/`, which
-   `typecheck.mjs` writes for the same reason.                                */
+   `typecheck.mjs` writes for the same reason.
+
+   **Prerequisite: a `md2pdf` binary on `PATH`**, beside this rig's other two —
+   `bun` and Playwright's Chromium. Every document served here is compiled by
+   it, and it is the engine's own CLI rather than anything this repository
+   builds:
+
+     cargo install --git https://github.com/Ivapo/md2pdf --locked md2pdf-cli
+
+   which becomes `cargo install md2pdf-cli` once `mpdf-011` Phase 3 publishes
+   the crate.                                                                 */
 
 import { createServer } from 'node:http'
 import { spawnSync } from 'node:child_process'
@@ -28,6 +38,10 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const APP = dirname(HERE)
 const REPO = dirname(APP)
 const SCRATCH = join(APP, '.harness')
+
+/* Named once, so the header comment, the README and the failure a missing
+   binary dies with cannot drift apart. */
+const INSTALL = 'cargo install --git https://github.com/Ivapo/md2pdf --locked md2pdf-cli'
 
 const die = (why) => {
   console.error(`serve: ${why}`)
@@ -363,17 +377,30 @@ export async function serve({ rev = null, doc = PANEL, port = 0, mutate = null, 
   const here = project(doc)
 
   /* **`-o` into the scratch directory, and the flag is not optional.**
-     `cli/src/main.rs:default_output` writes beside its input and `.gitignore`
-     covers PDFs under `/samples/` and nowhere else, so a compile without it leaves
-     an untracked PDF in `tests/fixtures/` and fails the gate's own "`git status` is
-     clean". The crate is `md2pdf-cli`; the binary it builds is `md2pdf`. */
+     `md2pdf` writes beside its input by default and `.gitignore` covers PDFs
+     under `/tests/fixtures/samples/` and nowhere else, so a compile without it
+     leaves an untracked PDF in `tests/fixtures/` and fails the gate's own
+     "`git status` is clean".
+
+     **The binary comes off `PATH`, not out of this workspace**, and that is the
+     one wire `mpdf-011` Phase 1 had to move rather than carry. This was
+     `cargo run -p md2pdf-cli`, which reaches workspace *members* only; the
+     engine left with that split and `app` is now this workspace's one member,
+     so the old spelling would die at the message below before a single clause
+     ran. The install line is at the head of this file and in the README. */
   const pdf = join(scratch, 'document.pdf')
   const compile = spawnSync(
-    'cargo',
-    ['run', '--quiet', '-p', 'md2pdf-cli', '--', here.document, '-o', pdf],
+    'md2pdf',
+    [here.document, '-o', pdf],
     { cwd: REPO, stdio: quiet ? ['ignore', 'ignore', 'pipe'] : 'inherit' }
   )
-  if (compile.status !== 0) die(`the CLI would not compile ${here.document}\n${compile.stderr ?? ''}`)
+  if (compile.status !== 0) {
+    die(
+      `the CLI would not compile ${here.document}\n` +
+        `${compile.error?.code === 'ENOENT' ? `no \`md2pdf\` on PATH — ${INSTALL}\n` : ''}` +
+        `${compile.stderr ?? ''}`
+    )
+  }
 
   let page = takePage(scratch, rev)
   if (mutate) page = MUTATIONS[mutate](page)

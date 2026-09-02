@@ -45,7 +45,7 @@
    the two copies you save, one inside the project and one outside it. Put the
    outside one somewhere you do not mind, `~/Desktop` for instance. **It writes
    nothing into the repository** if the open document is not in one; if you drive
-   it on this repo's own `samples/`, delete the inside copy afterwards, or
+   it on this repo's own `tests/fixtures/samples/`, delete the inside copy afterwards, or
    `git status` will not be clean and clause 10 is the gate's own.
 
    ORDER:
