@@ -188,7 +188,7 @@ Chromium, and the engine's own CLI — every document the harness serves is comp
 `md2pdf` binary on `PATH`, because this workspace holds the window and not the engine:
 
 ```console
-$ cargo install --git https://github.com/Ivapo/md2pdf --locked md2pdf-cli
+$ cargo install --locked md2pdf-cli
 $ cd app && bun install
 $ bun harness/checks.mjs
 ```

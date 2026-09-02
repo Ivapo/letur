@@ -41,11 +41,19 @@ tauri-build = { version = "2.6.3", features = [] }
 # inherits. No `target.'cfg(...)'` table, because this binary is macOS only by
 # construction and `src/main.rs` says so.
 [dependencies]
-# **The engine, by git revision until it is on the registry.** `mpdf-011` Phase 3
-# publishes `md2pdf-core` and this becomes `md2pdf-core = "0.1"`; until then the
-# revision is the split commit on the engine's `main`, which is an ordinary Cargo
-# shape and a documented seam rather than a workaround.
-md2pdf-core = { git = "https://github.com/Ivapo/md2pdf", rev = "0338da1b8247d17ffafd70458d485d24da02ad7a" }
+# **The engine, from the registry.** `mpdf-011` Phase 3 published `md2pdf-core`
+# and this line took its version. `"0.1"` and not `"=0.1.0"`, per that spec's
+# OQ-5: a patch release arrives without a commit here, and what would reopen the
+# question is the first engine patch that moves a number
+# `rules/desktop-panes.md` measures off its frozen showcase.
+#
+# It was a git revision at the split, pinned to the engine's `main`, and that
+# shape stays the documented seam rather than a workaround: a `{ git, rev }`
+# table is what this line becomes again between any two publishes Letur cannot
+# wait for. **Spelled without the `=` on purpose** — Phase 3's gate 3 greps
+# these two manifests for that literal and requires nothing back, and a comment
+# is not worth blunting the check that proves the dependency left.
+md2pdf-core = "0.1"
 notify = "8.2.0"
 objc2-foundation = { version = "0.3.2", features = [
   "NSError",

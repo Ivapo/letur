@@ -26,11 +26,11 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# The engine, by git revision until `mpdf-011` Phase 3 publishes it — the same
-# dependency `app/Cargo.toml` takes, spelled the same way. A git dependency
-# builds for `wasm32` exactly as a path one did: Cargo fetches the whole
-# repository and resolves the workspace inheritance inside it.
-md2pdf-core = { git = "https://github.com/Ivapo/md2pdf", rev = "0338da1b8247d17ffafd70458d485d24da02ad7a" }
+# The engine, from the registry since `mpdf-011` Phase 3 published it — the same
+# dependency `app/Cargo.toml` takes, spelled the same way, and a git revision in
+# both until that phase. A registry dependency builds for `wasm32` exactly as
+# the git one did, and as the path one before it did.
+md2pdf-core = "0.1"
 wasm-bindgen = "0.2.104"
 console_error_panic_hook = "0.1.7"
 

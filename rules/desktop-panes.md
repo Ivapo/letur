@@ -720,10 +720,12 @@ declaration. A field renamed on either side alone fails one of the two.
 
 **`app/harness/` drives this page rather than reading it, and it needs the engine's CLI
 on `PATH`.** Every document it serves is compiled by a `md2pdf` binary, installed with
-`cargo install --git https://github.com/Ivapo/md2pdf --locked md2pdf-cli` until
-`mpdf-011` Phase 3 publishes the crate — a third prerequisite beside `bun` and
-Playwright's Chromium, stated in `serve.mjs`'s header and in the README. It was
-`cargo run -p md2pdf-cli` until that phase, which reaches workspace *members* only: the
+`cargo install --locked md2pdf-cli` since `mpdf-011` Phase 3 put the crate on the
+registry — a third prerequisite beside `bun` and Playwright's Chromium, stated in
+`serve.mjs`'s header and in the README. **`--locked` and not the plain line the engine's
+README gives a reader**: this rig compiles documents a gate then compares, so it wants
+the resolve the published lockfile pins rather than whatever a fresh one picks up. It was
+`cargo run -p md2pdf-cli` until Phase 1, which reaches workspace *members* only: the
 engine left with the split and `app` is this workspace's one member, so the old spelling
 would die at its own "the CLI would not compile" before a clause ran. `serve.mjs` copies
 the page into a gitignored scratch directory — never edits it, `typecheck.mjs` dying on a page with two module

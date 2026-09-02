@@ -23,10 +23,14 @@
    it, and it is the engine's own CLI rather than anything this repository
    builds:
 
-     cargo install --git https://github.com/Ivapo/md2pdf --locked md2pdf-cli
+     cargo install --locked md2pdf-cli
 
-   which becomes `cargo install md2pdf-cli` once `mpdf-011` Phase 3 publishes
-   the crate.                                                                 */
+   **`--locked`, and it is not the line the engine's README gives a reader.**
+   This rig compiles documents a gate then compares, so it wants the resolve the
+   published lockfile pins and not whatever a fresh one picks up — the reason
+   `mpdf-011` Phase 3's own gate 2 carries the same flag. That phase put the
+   crate on the registry; before it the line named `--git
+   https://github.com/Ivapo/md2pdf`.                                          */
 
 import { createServer } from 'node:http'
 import { spawnSync } from 'node:child_process'
@@ -41,7 +45,7 @@ const SCRATCH = join(APP, '.harness')
 
 /* Named once, so the header comment, the README and the failure a missing
    binary dies with cannot drift apart. */
-const INSTALL = 'cargo install --git https://github.com/Ivapo/md2pdf --locked md2pdf-cli'
+const INSTALL = 'cargo install --locked md2pdf-cli'
 
 const die = (why) => {
   console.error(`serve: ${why}`)
