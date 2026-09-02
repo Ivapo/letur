@@ -16,10 +16,12 @@ on:
     # The spike is the only thing this publishes, so nothing else needs to
     # trigger a five-minute wasm build.
     #
-    # `core/**` left this list with `mpdf-011` Phase 1: the engine is a git
-    # dependency of `web/Cargo.toml` now rather than a directory beside it, so
-    # there is no `core/` in this repository to watch. A new engine revision
-    # reaches the page through a commit to that manifest, which `web/**` covers.
+    # `core/**` left this list with `mpdf-011` Phase 1: the engine is a
+    # dependency of `web/Cargo.toml` rather than a directory beside it, so there
+    # is no `core/` in this repository to watch. A new engine version reaches
+    # the page through a commit to that manifest or to `web/Cargo.lock`, both of
+    # which `web/**` covers. It was a git revision until `mpdf-011` Phase 3 and
+    # is `md2pdf-core = "0.1"` off the registry since.
     paths:
       - 'web/**'
       - '.github/workflows/pages.yml'

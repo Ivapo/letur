@@ -261,9 +261,11 @@ share link: `mpdf-001` §1.1 refuses servers permanently, and Pages serves stati
 
 `.github/workflows/pages.yml` builds `web/` alone with `wasm-pack build --target web
 --release`, on a push to `main` touching `web/**` or the workflow. **`core/**` left that
-trigger with `mpdf-011` Phase 1**: the engine is a git dependency of `web/Cargo.toml` now,
-so there is no `core/` here to watch and a new revision of it reaches the page through a
-commit to that manifest. It assembles
+trigger with `mpdf-011` Phase 1**: the engine is a dependency of `web/Cargo.toml` rather
+than a directory beside it, so there is no `core/` here to watch and a new version of it
+reaches the page through a commit to that manifest or its lockfile, both of which `web/**`
+covers. It was a git revision until `mpdf-011` Phase 3 and is `md2pdf-core = "0.1"` off
+the registry since. It assembles
 `_site` from **`web/index.html` and `web/pkg/` only**, so anything the page needs must be
 inline in that file or added to that step — which is why both of the page's files are. `wasm-pack`'s
 own `.gitignore` inside `pkg/` is deleted before upload, or the artifact would skip the

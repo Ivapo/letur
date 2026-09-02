@@ -92,8 +92,11 @@ so neither adds a crate to the tree**, and that fact is what picked
 `objc2-foundation` over the `trash` crate, whose macOS implementation is the
 same `NSFileManager` call. There is no `target.'cfg(...)'` table: this binary is
 macOS only by construction and `src/main.rs` says so. **`md2pdf-core` is a
-dependency by git revision**, pinned to the engine's split commit in
-`Ivapo/md2pdf` until `mpdf-011` Phase 3 publishes it, and **this crate owns its
+registry dependency at `"0.1"`**, since `mpdf-011` Phase 3 published it; it was
+pinned to the engine's split commit in `Ivapo/md2pdf` until then, and a
+`{ git, rev }` table stays the documented seam for any publish Letur cannot wait
+for. The range takes a patch release without a commit here, which is that spec's
+OQ-5 answered and what its own reopening condition watches. **This crate owns its
 `version`** — `0.1.0` inline rather than `version.workspace`, because a library
 versions by API and a product by release; `app/tauri.conf.json` carries **no**
 `"version"` key, Tauri falling back to this one, so the two cannot disagree,
