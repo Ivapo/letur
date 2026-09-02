@@ -38,7 +38,7 @@ covers: >
   facts a build enforces, and the server one build carries behind a feature,
   the capability it looks to want and does not, and the setter it offers where
   the page is refused one
-max_lines: 685
+max_lines: 695
 generated: 2026-08-28
 ---
 
@@ -58,6 +58,16 @@ the text back, and writes the page to a file the user names. It bundles into an
 file's project. **The bundle is unsigned**, a credential this machine does not
 hold rather than a step skipped; `specs/desktop_app_spec.md` OQ-8 says what that
 costs.
+
+**The fixtures this suite reads are its own, frozen at `mpdf-011` Phase 1**: the
+eleven documents and images `app/src/*.rs` names under `tests/fixtures/`, and the
+engine's `samples/` tree under `tests/fixtures/samples/` as `article.md`,
+`check.svg`, `pipeline.svg` and `showcase/` — that shape because
+`document.rs:a_master_in_a_subdirectory_is_not_this_roots_master` reads the
+directory and asserts no master sits at its top. Copies on purpose: these tests
+assert what the *app* does with a document, so a fixture that stopped tracking
+the dialect costs them nothing, where one that kept tracking it would move this
+app's measured numbers on every dialect phase.
 
 **The pane's text is what compiles**, and several claims below turn on it. The
 file beside it need never have held that text. **The pane holds exactly one file
@@ -81,8 +91,14 @@ those last two are already in `Cargo.lock` at their version by way of `tauri`,
 so neither adds a crate to the tree**, and that fact is what picked
 `objc2-foundation` over the `trash` crate, whose macOS implementation is the
 same `NSFileManager` call. There is no `target.'cfg(...)'` table: this binary is
-macOS only by construction and `src/main.rs` says so. `build.rs`
-calls `tauri_build::build()`. `tauri.conf.json` sets `app.withGlobalTauri: true`, which
+macOS only by construction and `src/main.rs` says so. **`md2pdf-core` is a
+dependency by git revision**, pinned to the engine's split commit in
+`Ivapo/md2pdf` until `mpdf-011` Phase 3 publishes it, and **this crate owns its
+`version`** — `0.1.0` inline rather than `version.workspace`, because a library
+versions by API and a product by release; `app/tauri.conf.json` carries **no**
+`"version"` key, Tauri falling back to this one, so the two cannot disagree,
+while `edition`, `license` and `[profile.release]` are still the root's.
+`build.rs` calls `tauri_build::build()`. `tauri.conf.json` sets `app.withGlobalTauri: true`, which
 puts the API on `window.__TAURI__` and is what removes the bundler and the node
 toolchain entirely — `build.frontendDist` is `dist`, a directory of static files,
 so the whole app is one Cargo build. **The vendored `pdf.js` does not spend

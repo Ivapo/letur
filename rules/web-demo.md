@@ -3,7 +3,7 @@ title: web-demo
 sources:
   - web/index.html
   - web/src/lib.rs
-  - core/tests/page_examples_test.rs
+  - app/tests/page_examples_test.rs
   - .github/workflows/pages.yml
 covers: >
   the published browser demo: the one page and what it costs, the two exports
@@ -15,17 +15,24 @@ covers: >
   height model and the panes beneath the list, the two files the page carries
   down one attribute and the limit that remains, the engines the page has been
   run in, and the build and deploy that publish it
-max_lines: 255
+max_lines: 265
 generated: 2026-08-23
 ---
 
 # Web demo
 
-The project's front door: `md2pdf-core` compiled to `wasm32-unknown-unknown` and called
-from one page, published to GitHub Pages at `https://ivapo.github.io/md2pdf/`. The third
-front end beside the CLI and the desktop app, sharing `core`'s API with them and nothing
-else. `mpdf-006` owns the directory; `mpdf-003` §1.1 named this a later spec rather than a
-phase of its own, and it is that spec.
+Letur's page: `md2pdf-core` compiled to `wasm32-unknown-unknown` and called from one
+page, published to GitHub Pages at `https://ivapo.github.io/letur/`. A third front end
+beside the engine's CLI and this desktop app, sharing `md2pdf-core`'s API with them and
+nothing else. `mpdf-006` owns the directory; `mpdf-003` §1.1 named this a later spec
+rather than a phase of its own, and it is that spec.
+
+**It came here with `mpdf-011` Phase 1**, which split the engine off into
+`Ivapo/md2pdf`. Two things moved with it: the URL above, and the test compiling the
+page's claims, `app/tests/page_examples_test.rs`, which was `core/tests/`'s. What the
+page *says* did not move — rewriting it into Letur's landing site is a later spec. Every
+`core/…` citation below points into the engine's repository deliberately: that is where
+the code went, and a reader wants the pointer, not its absence.
 
 **The PDF a visitor sees is the PDF the CLI writes.** `web/src/lib.rs:render` calls
 `md2pdf_core::md_to_pdf` with both of the page's files in hand, and maps a failure through
@@ -75,7 +82,7 @@ needs scripting: every example is on the page either way, compiling one is not.
 twelve carry `disabled` in the markup — inert with scripting off rather than promising a
 compile the page cannot run — and `await mod.default()` resolving enables them. Nothing
 else reports readiness. The button carries no `data-example` attribute of its own:
-`core/tests/page_examples_test.rs` asserts the page holds exactly twelve of those.
+`app/tests/page_examples_test.rs` asserts the page holds exactly twelve of those.
 
 A click reads its own row's element — `button.closest('.row')`, then
 `querySelector('script[data-example]')` — writes that source into the textarea and calls
@@ -141,7 +148,7 @@ drafted rather than a note to re-write a third time.
 
 **Each example is one element, and three consumers read it.** A
 `<script type="text/markdown" data-example="…" data-expect="ok|error">` holds the source;
-the reader sees it, the row's button loads it, and `core/tests/page_examples_test.rs` reads
+the reader sees it, the row's button loads it, and `app/tests/page_examples_test.rs` reads
 it through `include_str!`. A `<script>` holds raw text, so markdown inside one needs no
 escaping and a block of a non-JavaScript type is never executed.
 
@@ -153,7 +160,7 @@ both. A leading newline is the same hazard one line on, moving every refusal's `
 by one. The rule needs no stripping step in any consumer, so they cannot drift apart by
 normalising differently.
 
-`core/tests/page_examples_test.rs` asserts that rule, a count of exactly twelve, a mark of
+`app/tests/page_examples_test.rs` asserts that rule, a count of exactly twelve, a mark of
 `ok` or `error` on each, unique names, two asset elements, and message elements matching the
 refusals; then that each `ok` example compiles — **each handed the page's image**, as the
 page hands it to every compile — and that each `error` example's `to_string()` equals its
@@ -206,7 +213,7 @@ because the reflex is broken and the break is invisible to an equality check —
 sides agree about the broken bytes. Measured 2026-08-22: 509 bytes to a 954-byte URI that
 round-trips exactly, the diagram loading at its declared `320×72`.
 
-**The generator is the test** — `core/tests/page_examples_test.rs:generated` produces a
+**The generator is the test** — `app/tests/page_examples_test.rs:generated` produces a
 block, `every_generated_block_is_the_parsers_own_html` compares all twelve against the page,
 and `bless_the_generated_blocks`, `#[ignore]`d so `cargo test --workspace` skips it, writes
 them in; a generator of its own would implement the substitution twice. Three assertions
@@ -231,7 +238,7 @@ suite.
 `<script type="image/svg+xml" data-asset="…">` and the bibliography a
 `<script type="application/yaml" data-asset="…">` — non-JavaScript types, so neither is
 executed and neither needs escaping. The page's module selects on the pair and
-`core/tests/page_examples_test.rs` scans for it, so neither depends on document order, and
+`app/tests/page_examples_test.rs` scans for it, so neither depends on document order, and
 it is what keeps the `data:` URI substitution keyed to the image alone. Both obey the
 examples' byte rule at the ends — no leading and no trailing newline — but only the
 bibliography's *inner* indentation is load-bearing: the SVG's bytes reach Typst's image
@@ -253,7 +260,10 @@ share link: `mpdf-001` §1.1 refuses servers permanently, and Pages serves stati
 ## The build and the deploy
 
 `.github/workflows/pages.yml` builds `web/` alone with `wasm-pack build --target web
---release`, on a push to `main` touching `web/**`, `core/**` or the workflow. It assembles
+--release`, on a push to `main` touching `web/**` or the workflow. **`core/**` left that
+trigger with `mpdf-011` Phase 1**: the engine is a git dependency of `web/Cargo.toml` now,
+so there is no `core/` here to watch and a new revision of it reaches the page through a
+commit to that manifest. It assembles
 `_site` from **`web/index.html` and `web/pkg/` only**, so anything the page needs must be
 inline in that file or added to that step — which is why both of the page's files are. `wasm-pack`'s
 own `.gitignore` inside `pkg/` is deleted before upload, or the artifact would skip the

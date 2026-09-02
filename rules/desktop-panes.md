@@ -50,7 +50,7 @@ covers: >
   asserts as properties and the twelve broken pages that falsify them, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
-max_lines: 725
+max_lines: 740
 generated: 2026-09-01
 ---
 
@@ -138,7 +138,10 @@ re-measured 2026-09-01 by `mpdf-007` Phase 5 through the vendored `app/dist/pdfj
 served with the PDF to a browser, which is the engine that produced the number; the
 unedited source read 1140 under both binaries, so the whole delta is that phase's
 showcase edit. Nothing in `cargo test` reads it, so it is a phase that edits the
-showcase that moves it.
+showcase that moves it — and **the showcase it means is `tests/fixtures/samples/showcase/`,
+frozen at `mpdf-011` Phase 1** rather than the engine's, which goes on changing next door.
+That is what stops this number and the sixteen below rotting unobserved: a dialect phase
+cannot move either any more, so only a phase of *this* repository's can.
 
 **Only a link carrying an internal destination is rendered**, filtered before the
 layer is built. An external one has no element, no `href` and nothing to
@@ -715,8 +718,15 @@ must carry, since an empty list puts no `Anchor` in the JSON at all. **Two
 declarations compared with each other**, rather than usage compared against a
 declaration. A field renamed on either side alone fails one of the two.
 
-**`app/harness/` drives this page rather than reading it.** `serve.mjs` copies it into a
-gitignored scratch directory — never edits it, `typecheck.mjs` dying on a page with two module
+**`app/harness/` drives this page rather than reading it, and it needs the engine's CLI
+on `PATH`.** Every document it serves is compiled by a `md2pdf` binary, installed with
+`cargo install --git https://github.com/Ivapo/md2pdf --locked md2pdf-cli` until
+`mpdf-011` Phase 3 publishes the crate — a third prerequisite beside `bun` and
+Playwright's Chromium, stated in `serve.mjs`'s header and in the README. It was
+`cargo run -p md2pdf-cli` until that phase, which reaches workspace *members* only: the
+engine left with the split and `app` is this workspace's one member, so the old spelling
+would die at its own "the CLI would not compile" before a clause ran. `serve.mjs` copies
+the page into a gitignored scratch directory — never edits it, `typecheck.mjs` dying on a page with two module
 scripts — injects `stub.mjs` into the `<head>`, where it must run before the page reads
 `window['__TAURI__']` at module top level, and serves real compiled bytes for `current_pdf`
 **and the project's own images for `asset_bytes`**, copied into the scratch tree rather

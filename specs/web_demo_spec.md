@@ -56,6 +56,22 @@ PDF pane with no word on the page about why the markdown in that textarea is wor
 writing. A visitor who arrives from the README meets a box that makes PDFs and no reason
 to prefer it to any other thing that makes PDFs.
 
+> **CORRECTED 2026-09-02, by `mpdf-011` Phase 1.** The sentence above is kept as it was
+> written, and it no longer says whose front door this is. `mpdf-011` split the
+> repository: the page moved here with Letur, and **the dialect's front door is the
+> engine's own README and its registry entry**, not this page. What the phrase was
+> really about survives whole — a reader should meet the dialect showing itself rather
+> than described — and every claim on the page is still a snippet a suite compiles.
+> Two things follow. The page now publishes from `https://ivapo.github.io/letur/`, the
+> old URL being the engine's to redirect or let go (`mpdf-011` OQ-4). And the test that
+> compiles the claims came with the page, as `app/tests/page_examples_test.rs`, while
+> the engine keeps the twelve snippets as fixtures of its own — so the landing page can
+> change without the dialect's claims going unchecked.
+>
+> The frontmatter `note:` still reads *"the published browser demo becomes the project's
+> front door"*. That is the index line and cannot hold a note; it is left as the record
+> of what was decided.
+
 **The observable is unchanged — the typeset PDF that Typst compiles from the user's
 markdown — and this spec builds no new one.** What it builds is the first place a reader
 meets that observable without installing anything: `web/src/lib.rs:render` already calls
