@@ -22,7 +22,8 @@ covers: >
   that says they can be pressed, the rule that decided which of the two bars a
   control belongs to and the third thing that is neither, the bar along the
   foot, the five cells and one rule it carries and the one control each of its
-  settings has, the two marks it draws rather than borrows, the file it
+  settings has, the two of those that also take a menu event carrying no state,
+  the two marks it draws rather than borrows, the file it
   names, the one it does not and the figure that is neither, the receipt a save
   leaves and the cell that costs nothing while it is silent,
   the appearance the author chooses and the four token blocks that wear it, the
@@ -46,12 +47,12 @@ covers: >
   the pane does not draw, and the pane that loses both when it empties, the check that reads this file and the
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
-  because the DOM cannot show one, the fifteen clauses it
-  asserts as properties and the twelve broken pages that falsify them, the second
+  because the DOM cannot show one, the sixteen clauses it
+  asserts as properties and the thirteen broken pages that falsify them, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
-max_lines: 740
-generated: 2026-09-01
+max_lines: 755
+generated: 2026-09-03
 ---
 
 # Desktop panes
@@ -328,11 +329,25 @@ and `hideAsset` is the one exit all three ways back go through. **Nothing marks 
 
 **Three of the bar's settings have one control each, and the bar is where a setting
 goes**: the footer sets and the header acts. The fit has `fitControls` and `showFit`,
-the fold `foldControls`, `showFold` and `offerFold`, the gutter `lineControls`. Each was
+the fold `foldControls`, `showFold` and `offerFold`, the gutter `lineControls`,
+`shown` and `showLines`. Each was
 briefly two — the header carried a copy while the bar's shape was being looked at — and
 the shape of that survives: the listener is installed on every control rather than
-against an id and the new value is read off *the control that was pressed*, which is
-what made withdrawing the second copy one line.
+against an id, which is what made withdrawing the second copy one line.
+
+**Two of the three now have a second way in, and it is not a second control.** The
+`View` menu's `Files` and `Lines` items emit `view-files` and `view-lines`, and the page
+takes both through `toggleFold` and `toggleLines` — the same functions the bar's own
+presses take, which is what keeps the item and the button one code path. **The state left
+the control to make that possible**: the gutter's press used to be read off *the control
+that was pressed*, which an event with no control cannot answer, so `shown` sits beside
+`folded` as page state and `showLines` writes it onto every control, onto `#lines.hidden`,
+and then calls `relines()` and `markLine()`. **All four statements are load-bearing.**
+Hiding early-returns out of `relines`, so `markLine` alone clears the caret band off
+`text.style.backgroundImage`; showing needs `relines` to build the rows at all, `settle()`
+being 200 ms away. **The two items carry no checkmark**, so the marks in the bar remain
+the only things that wear either state, and `toggleFold` alone declines: with no document
+open `offerFold` has hidden the button and `files.hidden` is what the listener asks.
 
 **The two view toggles are drawn marks where the appearance toggle stays a glyph, and
 that is one rule rather than an inconsistency: a mark a glyph names is a glyph, a mark
@@ -742,8 +757,8 @@ sentence — found by a mutation that falsified nothing, not by reading.
 `core:default`'s own words — the half a stub that merely omits it never tests. It also keeps
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
-asserts fifteen clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against twelve broken copies
+asserts sixteen clauses in Playwright's Chromium and WebKit, **both of which must pass, every
+clause a property and none a metric literal**, and is falsified first against thirteen broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
 without either being redundant**, and clause 3 is where that now stands: `flex-min` reaches
 the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`

@@ -13,7 +13,9 @@ sources:
   - app/package.json
   - app/driver/drive.mjs
 covers: >
-  the desktop app: the crate and its files, the window and its menu, the two
+  the desktop app: the crate and its files, the window and its menu, the five
+  submenus and the six ids the one filter enumerates, the two items that name a
+  view and carry no state, the two
   titles an open sets, the commands and the signal between them, the file I/O the
   app owns and the two read passes one closure serves, the fourth reader of a
   path the author did not name in a dialog, the first write to one and the first
@@ -38,8 +40,8 @@ covers: >
   facts a build enforces, and the server one build carries behind a feature,
   the capability it looks to want and does not, and the setter it offers where
   the page is refused one
-max_lines: 695
-generated: 2026-08-28
+max_lines: 715
+generated: 2026-09-03
 ---
 
 # Desktop
@@ -193,8 +195,11 @@ callback and see the run events a `.run(generate_context!())` never surfaces.
 The menu is built by hand, because macOS draws none of its own: an app submenu,
 a `File` submenu carrying `Open…` at `CmdOrCtrl+O`, `Save` at `CmdOrCtrl+S`,
 `Save as…` at `Shift+CmdOrCtrl+S` and `Save a Copy…` at no accelerator at all,
-an `Edit` submenu, and a `Window`
-submenu. **No item acts on its own.** Each emits an event of its own id to the
+an `Edit` submenu, a `View` submenu carrying `Files` at `CmdOrCtrl+B` and `Lines`
+at `CmdOrCtrl+L`, and a `Window`
+submenu. **`View` sits between `Edit` and `Window`**, which is where macOS puts
+it; the builders have no positional insert, so the slice's order is the
+placement. **No item acts on its own.** Each emits an event of its own id to the
 window, and the page invokes, so a menu item and the button beside it run one
 code path and not two — which is why `Save` emits too, though it opens no dialog
 and so costs no capability. **`Open…` and `Save` have that button, in the header;
@@ -202,9 +207,23 @@ and so costs no capability. **`Open…` and `Save` have that button, in the head
 `Save` has neither a button nor a rival for `⌘S`, and **`Save a Copy…` is the menu's
 alone and now its only accelerator-less item**, its header button withdrawn on the argument
 that the other two act on the document being edited where the export writes a
-derived artifact. `core:default` already carries
+derived artifact. **`Files` and `Lines` have theirs in the footer**, the bar's two
+drawn marks. `core:default` already carries
 `core:event:allow-listen`, so neither those events nor the `rendered` signal
 below needs an entry either.
+
+**Six ids, and the enumeration is the load-bearing half.** `on_menu_event` filters
+on `open`, `save`, `save-as`, `export`, `view-files` and `view-lines` by name
+before it emits, so an item whose id is missing from that list builds, draws with
+its accelerator, and does nothing at all. **The two view items are plain
+`MenuItem`s and carry no checkmark**: the state one would place is the page's —
+`app/dist/index.html` holds both settings and Rust reads neither — and a
+`CheckMenuItem` would be a second copy of a page-held boolean across the IPC
+boundary. The bar's two marks stay the only things in the window that wear either
+state. **`Files` stays enabled with no document open** and the page declines it,
+on `Save`'s precedent: the refusal happens where the state is, and disabling it
+here would put a menu write on the status path, which runs on every compile and
+every watch event, to grey an item whose press already does nothing.
 
 `app/src/main.rs:open_document` **titles the window twice, and both are
 needed**: once from the path the user picked before the compile, so the window
@@ -729,7 +748,7 @@ its signature and its `async`.
 
 The limit that accepts: `listen` completes over IPC, so a document landing
 between the startup take and the listener's registration would sit in the slot
-until the next signal. `app/dist/index.html` registers its five `listen` calls
+until the next signal. `app/dist/index.html` registers its eight `listen` calls
 before it calls `refresh()` and `takePendingOpen()`, which makes that window
 practically unreachable, and the cost if it is reached is a document that opens
 late rather than one that opens wrong.

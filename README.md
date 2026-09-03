@@ -66,8 +66,8 @@ system is set to, and clicking gives you the other one. It remembers your choice
 next time you open the app, and it changes only the app's own chrome — the page stays
 the white it will print as. Until you press it the window follows your system, so a
 machine that switches at sunset takes the window with it; pressing it once settles
-that, and there is no way back short of clearing the app's own settings. Drag the divider to give either side more room. **The `Lines` mark in the bar numbers
-the pane and marks the line your cursor is on**, so an error that names a line names
+that, and there is no way back short of clearing the app's own settings. Drag the divider to give either side more room. **The `Lines` mark in the bar, or `⌘L`,
+numbers the pane and marks the line your cursor is on**, so an error that names a line names
 somewhere you can see.
 
 **Save the file in another program and the page redraws too** — with one exception. The
@@ -138,8 +138,8 @@ the images under the project's root, folders and all, with the file that compile
 because that is the file the next compile will refuse on. Hover a markdown row and a
 `main` button appears: click it and that file becomes the one that compiles, and the app
 remembers your choice the next time you open that folder. It remembers it in its own
-Application Support folder and writes nothing into yours. The `Files` mark in the bar
-folds the list away and brings it back.
+Application Support folder and writes nothing into yours. The `Files` mark in the bar, or
+`⌘B`, folds the list away and brings it back.
 
 **The `+` beside `Files` makes a new one.** Type the path you want it at, relative to
 the project — `sections/discussion.md` — and the app creates it empty and lists it. It
