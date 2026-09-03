@@ -5,7 +5,7 @@ note: >
   A macOS desktop app that shows the PDF while you write: a Tauri window wraps
   the same core crate, watches the document and its images, and re-renders.
 status: accepted
-last_updated: 2026-08-30
+last_updated: 2026-09-03
 
 phases:
   - name: "Phase 1 — the window, and one compile on screen"
@@ -106,6 +106,11 @@ phases:
   - name: "Phase 20 — the two defaults the page never named"
     reviewed: 2026-08-30
     shipped: 2026-08-30
+    cut: null
+    by: null
+  - name: "Phase 21 — the two views take chords"
+    reviewed: 2026-09-03
+    shipped: null
     cut: null
     by: null
 
@@ -5370,6 +5375,248 @@ rule about either, and the engine supplying its own answer to both.
 
   **Commit plan.** One push, two commits: the drag's cancelled default with its clause and
   its mutation; then the ring, and the rules both halves move.
+
+
+### Phase 21 — the two views take chords
+
+*Produces no observable, and here is the argument.* Nothing in this phase reaches the
+pipeline: the same markdown compiles to the same bytes, and no gate below opens a PDF. It
+adds no capability either — both toggles ship, and both are one click away in the bar. What
+it adds is reaching them **without leaving the keyboard**, in an app whose whole use is a
+hand on the keys, and a place in the window where their existence is written down. **The
+observable is produced continuously while typing, and both toggles move the pane it is drawn
+in** — which is the opposite of what the first draft of this paragraph said, and the
+correction strengthens it. `#text` is `flex: 0 0 40%` and the divider is the only thing that
+writes its basis, so neither toggle takes a pixel from the text. `#preview` is `flex: 1` in
+`main`'s row and `#pages` is `flex: 1` inside it, so folding the panel or hiding the gutter
+hands that width to **the pane the page is rasterised in**, where the `ResizeObserver` over
+`#pages` re-derives the fit and redraws it. Neither width is a literal this phase may
+quote: the panel is content-sized under a 40% cap, so its width is a property of the
+project's longest name, and the gutter's is 31.45px at two digits. **That figure is the
+working tree's and not `HEAD`'s**, and the phase says so rather than citing a comment a reader
+would not find: an unrelated edit trims `#lines`' left inset from 12px to 8px and writes the
+paragraph recording it, which is where 31.45 comes from — at `HEAD` the same reading is 35.45.
+Gate clause 7 names that edit, and nothing else here depends on it. A toggle reachable only by leaving the keyboard is a small tax on the one
+posture this window is used in. That is a modest argument and it is stated as one: this
+phase is convenience, and it is not dressed as more.
+
+Appended 2026-09-03, per §6.1. **Step 0 says decision, on three counts** — which chords,
+where they live, and what a menu item that names a *view* rather than a document action may
+know about the view's state. Step 2 then puts it here, because `mpdf-003` owns the menu
+(Phases 1, 3 and 17), the gutter (Phase 8) and the bar the two marks sit in (Phase 15).
+
+**Asked for at the window**: *"I want to add keybindings for the show files and show lines
+buttons."*
+
+- **Scope:** **`app/src/main.rs`** — two id constants, two `MenuItemBuilder`s, a `View`
+  submenu, and two names added to `on_menu_event`'s filter; **`app/dist/index.html`** — two
+  `listen` registrations, and the gutter's state made page-held so a menu event can reach
+  it; **`app/harness/checks.mjs`** — one clause; **`app/harness/serve.mjs`** — one mutation;
+  **`README.md`** — two sentences.
+
+  **And two comments this phase makes false, rewritten in the same pass**, which is Phase
+  16's house rule: `app/src/main.rs:menu`'s doc comment says `⌘O`, `⌘S` and `⇧⌘S` are *"the
+  three accelerators the app has"*, and `app/harness/checks.mjs`'s header says `--falsify`
+  *"runs all twelve"*. Both sit in files this phase edits.
+
+  **`⌘B` for `Files`, `⌘L` for `Lines`, and the cost of the first is recorded rather than
+  hidden.** `⌘B` is the sidebar in VS Code, Zed and Cursor, and the panel it folds here is a
+  sidebar; `⌘L` is unbound in this window and names the mark it works. **In markdown editors
+  — Obsidian, Typora, iA Writer — `⌘B` is bold**, and that is the reading this spends.
+  Nothing collides today and the collision is not hypothetical-in-principle: this pane is a
+  plain `textarea` with no formatting command of any kind, and by `CLAUDE.md`'s own division
+  what the dialect accepts is a spec next door, not a chord in this window. So what is spent
+  is the chord a *future* bold would want, knowingly. **The named alternative is `⌥⌘F` and
+  `⌥⌘L`**, which collide with nothing and which neither hand already knows; it is what a
+  later phase moves to if a formatting command ever arrives, and moving one says so, by
+  Phase 17's rule.
+
+  **The chord and the menu item arrive together, and neither is the other's decoration.**
+  Phase 17 declined `⌥⌘S` for `Save a Copy…` on the argument that *"an accelerator nobody
+  guesses is not better than the menu item it duplicates"*. Read forwards it is the same
+  argument: a chord bound only in the page is one nothing in the window says exists, and
+  `⌘B` is guessable exactly because the reader has met it elsewhere. The item is where it is
+  written down; the chord is what makes it worth writing.
+
+  **So the page keeps no `keydown` of its own for either**, and the two it has stay what they
+  are: the global `Escape` that closes the figure surface, and `#new-name`'s own `Escape` that
+  shuts the field — neither cancelling the key, the first calling no `preventDefault` by an
+  argument written beside it. A
+  menu accelerator on macOS is consumed before the web view sees the key, which is what a
+  chord over a focused `textarea` needs and what a page handler would have to reproduce.
+
+  **The item asks and does not act**, which is `OPEN`'s rule and the reason every one of the
+  four existing ids emits rather than doing the work: the menu item and the button in the
+  bar run one code path and not two.
+
+  **Plain `MenuItem`s and no checkmark, and that is the third decision.** A `CheckMenuItem`
+  would have to be *placed*, and the state it would place is the page's: `folded` is a
+  variable in `app/dist/index.html`, and Phase 15 argued it belongs there because a fold
+  decides nothing but its own drawing. Rust does not know either setting and has no reason
+  to learn one. **A checkmark would be a second copy of a page-held boolean across the IPC
+  boundary**, which is the exact shape `app/harness/checks.mjs` withdrew `views-one-way`
+  for — a copy that cannot disagree cannot exist, and one that can is a defect waiting. So
+  two items that toggle, labelled with the same two words the marks are named by, and the
+  bar stays the only thing in the window that says which state either view is in.
+
+  **`View` sits between `Edit` and `Window`**, which is where macOS puts it.
+
+  **The gutter's state becomes a page-held boolean, and that is what the menu needs.**
+  Today `lineControls`' handler reads `aria-pressed` off *the control that was pressed* —
+  correct while a press is the only way in, and unanswerable from an event that has no
+  control. So `shown` beside `folded`, and `showLines()` beside `showFold()`, writing the
+  state onto every control in `lineControls` and onto `#lines.hidden`, **and then calling
+  `relines()` and `markLine()` — the two statements the live handler ends with, which the
+  writer must not drop.** Both are load-bearing, and the accurate claim is that nothing
+  asserts them today rather than that nothing could — clause 3 below now does. Hiding the
+  gutter early-returns out of `relines` at its own `if (lines.hidden) return`, so it is
+  `markLine` alone that clears the caret band off `text.style.backgroundImage`, and without it
+  the band stays painted until the next keystroke moves it; showing the gutter needs `relines`
+  to build the rows at all, the `ResizeObserver`'s `settle()` being 200 ms away. So the writer
+  is all four statements, and the button's handler and the menu's listener both flip the
+  boolean and call it. **This is the
+  fold's arrangement, arrived at a second time by the same road**: that list-walking shape
+  was kept after the header gave its copies up, and the reason it was kept is the reason it
+  is now wanted.
+
+  **`Files` stays enabled with no document open, and the page declines it.** `offerFold`
+  hides the *button* because with nothing open there is no panel. **Rust could disable the
+  item**, and the phase says so rather than resting on a "Rust cannot know" that is untrue:
+  what decides the panel's presence is `state.state === 'empty'`, which is `preview.rs`'s own
+  state and not the fold. It is declined anyway. **`Save` is the precedent** — always in the
+  menu, and the refusal happens where the state is — and the alternative would put a menu
+  write on the status path, which runs on every compile and every watch event, to grey an item
+  whose press already does nothing. So the listener asks the panel the question the button's
+  presence answers: `files.hidden`, nothing to fold, return.
+
+  **`Lines` needs no such guard and the phase says so** rather than leaving the asymmetry to
+  be read as an oversight. Its button is never hidden — the gutter over an empty disabled
+  pane is a state the bar already offers — so the chord in the empty state does exactly what
+  the button does there today, which is `relines`' own early return.
+
+  **Deliberately not in this phase.** No chord for the fit control, which is a `select` and
+  not a toggle. No `View` item for the appearance button — that is OQ-13's question and this
+  phase does not touch it. No checkmarks, no `Show`/`Hide` labels that would need the same
+  state a checkmark would. No change to what either toggle does once it is reached.
+
+- **Exit gate:**
+
+  1. `bun app/typecheck.mjs` exits 0.
+  2. `cargo build -p letur` compiles the menu, and `cargo test --workspace` is run and
+     expected **unchanged**. **No test is added over `main.rs:menu` and the phase says
+     why**: nothing in this repository tests that function today, an item's label and
+     accelerator are declarations rather than behaviour, and the one thing that can break —
+     the event reaching the page — is clause 3's and clause 5's.
+  3. `bun app/harness/checks.mjs` and `--webkit` each print **sixteen clauses, sixteen
+     passed** — one added: *each view's menu event works the pane its button works, and the
+     page is listening for both.* **The two ids are `view-files` and `view-lines`**, spelled
+     here because the emit, the `listen` and the `fire` all land in this phase and nothing
+     outside it constrains the pair. **It is clause 15 and the uncaught-error clause becomes
+     16**, by that file's own rule that the error clause stays last because it accumulates
+     across the others. `OWNS` gains one entry at 15; no existing value moves.
+
+     **It asserts the registration and not only the effect**, through
+     `window.__harness.listening()`, which the stub has offered since Phase 12 and which no
+     clause has used: a page that wired the two events to the wrong names would fail the
+     effect and give no reading of why. Then, with a document open, each event is fired and
+     the pane it names is read on both sides of it — `#files.collapsed` for one,
+     `#lines.hidden` for the other — together with the mark in the bar, which must follow.
+     **Both halves matter and the second is the one this phase can break**: the boolean
+     replacing the `aria-pressed` read is exactly the change that could leave the pane
+     moving while the mark stays where it was.
+
+     **The mark is read as its ARIA attribute and not as its ink**, and the difference is a
+     falsify failure rather than a taste: `marks-unlit` drops the `[aria-expanded='true']` and
+     `[aria-pressed='true']` selectors from the mark rule, so a clause reading
+     `getComputedStyle(...).color` would fail under that mutation as well as clause 10 and
+     report NOT ISOLATED. `aria-expanded` and `aria-pressed` are the branch that works, and
+     clause 10 keeps the ink.
+
+     **And the writer's last two statements are read too**, which is what keeps the paragraph
+     above from resting on "no rig can see it". **`view-lines` is fired twice and read on both
+     sides of each**, and the count is spelled because "the two fires" above would be one
+     short: after the show, `#lines.children.length` equals `text.value.split('\n').length`;
+     after the **hide**, `text.style.backgroundImage` is `''` — which is false immediately
+     after the show, when the band is painted, so a clause that read it there would fail on
+     correct code. Both are properties rather than metric literals, so
+     the suite's own rule takes them, and neither costs `views-deaf` its isolation — no
+     mutation touches `relines` or `markLine`.
+
+     **And the decline is asserted, because it is the one place the chord and the button
+     differ.** `__harness.reset()` and a `rendered` fire put the page in the empty state;
+     firing `view-files` there must leave `#files` hidden and raise nothing. A clause that
+     only ever drove an open page would pass on a page that folded a panel that is not
+     there.
+  4. `bun app/harness/checks.mjs --falsify` reports **thirteen mutations, each isolating the
+     clause it owns**, in both engines. The one added is **`views-deaf`**, dropping the two
+     `listen` registrations and nothing else — the whole of the defect this clause exists to
+     catch, and reachable by no other clause, the events being fired nowhere else.
+  5. **The chord itself is a person's reading, and both rigs are named as unable to take
+     it** rather than left to be assumed. The harness drives the page with no Tauri and no
+     menu at all; the driver speaks `execute/sync`, `execute/async` and `window/rect` and
+     has no Actions API, and a native accelerator is not a web-view key event in any case.
+     So, at the window, with the caret mid-document: `⌘B` folds the panel and brings it
+     back, `⌘L` shows the gutter and hides it, **both marks in the bar follow every press**,
+     and **neither chord puts a character in the pane** — which is the one way a menu
+     accelerator can be got wrong and the reason the caret is placed in the text first.
+     Then with no document open: `⌘B` does nothing at all, `⌘L` still works its own toggle,
+     and both items are drawn under `View` with their chords beside them.
+  6. `bun app/driver/drive.mjs` and `--falsify` pass, **unchanged** — its clause 4 presses
+     the two marks by script, which this phase leaves exactly where it found them.
+  7. `git status` clean after a full run of clauses 1–4 and 6. **One unrelated edit is
+     already in the tree, and in this phase's own busiest file** — `app/dist/index.html`,
+     where `#lines`' `padding: 12px 8px 12px 12px` becomes `12px 8px` under a paragraph
+     arguing which half of that pair is free. Nothing in this phase causes it, it is code only
+     by §6.1 step 0, and **it must be committed or reverted before this clause can mean
+     anything**: it sits in the file this phase's listeners, its clause and its human reading
+     all exercise, so a stray CSS change would otherwise ride into the commit plan's second
+     commit unnoticed. Phase 20 met this and spent the same sentence on it.
+
+- **Close-out:** **No earlier phase takes a dated note.** Phase 15's shape is *"one setting,
+  two controls, one writer"* — the header still carried its copies then — and the
+  one-control-each formulation arrived with Phase 16 and lives in `rules/desktop-panes.md`.
+  **Both stand**, and they are the reason the items carry no checkmark: the bar's marks remain
+  the only things that *wear* either state, and the writer is still one. Phase 17's account of
+  what an accelerator is for is extended rather than corrected.
+
+  **`rules/desktop.md`** — *"the window and its menu"* in `covers:`, and the body's account
+  of the three accelerators that became two plus a chordless `Save a Copy…`. It gains a
+  fifth submenu — fourth if the app menu is not counted, and `main.rs:menu` builds four
+  today — and two more ids, of which the ids are the load-bearing half: `on_menu_event`'s
+  filter is an enumeration, and a rule that lists four where the code emits six is the kind
+  of drift this file exists to prevent.
+
+  **`rules/desktop-panes.md`** — the fold and the gutter both gain a second way in, and
+  `covers:`' *"the one control each of its settings has"* becomes false as written: there is
+  still one control, and now also a menu item that carries no state. The body's `foldControls`
+  / `lineControls` paragraph gains `shown` and `showLines`.
+
+  **And four in-place count edits, named the way Phase 20 named its own** rather than left for
+  the linter to find: *"the fifteen clauses it asserts as properties and the twelve broken
+  pages that falsify them"* appears in `covers:` and again in the body, two words in each.
+  `fifteen → sixteen`, `twelve → thirteen`; the body's third `twelve` is `Status`'s fields and
+  is not this. **All four are same-length or shorter substitutions**, so they cost no lines and
+  the cap arithmetic below is unaffected by them.
+
+  **Both files are within a few lines of their caps** — `desktop-panes.md` at 734 of 740 and
+  `desktop.md` at 692 of 695, as `spec-lint` counts them — so this close-out **raises the
+  caps or trims**, and does not quietly exceed them. It is named here because Phase 20 had
+  to do the same arithmetic and found it late.
+
+  **`rules/INDEX.md` is regenerated, not hand-edited** — it carries `covers:` verbatim, so
+  `spec-lint --write-index` runs in the same pass.
+
+  **`README.md`** — two sentences name the marks and neither names a chord: *"The `Lines`
+  mark in the bar numbers the pane…"* and *"The `Files` mark in the bar folds the list away
+  and brings it back."* Each gains its chord, in the shape the file already uses for `⌘S`
+  and `⇧⌘S` — the mark **or** the chord, not a table of shortcuts this README does not have.
+
+  **No `CLAUDE.md` change**: the id prefix, the observable and the engine's boundary are all
+  untouched.
+
+  **Commit plan.** One push, three commits: the menu, its two ids and the emit; the page's
+  two listeners with the gutter's state made page-held, its clause and its mutation; then
+  the rules and the README.
 
 <!--
 The review record is a sibling file, not a section: it lives at

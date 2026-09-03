@@ -2,6 +2,88 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 24 — Phase 21 only — 2026-09-03 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. Round 23's blocker resolved, and one non-blocking finding folded in after the
+verdict.
+
+**The reviewer's own round-23 sentence was the one corrected.** It called `#pages` the sole
+positive grow factor in `main`; `main`'s in-flow row is `#files`, `#lines`, `#text`,
+`#divider` and `#preview`, and it is **`#preview`** that is `flex: 1` there, with `#pages`
+`flex: 1` inside its column. `#mirror` and `#viewer` are out of flow. The mechanism is
+unaffected — the width still reaches the pane the page is rasterised in, and the
+`ResizeObserver` over `#pages` still sees every change either toggle causes — and the
+paragraph now names both elements rather than one.
+
+**The two gate readings added this round were verified reachable, and one of them was
+mis-counted.** `#lines.children.length` against `text.value.split('\n').length` holds because
+`relines` early-returns *before* writing `linedText`, so the cache cannot skip the first
+rebuild; `text.style.backgroundImage === ''` holds because `markLine`'s guard is the only
+writer of that property. But the band reading needs a `view-lines` fire that **hides**, and
+the clause as written fired each event once — `''` is false immediately after a show, so an
+implementer following it literally would have failed on correct code. The clause now spells
+**two `view-lines` fires, read on both sides of each**. Neither reading costs `views-deaf`
+its isolation: no mutation touches `relines` or `markLine`.
+
+### Round 23 — Phase 21 only — 2026-09-03 — the same reviewer, resumed — **NOT READY**
+
+Round 22's blocker resolved. **The new blocker was in the tree rather than in the phase**: an
+unrelated working-tree edit — `#lines`' `padding: 12px 8px 12px 12px` → `12px 8px`, argued
+and measured separately and code-only by §6.1 step 0 — sat in `app/dist/index.html`, which is
+this phase's own busiest file, and the phase's only quoted pixel figure was sourced to a
+comment that edit introduces. So gate clause 7's *"`git status` clean"* could not read as
+written, and 31.45px could not be found at `HEAD`. Both fixed in Phase 20's own form: clause
+7 names the edit, its exact before and after, and that it must be committed or reverted
+before the clause means anything; the observable paragraph states that 31.45 is the working
+tree's reading and 35.45 is `HEAD`'s. **The edit landed in its own commit the same day**, on
+the argument the phase makes for it — the record is kept here because the sentence in clause
+7 describes the state the phase was reviewed against, and a spec is allowed to drift.
+
+The non-blocking finding was that *"neither rig can see them go"* claimed impossibility where
+the truth was "nothing asserts them today". Accepted with the gate the reviewer offered
+rather than only the softer wording.
+
+### Round 22 — Phase 21 only — 2026-09-03 — a fresh reviewer with repo access — **NOT READY**
+
+**Round 0** (asked once for this episode): *does this phase produce the observable, and if not
+is that argued?* It produces none — the same markdown compiles to the same bytes — and the
+phase argues it explicitly and modestly: both toggles already ship and are one click away, so
+what is added is reaching them without leaving the keyboard and a place in the window where
+they are written down. The argument was **wrong in its first draft and the correction
+strengthened it**, which is finding 2 below.
+
+**The blocker was a refactor specified exhaustively enough to lose two statements.** The phase
+makes the gutter's state a page-held boolean so a menu event can reach it, and defined the new
+writer as "the state onto every control and onto `#lines.hidden`" — dropping the `relines()`
+and `markLine()` the live handler ends with, on the button path as well as the menu's. Both
+are load-bearing in opposite directions: hiding early-returns out of `relines`, so `markLine`
+alone clears the caret band off `text.style.backgroundImage`; showing needs `relines` to build
+the rows at all, `settle()` being 200 ms away. **Neither rig would have caught it** — clause 15
+as specified read `#lines.hidden` and the bar mark, and `drive.mjs` clause 4 reads ink and
+size. The writer is now all four statements.
+
+**Eight non-blocking findings, all accepted, three of them the author's own errors of fact.**
+The observable argument had the fold's pixels going to the text: `#text` is `flex: 0 0 40%`
+with the divider its only basis writer, so they go to the preview pane instead — and the
+figure `190` was quoted from nothing. The close-out quoted Phase 15 for a sentence Phase 16
+wrote. "The one `keydown` the page has" is two. The rest: four in-place count edits in
+`rules/desktop-panes.md` the close-out had not named (`fifteen → sixteen`, `twelve →
+thirteen`, at lines 49, 50, 745, 746, with 713's `twelve` excluded as `Status`'s fields); two
+comments the phase makes false and must rewrite in the same pass (`main.rs:menu`'s "the three
+accelerators the app has", `checks.mjs`'s "runs all twelve"); the mark must be read as
+`aria-expanded`/`aria-pressed` and not as ink, an ink reading failing under `marks-unlit` and
+reporting NOT ISOLATED; only one of the two event ids was written down; and the reason given
+for leaving `Files` enabled with no document open rested on a "Rust cannot know" that is
+untrue — Rust holds `state.state === 'empty'`, and the decline stands on the `Save` precedent
+and on not putting a menu write on the status path.
+
+**Numbers re-derived and confirmed by both sides**: 15 `ok()` clauses and 12 `MUTATIONS`
+today, going to 16 and 13; `OWNS` has 12 entries with 14 the highest, so the new clause is 15,
+the uncaught-error clause becomes 16 and no existing value moves; `rules/desktop.md` 692/695
+and `rules/desktop-panes.md` 734/740 body lines; `main.rs:menu` builds four submenus, so
+`View` is the fifth; `stub.mjs`'s `fire` dispatches any name and `listening()` is used by no
+clause; `drive.mjs` speaks no Actions API, so neither rig can take a native accelerator.
+
 ### Round 21 — Phase 20 only — 2026-08-30 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking. Round 20's blocker resolved, and three non-blocking findings folded in after
