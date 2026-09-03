@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all twelve. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all thirteen. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -68,7 +68,8 @@ const OWNS = {
   'figure-unnamed': 11,
   'save-as-mislabelled': 12,
   'receipt-sticks': 13,
-  'divider-selects': 14
+  'divider-selects': 14,
+  'views-deaf': 15
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -1082,6 +1083,153 @@ const dividerLeavesThePaneAlone = async (browser, url) => {
   return errors
 }
 
+/* 15. **Each view's menu event works the pane its button works, and the page is
+       listening for both.** `mpdf-003` Phase 21 gave the two toggles a `View`
+       submenu and an accelerator each; the item emits and the page decides,
+       which is `OPEN`'s rule and the reason there is anything here to drive.
+
+       **It asserts the registration and not only the effect**, through
+       `window.__harness.listening()` — offered by the stub since Phase 12 and
+       used by no clause until this one. `fire` dispatches any name and is
+       silent for one nothing registered, so a page that wired the two events to
+       the wrong names would fail every reading below and give no account of why.
+
+       **The marks are read as their ARIA attributes and never as their ink**,
+       and the difference is a falsify failure rather than a taste: `marks-unlit`
+       drops the `[aria-expanded='true']` and `[aria-pressed='true']` selectors,
+       so a `getComputedStyle(...).color` reading here would fail under that
+       mutation as well as clause 10 and report NOT ISOLATED. `aria-expanded`
+       and `aria-pressed` are the branch that works; clause 10 keeps the ink.
+
+       **And the writer's last two statements are read too.** The gutter's state
+       moved off the pressed control and into the page so a menu event could
+       reach it, and that refactor is exactly what could leave `relines()` and
+       `markLine()` behind. So `view-lines` is fired **twice**, read on both
+       sides of each: after the show the gutter holds one row per line, and
+       after the **hide** the band is gone. The count is spelled because one
+       fire would not do — `backgroundImage` is not `''` immediately after a
+       show, when the band is painted, so a clause reading it there would fail
+       on correct code. Both are properties, not metric literals, and neither
+       costs `views-deaf` its isolation: no mutation touches either function.
+
+       **The decline is asserted, because it is the one place the chord and the
+       button differ.** With nothing open there is no panel, so `offerFold`
+       hides the button and the still-enabled item's event must be declined by
+       the page. A clause that only ever drove an open page would pass on a page
+       that folded a panel that is not there. */
+const viewsTakeTheirMenuEvents = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  const heard = await page.evaluate(() => window.__harness.listening())
+
+  const read = () =>
+    page.evaluate(() => {
+      const text = /** @type {HTMLTextAreaElement} */ (document.getElementById('text'))
+      return {
+        filesMark: document.getElementById('views-files').getAttribute('aria-expanded'),
+        linesMark: document.getElementById('views-lines').getAttribute('aria-pressed'),
+        folded: document.getElementById('files').classList.contains('collapsed'),
+        absent: document.getElementById('files').hidden,
+        gutter: !document.getElementById('lines').hidden,
+        rows: document.getElementById('lines').children.length,
+        wanted: text.value.split('\n').length,
+        band: text.style.backgroundImage
+      }
+    })
+
+  const fire = async (name) => {
+    await page.evaluate((n) => window.__harness.fire(n), name)
+    await settle(page)
+    return read()
+  }
+
+  /* One fire for the fold, read on both sides, and two for the gutter. */
+  const openFold = [await read()]
+  openFold.push(await fire('view-files'))
+
+  const gutter = [await read()]
+  gutter.push(await fire('view-lines'))
+  gutter.push(await fire('view-lines'))
+
+  /* The empty state, and the decline. `reset()` does not redraw on its own —
+     `open()`'s caller fires `rendered` too — and it is that pass through
+     `report` and `parts` which hides the panel and withdraws the button. */
+  await page.evaluate(() => {
+    window.__harness.reset()
+    window.__harness.fire('rendered')
+  })
+  await settle(page)
+  const empty = [await read()]
+  empty.push(await fire('view-files'))
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const listening = heard.includes('view-files') && heard.includes('view-lines')
+
+  /* The panel moved and the mark followed it. `Files` is expanded-when-open, so
+     the mark is compared against the box it works rather than against a
+     literal. */
+  const [wasFolded, nowFolded] = openFold
+  const foldMoved = wasFolded.folded !== nowFolded.folded
+  const foldMarked = openFold.every((r) => r.filesMark === String(!r.folded))
+
+  /* The gutter moved, its mark followed, and the two statements the writer ends
+     with ran: the rows exist after the show, the band is gone after the hide. */
+  const [wasShown, afterShow, afterHide] = gutter
+  const linesMoved = !wasShown.gutter && afterShow.gutter && !afterHide.gutter
+  const linesMarked = gutter.every((r) => r.linesMark === String(r.gutter))
+  const relined = afterShow.rows === afterShow.wanted && afterShow.wanted > 1
+  const unbanded = afterHide.band === ''
+
+  /* Nothing to fold, and nothing folded: the panel stays away and the page left
+     the mark and the class exactly where they were. */
+  const [wasEmpty, stillEmpty] = empty
+  const declined =
+    wasEmpty.absent &&
+    stillEmpty.absent &&
+    stillEmpty.filesMark === wasEmpty.filesMark &&
+    stillEmpty.folded === wasEmpty.folded
+
+  note(`the page is listening for: ${heard.join(', ')}`)
+  note(
+    `view-files: the panel ${wasFolded.folded ? 'folded' : 'open'} → ${nowFolded.folded ? 'folded' : 'open'}, ` +
+      `the mark ${wasFolded.filesMark} → ${nowFolded.filesMark}`
+  )
+  note(
+    `view-lines: the gutter ${gutter.map((r) => r.gutter).join(' → ')}, ` +
+      `the mark ${gutter.map((r) => r.linesMark).join(' → ')}, ` +
+      `${afterShow.rows} rows for ${afterShow.wanted} lines, the band ${JSON.stringify(afterHide.band)} after the hide`
+  )
+  note(
+    `with nothing open: #files hidden ${wasEmpty.absent} → ${stillEmpty.absent}, ` +
+      `the mark ${wasEmpty.filesMark} → ${stillEmpty.filesMark}`
+  )
+
+  ok(
+    15,
+    "each view's menu event works the pane its button works, and the page is listening for both",
+    listening && foldMoved && foldMarked && linesMoved && linesMarked && relined && unbanded && declined,
+    [
+      listening ? null : `the page registered [${heard.join(', ')}] and neither view event is among them`,
+      foldMoved ? null : 'view-files left the panel where it was',
+      foldMarked ? null : `the Files mark disagreed with the panel: ${JSON.stringify(openFold)}`,
+      linesMoved ? null : `view-lines did not show the gutter and hide it again: ${gutter.map((r) => r.gutter).join(' → ')}`,
+      linesMarked ? null : `the Lines mark disagreed with the gutter: ${JSON.stringify(gutter)}`,
+      relined ? null : `the show left ${afterShow.rows} rows for ${afterShow.wanted} lines — relines() did not run`,
+      unbanded ? null : `the hide left the band at ${JSON.stringify(afterHide.band)} — markLine() did not run`,
+      declined
+        ? null
+        : `with nothing open the event was taken: #files hidden ${wasEmpty.absent} → ${stillEmpty.absent}, ` +
+          `mark ${wasEmpty.filesMark} → ${stillEmpty.filesMark}, collapsed ${wasEmpty.folded} → ${stillEmpty.folded}`
+    ]
+      .filter(Boolean)
+      .join('; ') ||
+      'both events registered and taken, each mark following its pane, and the one with nothing open declined'
+  )
+  return errors
+}
+
 /* ----------------------------------------------------------------- the run */
 
 const run = async ({ engine, headed, rev, doc, mutate }) => {
@@ -1117,7 +1265,8 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       cellNamesTheFigure,
       theSaveMarkSaysWhatItDoes,
       theSaveSaysWhatItDidAndThenStops,
-      dividerLeavesThePaneAlone
+      dividerLeavesThePaneAlone,
+      viewsTakeTheirMenuEvents
     ]) {
       gather(await check(browser, held.url))
     }
@@ -1132,7 +1281,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    15,
+    16,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +

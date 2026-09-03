@@ -328,6 +328,22 @@ const MUTATIONS = {
     const statement = '        down.preventDefault()\n'
     if (page.split(statement).length !== 2) die('the mutation divider-selects found no single cancelled default')
     return page.replace(statement, '')
+  },
+
+  /* The page hears neither menu event. **The two registrations and nothing
+     else**: `toggleFold` and `toggleLines` stay, so both buttons in the bar work
+     exactly as they did and clause 10 still passes against this page — which is
+     what makes this reach the clause that drives the events and no other.
+
+     The comment above the pair stays, for `divider-selects`' reason: a mutation
+     that took prose out with the code would be falsifying the page's
+     documentation rather than its behaviour. */
+  'views-deaf': (page) => {
+    const block =
+      "      listen('view-files', toggleFold)\n" +
+      "      listen('view-lines', toggleLines)\n"
+    if (page.split(block).length !== 2) die('the mutation views-deaf found no single pair of view listens')
+    return page.replace(block, '')
   }
 }
 

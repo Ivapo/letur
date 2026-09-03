@@ -2226,12 +2226,33 @@
         for (const control of foldControls) control.hidden = !can
       }
 
-      for (const control of foldControls) {
-        control.addEventListener('click', () => {
-          folded = !folded
-          showFold()
-        })
+      /*
+        Fold the panel, or bring it back. **A function rather than the press's
+        own body**, because since `mpdf-003` Phase 21 there are two ways in and
+        `OPEN`'s rule is that they are one code path: the bar's control below,
+        and the `View` menu's `Files` item at `⌘B`.
+
+        **The decline is here and not in Rust.** `offerFold` hides the *button*
+        with no document open, because then there is no panel to fold; the menu
+        item stays enabled. Rust could have disabled it — what decides the
+        panel's presence is `state.state === 'empty'`, which is `preview.rs`'s
+        own state — and does not, on `Save`'s precedent: the refusal happens
+        where the state is, and the alternative would put a menu write on the
+        status path, which runs on every compile and every watch event, to grey
+        an item whose press already does nothing. So the question the button's
+        presence answers is asked here instead.
+
+        It costs the button nothing: `files.hidden` is true exactly when
+        `offerFold` has hidden the control, so on that path this returns before
+        anything could have clicked it.
+      */
+      function toggleFold() {
+        if (files.hidden) return
+        folded = !folded
+        showFold()
       }
+
+      for (const control of foldControls) control.addEventListener('click', toggleFold)
 
       /*
         The panel's own gesture: name a file and the project gains it.
@@ -4107,10 +4128,28 @@
       */
       const lines = document.getElementById('lines')
       const mirror = document.getElementById('mirror')
-      /* Every control that shows the gutter, on the fold's arrangement: the
-         press is read off the control that was pressed and written to every
-         one. One control since the header gave its copy up. */
+      /* Every control that shows the gutter, on the fold's arrangement:
+         `showLines` is the only writer of the state onto them, and the `click`
+         listener is installed per control rather than against an id. One
+         control since the header gave its copy up.
+
+         **The state moved off the control and into the page**, `mpdf-003`
+         Phase 21. The press used to be read off *the control that was
+         pressed* — correct while a press was the only way in, and unanswerable
+         from a menu event that has no control. This is the fold's arrangement
+         arrived at a second time by the same road: that list-walking shape was
+         kept after the header gave its copies up, and the reason it was kept
+         is the reason it is now wanted. */
       const lineControls = [document.getElementById('views-lines')]
+
+      /* Whether the gutter is drawing, held in the page — `folded` above is the
+         precedent and carries the argument: it decides nothing but its own
+         drawing, and nothing else reads it.
+
+         **`wearAppearance` has a `const shown` of its own**, 2300 lines up and
+         block-scoped to that function, which touches neither this nor the
+         gutter. Said here rather than left for a reader to trip over. */
+      let shown = false
 
       // What the gutter was last built for, so an event that changed neither
       // costs nothing.
@@ -4250,15 +4289,38 @@
       text.addEventListener('keyup', markLine)
       text.addEventListener('click', markLine)
 
-      for (const control of lineControls) {
-        control.addEventListener('click', () => {
-          const on = control.getAttribute('aria-pressed') !== 'true'
-          for (const other of lineControls) other.setAttribute('aria-pressed', String(on))
-          lines.hidden = !on
-          relines()
-          markLine()
-        })
+      /*
+        Show the gutter on every control that carries it, and on the pane — then
+        rebuild the rows, then place the caret's mark. `showFold`'s twin, and the
+        only writer of `shown` onto anything.
+
+        **All four statements, and the last two are load-bearing in opposite
+        directions.** Hiding early-returns out of `relines` at its own
+        `if (lines.hidden) return`, so it is `markLine` alone that clears the
+        caret band off `text.style.backgroundImage` — without it the band stays
+        painted over a gutterless pane until the next keystroke moves it.
+        Showing needs `relines` to build the rows at all: the `ResizeObserver`'s
+        `settle()` is 200 ms away and would not do it either.
+      */
+      function showLines() {
+        for (const control of lineControls) control.setAttribute('aria-pressed', String(shown))
+        lines.hidden = !shown
+        relines()
+        markLine()
       }
+
+      /* The two ways in, one code path: the control below, and the `View` menu's
+         `Lines` item at `⌘L`. **No guard, and the asymmetry with `toggleFold` is
+         deliberate** — this button is never hidden, the gutter over an empty
+         disabled pane being a state the bar already offers, so the chord in the
+         empty state does what the button does there, which is `relines`' own
+         early return. */
+      function toggleLines() {
+        shown = !shown
+        showLines()
+      }
+
+      for (const control of lineControls) control.addEventListener('click', toggleLines)
 
       /*
         The fit changed. **The path is the width rest's, unmodified** — set
@@ -4412,6 +4474,13 @@
       listen('export', exportDocument)
       listen('rendered', refresh)
       listen('opened', takePendingOpen)
+      // **The page keeps no `keydown` of its own for either**, and the two it
+      // has stay what they are — the global `Escape` that closes the figure
+      // surface, and `#new-name`'s own. A menu accelerator on macOS is consumed
+      // before the web view sees the key, which is what a chord over a focused
+      // `textarea` needs and what a page handler would have to reproduce.
+      listen('view-files', toggleFold)
+      listen('view-lines', toggleLines)
 
       /*
         These two run last, and the ordering above them is load-bearing though
