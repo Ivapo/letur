@@ -51,6 +51,28 @@ const SAVE: &str = "save";
 /// second, more obscure chord. `mpdf-003` Phase 17.
 const SAVE_AS: &str = "save-as";
 
+/// The id of the `View` menu's `Files` item, and the event it sends the page.
+///
+/// It follows [`OPEN`] like the rest — the item emits and the page decides — but
+/// it names a *view* rather than an action on the document, and that is what
+/// keeps it a plain `MenuItem` with no checkmark. The fold is a `let` in
+/// `app/dist/index.html` and nothing in Rust reads it; a checked item would be a
+/// second copy of a page-held boolean across the IPC boundary, and a copy that
+/// can disagree is a defect waiting.
+///
+/// **It stays enabled with no document open**, on [`SAVE`]'s precedent: the
+/// refusal happens where the state is. The alternative would put a menu write on
+/// the status path — which runs on every compile and every watch event — to grey
+/// an item whose press already does nothing. `mpdf-003` Phase 21.
+const VIEW_FILES: &str = "view-files";
+
+/// The id of the `View` menu's `Lines` item, and the event it sends the page.
+///
+/// [`VIEW_FILES`]' twin in every respect, and it needs no guard at the other end:
+/// its button in the bar is never hidden, so the gutter over an empty pane is a
+/// state the window already offers. `mpdf-003` Phase 21.
+const VIEW_LINES: &str = "view-lines";
+
 /// The signal the loop sends the page after every compile.
 ///
 /// It carries no payload. The page then invokes [`current_pdf`], because an
@@ -104,7 +126,12 @@ fn main() {
             app.set_menu(menu(app.handle())?)?;
             app.on_menu_event(|app, event| {
                 let id = event.id();
-                if (id == OPEN || id == SAVE || id == SAVE_AS || id == EXPORT)
+                if (id == OPEN
+                    || id == SAVE
+                    || id == SAVE_AS
+                    || id == EXPORT
+                    || id == VIEW_FILES
+                    || id == VIEW_LINES)
                     && let Some(window) = app.get_webview_window(MAIN)
                 {
                     let _ = window.emit(id.as_ref(), ());
@@ -666,12 +693,22 @@ fn export(session: tauri::State<'_, Mutex<Session>>, path: String) -> Result<(),
 /// The window's menu.
 ///
 /// macOS draws no menu of its own, so every item the keyboard needs is named
-/// here — `Cmd-O`, `Cmd-S` and `Shift-Cmd-S`, which are the three accelerators
-/// the app has.
+/// here — `Cmd-O`, `Cmd-S`, `Shift-Cmd-S`, `Cmd-B` and `Cmd-L`, which are the
+/// five accelerators the app has. `Save a Copy…` is the one item with none.
 ///
-/// `Cmd-S` saves the document and `Shift-Cmd-S` writes a copy of the PDF.
-/// Phase 3 gave the export the second of those and reserved the first for the
-/// text pane, so this phase spends the accelerator rather than taking one back.
+/// `Cmd-S` saves the document and `Shift-Cmd-S` saves it wherever the author
+/// points. **Phase 3 gave `Shift-Cmd-S` to the export and Phase 17 took it
+/// back**, on the argument that an accelerator nobody guesses is not better
+/// than the menu item it duplicates — so the export kept the item and gave the
+/// chord up rather than moving to a second, more obscure one.
+///
+/// `Cmd-B` and `Cmd-L` work the two views, and the first is spent knowingly:
+/// it is the sidebar in VS Code, Zed and Cursor and the panel it folds here is
+/// a sidebar, but in Obsidian, Typora and iA Writer it is **bold**. Nothing
+/// collides today — this pane is a plain `textarea` with no formatting command
+/// of any kind — so what is spent is the chord a *future* bold would want. If
+/// one ever arrives the named alternative is `Alt+Cmd+F` and `Alt+Cmd+L`, and
+/// moving to it is a phase that says so. `mpdf-003` Phase 21.
 fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
     let open = MenuItemBuilder::with_id(OPEN, "Open…")
         .accelerator("CmdOrCtrl+O")
@@ -687,6 +724,16 @@ fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
     // knows to look in `File`, and an accelerator nobody guesses is not better
     // than the item it duplicates. `mpdf-003` Phase 17.
     let export = MenuItemBuilder::with_id(EXPORT, "Save a Copy…").build(app)?;
+    // **Plain items and no checkmark**, and the two words are the ones the marks
+    // in the bar are named by. A `CheckMenuItem` would have to be *placed*, and
+    // the state it would place is the page's — see [`VIEW_FILES`]. The bar stays
+    // the only thing in the window that says which state either view is in.
+    let view_files = MenuItemBuilder::with_id(VIEW_FILES, "Files")
+        .accelerator("CmdOrCtrl+B")
+        .build(app)?;
+    let view_lines = MenuItemBuilder::with_id(VIEW_LINES, "Lines")
+        .accelerator("CmdOrCtrl+L")
+        .build(app)?;
 
     MenuBuilder::new(app)
         .items(&[
@@ -717,6 +764,13 @@ fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
                 .copy()
                 .paste()
                 .select_all()
+                .build()?,
+            // Between `Edit` and `Window`, which is where macOS puts it. The
+            // builders have no positional insert, so this slice's order *is* the
+            // placement.
+            &SubmenuBuilder::new(app, "View")
+                .item(&view_files)
+                .item(&view_lines)
                 .build()?,
             &SubmenuBuilder::new(app, "Window")
                 .minimize()
