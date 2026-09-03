@@ -7,7 +7,7 @@ note: >
   file is set as the main the app compiles, and clicking another edits it while
   the main still draws the page.
 status: accepted
-last_updated: 2026-08-28
+last_updated: 2026-09-03
 
 phases:
   - name: "Phase 1 — the project's files, and the main among them"
@@ -33,6 +33,11 @@ phases:
   - name: "Phase 5 — an image row shows the figure"
     reviewed: 2026-08-28
     shipped: 2026-08-28
+    cut: null
+    by: null
+  - name: "Phase 6 — the delete is a drawn mark"
+    reviewed: 2026-09-03
+    shipped: null
     cut: null
     by: null
 
@@ -1501,6 +1506,274 @@ meets most often.*
   close-out set. README: that clicking a figure shows it and the pane keeps its
   file. **`specs/file_panel_spec.md` OQ-1 is already resolved** — this phase
   ships what that resolution names and adds nothing to it.
+
+### Phase 6 — the delete is a drawn mark
+*Produces the observable: **no**, and the argument is a small one stated as one.
+Nothing here reaches the pipeline: the same markdown compiles to the same bytes,
+`trash_file` is untouched, and no gate below opens a PDF. It adds no capability
+either — the gesture shipped in Phase 4 and stays exactly where it is, on the same
+rows, with the same three refusals. What it changes is that **the one destructive
+gesture in this window stops being a word and becomes a mark**, and that the panel
+gets 22px of its width back. The second half is the measurable one and it is the
+weaker: 198.23px → 176.13px on `tests/fixtures/panel` at a 1400px window. **The
+widest row is `loose/orphan.md`**, measured by isolating each row rather than
+reasoned about — its two extra name characters beat `parts/ch1/deep.md`'s extra
+14px of indent by 0.45px, and `deep.md`, which the first draft named, sizes the
+panel to 197.78. Four rows carry both buttons, not one kind. The first half is the
+reason. A word is read; a mark is seen, and this is the button whose press is the
+one thing in the app the author cannot undo from inside it.*
+
+Appended 2026-09-03, per §6.1. **Step 0 says decision, on two counts** — what
+vocabulary a row's controls are drawn in, and what a control that carries no text
+owes a reader. Step 2 then puts it here, because `mpdf-010` Phase 4 shipped this
+button and OQ-5 settled the edge it sits on.
+
+**Asked for at the window**: *"then we should do something about the 'trash' button,
+maybe instead we can use an icon?"* — the panel being content-sized under a 40% cap,
+so every control on the widest row is width the pages do not get.
+
+- **Scope:** **`app/dist/index.html`** — one `<symbol>`, one `<svg><use>` per row,
+  `control()` gaining a parameter, and two CSS edits; **`app/harness/checks.mjs`** —
+  one clause and one count in its header comment; **`app/harness/serve.mjs`** — one
+  mutation; **`README.md`** — one sentence. **No Rust, and no Cargo change**:
+  `trash_file`, `move_to_trash` and `Session::trash` are untouched, and this phase
+  does not go near the three refusals Phase 4 priced.
+
+  **The rule that decides this is imported, not invented.** `rules/desktop-panes.md`
+  carries `mpdf-003` Phase 15's: *a mark a glyph names is a glyph, a mark no glyph
+  names is drawn.* It is why `☾`/`☀` stayed a glyph where `Files` and `Lines` were
+  drawn, and applied here it answers in one step. **No glyph names this gesture.**
+  `🗑` U+1F5D1 is the only one that means it and is emoji-presentation on macOS: it
+  renders in colour and ignores `color`, which breaks the single thing this button
+  must do — wear `--alarm` under the pointer and `--quiet` at rest, which
+  `app/dist/index.html`'s `.trash:hover` rule has done since Phase 4. The `FE0E` text
+  selector is not reliably honoured by Apple's fonts, so the fallback is a colour bin
+  or tofu. `␡`, `⌫` and `⌦` mean *character* deletion. `×` means dismiss, and the
+  command behind this button is `trashItemAtURL`. So: drawn.
+
+  **A lidded basket in three strokes, and no ribs — the second half is the decision.**
+  On the footer marks' own grid, every coordinate on a half pixel so a 1px stroke
+  lands on a pixel rather than across two. The `<symbol>` declares
+  `viewBox="0 0 12 12"` and each row's `<svg>` is `width="12" height="12"`:
+
+  ```
+  lid     M1.5 3.5h9
+  handle  M4.5 3.5v-2h3v2
+  body    M2.5 3.5l1 7h5l1-7
+  ```
+
+  **The ribs are the trap, and this is Phase 15's finding arrived at a second time.**
+  That phase rejected `▥` and `☰` because they *"differ only by their fill at 10px"*.
+  Two 1px ribs inside a 12px basket is the same failure from the other side: rendered
+  at 6× and unsmoothed they merge with the body outline and the basket fills in as a
+  heavier blob, and in the panel at true size the ribbed and unribbed marks are not
+  one glance apart — they are barely two. **Measured before it was written**, on the
+  shipped page with the button swapped in the browser. The ribs cost ink and carry no
+  information at this size.
+
+  **`main` stays a word, and the asymmetry is the point rather than an oversight.**
+  It names a *state* where the basket names an action, and the row that already is
+  main draws `◀ main` as text — an icon for `main` beside a `◀ main` mark would be
+  two vocabularies for one concept. It also gives the basket something to be one
+  glance apart from, which is Phase 15's own criterion. So: a word for the reversible
+  setting, a drawn mark for the one that is not.
+
+  **The accessible name stops being carried by the thing a reader sees, and that is
+  the half this phase can get wrong.** Today `control()` sets
+  `button.textContent = 'trash'`, and that text *is* the button's accessible name.
+  **The name is not actually lost when the text goes** — `title` is accname's
+  last-resort fallback and this button already carries one naming the path — so what
+  this buys is an *explicit* name rather than a rescued one, which is the rule
+  `wearAppearance` wrote for the first mark this window carried and which all four
+  marks already in the window obey: `title` and `aria-label` both.
+
+  **One shape, spelled, because the first draft offered two that are not
+  interchangeable.** `control(kind, label, title, act)` gains a fifth parameter,
+  `mark` — a node or `null`:
+
+  - `mark === null` is today's behaviour exactly: `textContent = label`, no
+    `aria-label`. **`main` passes `null` and is untouched**, which is what keeps
+    *"No change to `main`'s drawing"* true.
+  - `mark` given: the button takes it as its only child, writes no text, and takes
+    **`aria-label = title`** — the string that already names the row's path.
+
+  The draft's alternative — writing `label` to `aria-label` instead of
+  `textContent` — is **rejected and recorded as such**: `label` is `'trash'`, so the
+  name would be the withdrawn word rather than the path, failing this phase's own
+  gate; and it would strip `main`'s text too. **This does not close OQ-6** — nobody on
+  this project has run a screen reader, and that entry stays open exactly as it is.
+
+  **One `<symbol>` in the markup, one `<svg><use>` per row**, and the argument is
+  where the drawing lives rather than what it costs. `app/dist/index.html` holds
+  **four** drawn marks today — `#open` and `#save` in the header, `Files` and `Lines`
+  in the footer — all inline in markup, and a fifth built out of `createElementNS`
+  calls in `panelRows` would be the only one a reader could not find beside the
+  others. The count is the second reason and is smaller than the first draft claimed:
+  a `<use>` cannot exist outside an `<svg>`, so it is **two elements per row against
+  four**, not one against four. It still wins, and `parts` rebuilds the panel whole
+  on **every status** — every compile and every watch event. `currentColor` inherits
+  into the shadow tree, measured in both engines.
+
+  **The `<symbol>` lives in a hidden defs `<svg>` prepended to `<body>`, and clause
+  1 is why the placement is stated rather than left to taste.** That clause asserts
+  `body`'s element order — `main.nextElementSibling === footer`,
+  `footer.nextElementSibling === module`, and `footer` not last — so a defs block
+  dropped between `</footer>` and the module script fails it. Prepended it is
+  harmless and measured so: the order reads `svg, HEADER, MAIN, FOOTER, SCRIPT,
+  CANVAS` and all three of clause 1's readings hold.
+
+  **The paint rule is a third copy, and the first draft's argument for widening one
+  was built on a false premise.** That draft said this window paints drawn marks in
+  one rule and there would now be three marks. Both are wrong: there are two rules
+  already — `#views button svg` and `header button svg` — and they **already
+  diverge**, the header's carrying `stroke-linejoin: round` that the footer's does
+  not. So nothing is widened. `#files li .controls .trash svg` gets its own rule
+  **taking the header's declaration set, `stroke-linejoin` included**, and the reason
+  is the shape rather than tidiness: the basket's body is a trapezoid whose two
+  corners are drawn as joins in a single path, where the footer's marks make their
+  only corners out of a `<rect rx="1.5">` — a rounded rectangle, which `rx` rounds
+  and `stroke-linejoin` never sees. **Consolidating the three is not this phase's
+  job**, and is named here so the next reader knows it was seen and declined rather
+  than missed.
+
+  **The padding edit names `.trash` and not the shared rule**, and the difference is
+  measurable: `#files li .controls button` is what both controls wear, so editing it
+  gives 172.125px and moves `main`, which the paragraph above forbids. So
+  `#files li .controls .trash` alone goes `padding: 0 6px` → `0 4px`, which is where
+  the 176.13px comes from. That is the second of this phase's two CSS edits.
+
+  **The row does not move, and it was measured rather than reasoned about.** The
+  button's content box goes from 15px — 10px text at `line-height: 1.5` — to a 12px
+  block `<svg>`, but the row's height is set by `.name` at 12px/1.5, so every row sits
+  where it sat.
+
+  **Deliberately not in this phase.** The controls stay **in flow**. Taking
+  `.controls` out of flow — absolute against the row's right edge — measures 122.11px
+  and is the larger saving by far, but it is a different decision with a different
+  cost (on hover the buttons overlay the tail of a long name), it is orthogonal to
+  which mark this button wears, and mixing them would leave one review round judging
+  two things. It is named here so a later phase can take it rather than rediscover it.
+  No change to `main`'s drawing. No change to which rows carry a delete, to the
+  refusals, or to the absence of a confirmation.
+
+- **Exit gate:**
+
+  1. `bun app/typecheck.mjs` exits 0.
+  2. **No `cargo` clause, and the phase says why**: nothing under `app/src` is
+     touched, so `cargo test --workspace` is neither run as a gate nor claimed to
+     mean anything here. `bun app/driver/drive.mjs` is likewise **unchanged and not
+     extended**, and that is a judgment this round may push back on: its clause 4
+     exists because a drawn mark is what neither Playwright engine can answer for,
+     and a fifth mark of the same family does not re-open the question — while the
+     half this phase *can* break, the ink following the pointer, is a `:hover` that
+     rig cannot produce at all, having no Actions API. It is run, and expected to
+     pass untouched.
+  3. `bun app/harness/checks.mjs` and `--webkit` each print **seventeen clauses,
+     seventeen passed** — one added: *the row's delete is a drawn mark that names
+     itself and wears the alarm ink only under the pointer.* **It is clause 16 and
+     the uncaught-error clause becomes 17**, by that file's own rule that the error
+     clause stays last because it accumulates across the others. `OWNS` gains one
+     entry at 16; no existing value moves.
+
+     Five readings, on the `sections/mark.svg` row — an image row, so it carries the
+     delete and no `main` button, except where a reading needs both:
+     - **the button carries no text and does carry a name**: `textContent` is `''`
+       and `aria-label` is a non-empty string containing that row's path, which is
+       the explicit name the word used to make unnecessary;
+     - **the mark resolves, and the reading is the `<use>` element's own box** —
+       **not** the outer `<svg>`'s, and not against 12. Measured in both engines: a
+       `<use>` pointing at nothing leaves the `<svg>` at 12×12 with
+       `getComputedStyle(svg).fill` still `none`, so **both readings the first draft
+       named pass on a broken page**. The `<use>` itself is 9×9 resolved — the ink
+       bbox, which is why 12 is the wrong comparison — and 0×0 when the reference is
+       dead. So: the `<use>`'s box is non-zero, asserted as a property;
+     - **the `<svg>` is the size it declares**, 12×12, read separately and claiming
+       nothing about resolution;
+     - **two inks, and the reading is the button's `color`**: quiet with the pointer
+       off the row, alarm with it on the button, and *that the two differ* is the
+       clause rather than which values they are — clause 10's own formulation. **The
+       row must be hovered before the button can be**, and that ordering is part of
+       the clause: `visibility: hidden` makes the button unhoverable, and a direct
+       `page.hover` on it times out;
+     - **the paint crosses into the shadow tree**, read as
+       `getComputedStyle(use).stroke` equal to the button's own `color` — a
+       comparison and not a literal. **This reading was dropped between drafts and
+       is restored**, which is the one place the review loop's own hazard bit: round
+       1 found the *warrant* wrong — the crossing is not witnessable, and what is
+       read is the inherited value on the light-DOM side — and the fix removed the
+       reading instead of re-wording it, leaving this phase's one novel technical
+       risk asserted by nothing automated. Measured with the `.trash svg` rule
+       removed, the `<use>` computes `fill: rgb(0,0,0)` and `stroke: none` — a black
+       blob that never reddens — and **every other machine reading here still
+       passes**;
+     - **and the mark is narrower than the control beside it**, read on a row that
+       carries both as `.trash` narrower than `.set` — a comparison and not a
+       literal, so the suite's own rule takes it, and it is the only automated
+       assertion of this phase's measurable half. It is stated against `.set` and
+       **not** against the withdrawn word, which is not on the page to be measured.
+       All four rows that carry both give the same pair, the controls being
+       content-sized and name-independent: 22px against 38.09 in Chromium and 38.73
+       in WebKit, where `.trash` was 44.11 before.
+  4. `bun app/harness/checks.mjs --falsify` reports **fourteen mutations, each
+     isolating the clause it owns**, in both engines. The one added is
+     **`trash-unnamed`**, dropping the `aria-label` write in `control()` and nothing
+     else: the mark still draws, still hovers, still deletes, and names nothing
+     explicitly — reachable by no other clause, no rig reading a panel control's
+     name today. **The reason for not mutating the paint rule instead has been wrong
+     twice and is recorded rather than quietly replaced.** The first draft claimed
+     such a mutation would also fail clause 10 — false: clause 10 reads
+     `getComputedStyle(#views-files).color`, which no `svg` paint rule touches. The
+     second claimed it would reach the new clause — also false at that moment,
+     because the stroke reading had just been dropped, and a paint mutation then
+     reached **zero** clauses. With that reading restored above, either mutation
+     would isolate, and `trash-unnamed` is chosen on its merits: the explicit name is
+     what this phase newly puts at risk, and no rig reads a panel control's name.
+  5. **The mark is a person's reading and the rigs are named as unable to take it.**
+     Both engines can measure a box and read a colour; neither can say the shape is a
+     waste basket. So, at the window: hover a row and the mark is legible as a basket
+     at its true size, one glance apart from the `main` word beside it, and it reddens
+     under the pointer and is quiet off it.
+  6. `git status` clean after a full run of clauses 1, 3 and 4.
+
+- **Close-out:** **No earlier phase takes a dated note, and the case was checked
+  rather than assumed.** Phase 4 says the gesture is *"a third control on the row,
+  drawn like `app/dist/index.html`'s `.set`"*, and that stays true in the respect it
+  makes the claim — small, quiet, bordered, revealed on hover and on focus, carrying
+  the entry's own `path`, holding no state. It never argued for the label, and the
+  label is the whole of what moves. **OQ-5 is untouched**: its resolution is about
+  `main`'s gesture and `margin-left: auto`, and both stand.
+
+  **`rules/desktop-panes.md`** — four places. The three-gestures paragraph, whose
+  *"the `trash` button beside **that**"* names a word that is gone; the `.controls`
+  paragraph, where *"`.trash` wears `--alarm` only under the pointer"* becomes a
+  statement about a stroke and stays otherwise exactly right; the glyph-or-drawn
+  paragraph — **and it is corrected, not extended**, because the first draft would
+  have written *"now counts three"* into a file that already records the header's own
+  pair eighty lines above, which would have made the artifact contradict itself: the
+  window draws four marks today and five after, in two rules becoming three; and the
+  harness counts, `sixteen → seventeen` and `thirteen → fourteen`, in `covers:` and
+  again in the body. **The file is at 748 of 755 as `spec-lint` counts it**, so this
+  close-out raises the cap or trims and does not quietly exceed it.
+
+  **`rules/desktop.md`** — none needed, and the reason is the scope: the commands,
+  the file I/O and the confinement rules are what that file carries about a delete,
+  and this phase changes none of them.
+
+  **`rules/INDEX.md` and `specs/INDEX.md` are regenerated, not hand-edited** —
+  `spec-lint --write-index` runs in the same pass, and `mpdf-010`'s rollup moves from
+  `done` to `partial` on its own, by §1.1.
+
+  **`README.md`** — one sentence, and it is the file's only mention: *"Hover any
+  other row and a `trash` button appears beside it: it moves that file to the
+  Trash."* The word it names is the word this phase withdraws. It gains the mark in
+  the shape the file already uses for the two in the bar — what it looks like and
+  what it does, not a glyph the reader is asked to hunt for.
+
+  **No `CLAUDE.md` change**: the id prefix, the observable and the engine's boundary
+  are untouched.
+
+  **Commit plan.** One push, two commits: the mark, its name and its paint rule, with
+  its clause and its mutation; then the rules and the README.
 
 <!--
 The review record is a sibling file, not a section: it lives at

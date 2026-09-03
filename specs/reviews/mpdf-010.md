@@ -2,6 +2,89 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 2 — Phase 6 only — 2026-09-03 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. All three of round 1's blockers resolved, and four non-blocking findings
+folded in after the verdict.
+
+**One of those four is the loop's own hazard, caught by the round it was introduced in.**
+Round 1 found the *warrant* of clause 3's stroke reading wrong — the `<use>` shadow tree is
+not reachable by `getComputedStyle`, so what is read is the inherited value on the
+light-DOM side — and the fix **removed the reading instead of re-wording it**. Measured with
+the `.trash svg` rule dropped, the mark computes `fill: rgb(0,0,0)`, `stroke: none` — a
+black blob that never reddens — and **all five remaining machine readings pass**, so a paint
+mutation reached zero clauses and this phase's one novel technical risk was asserted by
+nothing automated. The reading is restored as a comparison, `getComputedStyle(use).stroke`
+against the button's own `color`, and gate clause 4's reason — wrong twice now — is recorded
+as such rather than quietly replaced.
+
+**The four both-button rows were measured and the fifth reading is not a tautology.**
+`.trash` 22px against `.set` 38.09 in Chromium and 38.73 in WebKit, identical on all four
+rows because the controls are content-sized and name-independent, and `.trash` was 44.11
+before the change — so the comparison flips across it. `aria-label = title` contains the
+row's path, which is what the tightened wording ("containing", not "naming") wants. The new
+rule's six declarations, `stroke-linejoin` included, inherit into the `<use>` in both
+engines, and nothing being widened, `marks-unlit`'s three-line match on the `#views` colour
+block is untouched; `controls-auto-margin`'s regex is anchored `\n( *)#controls \{` and
+cannot reach `#files li .controls`. **Clause 3 asserting more than one mutation covers is
+the harness's existing pattern** — four of its sixteen clauses are unowned today, `OWNS`
+requiring each *mutation* to own one clause and not the reverse.
+
+The other three: the footer's marks do have corners, but they are a `<rect rx="1.5">` that
+`stroke-linejoin` never sees, so the argument for taking the header's set stands on a
+corrected sentence; the fifth reading's prose compared against a word that is not on the
+page; and the `<symbol>`'s placement was unstated while **clause 1 constrains it** — a defs
+block between `</footer>` and the module script fails `footer.nextElementSibling === module`,
+so it is prepended to `<body>`, measured as `svg, HEADER, MAIN, FOOTER, SCRIPT, CANVAS`.
+
+### Round 1 — Phase 6 only — 2026-09-03 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0** (asked once for this episode): *does this phase produce the observable, and if
+not is that argued?* It produces none — nothing reaches the pipeline, `trash_file` is
+untouched, the same markdown compiles to the same bytes — and the phase argues it
+explicitly, naming the 22px as the measurable but weaker half and the vocabulary change as
+the reason. It was asked for at the window rather than inferred.
+
+**Three blocking findings, all accepted; nine non-blocking, all accepted; none rejected.**
+
+1. **The gate's "the mark resolves" reading did not resolve anything.** Measured in both
+   engines: a `<use>` pointing at nothing leaves the `<svg>` at 12×12 with `fill: none`, so
+   **both readings the draft named pass on a broken page**. Only the `<use>`'s own box tells
+   them apart — 9×9 resolved, 0×0 dead — and 9×9 is the ink bbox, so an implementer
+   comparing against the declared 12 would have failed the clause on correct code.
+2. **The two shapes offered for `control()` were not interchangeable**, and the draft said
+   "either way". Writing `label` to `aria-label` names the button `'trash'` rather than the
+   path — failing the phase's own gate — and strips `main`'s text, contradicting *"No change
+   to `main`'s drawing"*. One shape now, spelled: a fifth parameter `mark`, `null` for
+   `main`, `aria-label = title` when given.
+3. **The window holds four inline drawn marks, not two, and there were already two paint
+   rules.** `#open` and `#save` in the header are drawn marks painted by `header button svg`,
+   which **already diverges** from `#views button svg` by `stroke-linejoin: round`. So the
+   "one rule, widen it" argument rested on a premise the code contradicts, and the
+   close-out's prescribed *"now counts three"* would have put a sentence into
+   `rules/desktop-panes.md` contradicting a paragraph eighty lines above it.
+
+**The nine non-blocking, all folded in.** The widest row is `loose/orphan.md` at
+198.234375px and not `parts/ch1/deep.md` at 197.78125 — two name characters beating 14px of
+indent by 0.45px — and four rows carry both buttons rather than one kind. The padding edit
+named no selector: on the shared `#files li .controls button` it measures 172.125px and
+moves `main`, so it names `.trash`. The stroke reading's warrant was unwitnessable (and the
+fix over-corrected — see round 2). Clause 4's reason for not mutating the paint rule was
+false, clause 10 reading `color`. `checks.mjs`'s own header count was outside the scope. A
+`<use>` is two elements, not one, so the count argument is 2 against 4. The accessible name
+is not *lost* — `title` is accname's last resort — so `aria-label` makes it explicit rather
+than rescuing it. The 22px was asserted by no automated clause, **fixed rather than merely
+recorded** with the `.trash` &lt; `.set` comparison. And the `<symbol>`'s `viewBox` and the
+per-row `<svg>`'s size were never stated.
+
+**Numbers re-derived and confirmed by both sides**: 198.234375 → 176.125 → 22.109375;
+172.125 for the shared-rule variant; 122.109375 out of flow; `rules/desktop-panes.md`
+748/755; 16 clauses today going to 17, `OWNS` 13 going to 14, the new clause 16 and the
+error clause 17; the control button's 10px/15px against `#files li`'s 12px/1.5, so the row
+does not move. **The hover ordering is both necessary and sufficient** — a direct
+`page.hover` on the button times out in both engines, `visibility: hidden` not being
+hoverable, and row-then-button works.
+
 ### Phase 4 shipped — 2026-08-28 — the window gate, and two things the rounds did not measure
 
 `tests/gates/mpdf-010-phase4.js`, over `$TMPDIR/mpdf-010-phase4`: **eight
