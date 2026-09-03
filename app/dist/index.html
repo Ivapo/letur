@@ -91,6 +91,21 @@
           sans-serif;
       }
 
+      /*
+        The mark definitions at the top of `<body>` draw nothing and take no
+        room. **`hidden` alone does not do it, and that was measured rather than
+        reasoned about**: the UA stylesheet's `[hidden]` rule is scoped to the
+        HTML namespace, so an `<svg hidden>` is still a flex item in the column
+        above and takes a replaced element's default 150px out of `main` —
+        which is `app/harness/checks.mjs`'s second clause, the three boxes
+        summing to `innerHeight`, and it is what caught this. The attribute
+        stays: it is what a reader and the accessibility tree are told. This is
+        what makes it true.
+      */
+      body > svg[hidden] {
+        display: none;
+      }
+
       header {
         flex: none;
         display: flex;
@@ -578,9 +593,18 @@
       }
       /*
         The row's own gestures, and there are two of them now: `main` sets which
-        file compiles, `trash` moves the file to the Trash. Each appears on
+        file compiles, the basket moves the file to the Trash. Each appears on
         hover and on focus, so they are reachable from the keyboard without
         being eighteen buttons on screen at once.
+
+        **One is a word and one is a mark, and the asymmetry is the point.**
+        `main` names a *state*, and the row that already is main draws `◀ main`
+        as text — a mark for `main` beside that would be two vocabularies for
+        one concept. The delete names an *action*, no glyph names it, and it is
+        the one press in this app the author cannot undo from inside it. So: a
+        word for the reversible setting, a drawn mark for the one that is not,
+        which is also what gives the basket something to be one glance apart
+        from.
 
         **`margin-left: auto` moved from the button to the group, and that is a
         correction rather than a tidy.** OQ-5 put it on `.set` "because only one
@@ -617,11 +641,41 @@
       /*
         The one destructive gesture in this app wears the one alarming colour,
         and only under the pointer: quiet like its neighbour until it is about
-        to be pressed, so a row does not read as a warning at rest.
+        to be pressed, so a row does not read as a warning at rest. The mark
+        takes it through `currentColor` below, so the ink is one declaration
+        and not two.
       */
       #files li .controls .trash:hover {
         color: var(--alarm);
         border-color: var(--alarm);
+      }
+      /*
+        **`.trash` and not `#files li .controls button`**, and the difference is
+        measurable rather than a preference: on the shared rule the panel comes
+        out at 172.13px and `main` moves with it, where this one leaves `main`
+        exactly where it was. A mark wants less side padding than a word did.
+      */
+      #files li .controls .trash {
+        padding: 0 4px;
+      }
+      /*
+        **A third paint rule and not a widened one.** This window already has
+        two — `header button svg` and `#views button svg` — and they already
+        diverge, the header's carrying `stroke-linejoin` that the footer's does
+        not. This takes the header's set, that declaration included, because the
+        basket's body is a trapezoid whose two corners are joins in a single
+        path, where the footer's marks make their only corners out of a
+        `<rect rx="1.5">` — which `rx` rounds and `stroke-linejoin` never sees.
+        Consolidating the three is a job for somebody, and it was declined here
+        rather than missed.
+      */
+      #files li .controls .trash svg {
+        display: block;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
 
       /*
@@ -1319,6 +1373,41 @@
   </head>
   <body>
     <!--
+      The one mark this window draws that is not in a bar, and it is defined
+      here rather than built where it is used. **A `<symbol>` because the other
+      four are inline in this file** — `#open` and `#save` below, `Files` and
+      `Lines` in the footer — and a fifth assembled out of `createElementNS`
+      calls inside `panelRows` would be the only one a reader could not find
+      beside them. Each row then costs a `<svg><use>`: two elements against
+      four, and `parts` rebuilds the panel whole on every status.
+
+      **Prepended to `<body>`, which is a position and not a preference.** The
+      footer is `main`'s next sibling and the last element before the module
+      script — `app/harness/checks.mjs`'s first clause asserts exactly that —
+      so a block of definitions dropped between them would fail it. Here it is
+      harmless: `hidden` takes it out of flow, and a `<symbol>` is never
+      rendered where it is declared in any case.
+
+      **A lidded basket in three strokes, and no ribs.** `mpdf-003` Phase 15
+      rejected `▥` and `☰` because they differ only by their fill at 10px, and
+      two 1px ribs inside a 12px basket is that same failure from the other
+      side: they merge with the body outline and the basket fills in as a
+      heavier blob. Measured on the shipped page with the button swapped in
+      before it was written. Every coordinate on a half pixel, so a 1px stroke
+      lands on a pixel rather than across two — the footer's rule, and the
+      reason the box is 12 like the footer's marks rather than 14 like the
+      header's: this sits beside a file name, not in the bar of primary
+      actions.
+    -->
+    <svg hidden aria-hidden="true" focusable="false">
+      <symbol id="mark-trash" viewBox="0 0 12 12">
+        <path d="M1.5 3.5h9" />
+        <path d="M4.5 3.5v-2h3v2" />
+        <path d="M2.5 3.5l1 7h5l1-7" />
+      </symbol>
+    </svg>
+
+    <!--
       The header's element children, in order: `#open`, `#save`, `#status`.
       **Two actions and a status line, and nothing that decides what the window
       shows** — the fold, the gutter and the fit are the bar's, one copy each.
@@ -1425,10 +1514,10 @@
 
     <!--
       The foot of the window. **After `</main>` and before the script**, which
-      is a position and not a preference: `body`'s element children are
-      `HEADER, MAIN, FOOTER, SCRIPT`, so this is `main`'s next sibling and the
-      last element before the module — and not `body.lastElementChild`, which
-      is that script.
+      is a position and not a preference: `body`'s element children are the
+      marks' `SVG`, then `HEADER, MAIN, FOOTER, SCRIPT`, so this is `main`'s
+      next sibling and the last element before the module — and not
+      `body.lastElementChild`, which is that script.
 
       **Its element children, in order — `#views`, `#edited`, `#receipt`,
       `#controls`, `#sep-brand`, `#brand`: five cells and one rule.** The receipt
@@ -2729,7 +2818,7 @@
 
         if (entry.kind === 'markdown' && !entry.missing) {
           controls.append(
-            control('set', 'main', `Compile ${entry.path} instead`, () => setMain(entry.path))
+            control('set', 'main', `Compile ${entry.path} instead`, () => setMain(entry.path), null)
           )
         }
         /* **A marked-missing row gets none**: it names a file the disk does not
@@ -2739,8 +2828,12 @@
            naming is a thing to be rid of. */
         if (!entry.missing) {
           controls.append(
-            control('trash', 'trash', `Move ${entry.path} to the Trash`, () =>
-              trashFile(entry.path)
+            control(
+              'trash',
+              'trash',
+              `Move ${entry.path} to the Trash`,
+              () => trashFile(entry.path),
+              trashMark()
             )
           )
         }
@@ -2749,18 +2842,59 @@
         return li
       }
 
+      /** The namespace `createElementNS` wants, and the only SVG this file
+          builds rather than declares. */
+      const SVG_NS = 'http://www.w3.org/2000/svg'
+
+      /**
+       * The delete's mark: a `<use>` of the `<symbol>` at the top of `<body>`.
+       *
+       * The drawing lives there rather than here, so it sits beside the
+       * window's other four marks where a reader will look for it. **The
+       * `<symbol>` carries the `viewBox` and this carries the size**, which is
+       * what makes a row cost two elements rather than four.
+       *
+       * @returns {SVGSVGElement}
+       */
+      function trashMark() {
+        const svg = document.createElementNS(SVG_NS, 'svg')
+        svg.setAttribute('width', '12')
+        svg.setAttribute('height', '12')
+        svg.setAttribute('aria-hidden', 'true')
+        svg.setAttribute('focusable', 'false')
+        const use = document.createElementNS(SVG_NS, 'use')
+        use.setAttribute('href', '#mark-trash')
+        svg.append(use)
+        return svg
+      }
+
       /**
        * One of a row's small quiet buttons.
        *
+       * **`mark` decides which of the two shapes this is.** `null` is a worded
+       * button and `label` is its text, which is also its accessible name;
+       * given a node, the button holds that and nothing else and `label` is
+       * never reached. A mark carries no text, so the name is written out:
+       * `title` is accname's last resort and this button already has one, so
+       * `aria-label` makes the name explicit rather than rescuing it, which is
+       * `wearAppearance`'s rule and what all four marks in the bars obey. **It
+       * takes `title` and not `label`** — the name a reader wants is the row's
+       * own path, not the word the mark replaced.
+       *
        * @param {string} kind @param {string} label @param {string} title
-       * @param {() => void} act
+       * @param {() => void} act @param {SVGSVGElement | null} mark
        * @returns {HTMLButtonElement}
        */
-      function control(kind, label, title, act) {
+      function control(kind, label, title, act, mark) {
         const button = document.createElement('button')
         button.type = 'button'
         button.className = kind
-        button.textContent = label
+        if (mark) {
+          button.append(mark)
+          button.setAttribute('aria-label', title)
+        } else {
+          button.textContent = label
+        }
         button.title = title
         button.addEventListener('click', act)
         return button

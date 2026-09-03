@@ -344,6 +344,22 @@ const MUTATIONS = {
       "      listen('view-lines', toggleLines)\n"
     if (page.split(block).length !== 2) die('the mutation views-deaf found no single pair of view listens')
     return page.replace(block, '')
+  },
+
+  /* The row's delete draws its mark and names nothing explicitly. **The
+     `aria-label` write and nothing else**: the mark still resolves, still wears
+     its two inks, still deletes, and the button is left with `title` alone —
+     accname's last resort, which is exactly the difference between a name made
+     explicit and a name that happens to be found.
+
+     **It is the paint rule's alternative, and the choice is on merits rather
+     than on reach.** With the stroke reading in clause 16 either mutation
+     isolates; the explicit name is what this change newly put at risk, and no
+     rig in this repository reads a panel control's name. */
+  'trash-unnamed': (page) => {
+    const statement = "          button.setAttribute('aria-label', title)\n"
+    if (page.split(statement).length !== 2) die('the mutation trash-unnamed found no single explicit name')
+    return page.replace(statement, '')
   }
 }
 

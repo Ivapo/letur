@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all thirteen. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all fourteen. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -69,7 +69,8 @@ const OWNS = {
   'save-as-mislabelled': 12,
   'receipt-sticks': 13,
   'divider-selects': 14,
-  'views-deaf': 15
+  'views-deaf': 15,
+  'trash-unnamed': 16
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -138,7 +139,8 @@ const drainErrors = async (page) => page.evaluate(() => window.__harness.errors)
 /* -------------------------------------------------------------- the checks */
 
 /* 1. **All three, and the position is satisfiable by and only by one
-      placement.** `body`'s element children are `HEADER, MAIN, FOOTER, SCRIPT`:
+      placement.** `body`'s element children are the marks' `SVG`, then
+      `HEADER, MAIN, FOOTER, SCRIPT`:
       "after `</main>`" and "the last element of `body`" name two different
       places — the second being that script, and at runtime a hidden canvas
       `pdf.js` appends — so a clause asserting only one of them would pass on a
@@ -1230,6 +1232,115 @@ const viewsTakeTheirMenuEvents = async (browser, url) => {
   return errors
 }
 
+/* 16. **The one destructive gesture in this window is a mark, and a mark owes a
+       reader two things a word gave for free.** It must say its own name, since
+       there is no text to be one; and since the only visible difference between
+       "about to delete something" and "quiet" is its ink, the ink has to reach
+       the drawing. **Both are read here, and the second is the phase's one
+       novel risk**: the mark is a `<use>` of a `<symbol>`, so the paint has to
+       cross into a shadow tree. Measured with the `.trash svg` rule removed and
+       nothing else changed, the `<use>` computes `fill: rgb(0,0,0)` and
+       `stroke: none` — a black blob that never reddens — while every other
+       reading below still passes.
+
+       **The `<use>`'s own box and not the `<svg>`'s.** A `<use>` pointing at
+       nothing leaves the `<svg>` at the size it declares with `fill` still
+       `none`, so a clause reading either of those alone passes on a page whose
+       mark is not there. The `<use>` is the ink's bounding box — non-zero when
+       the reference resolves and 0×0 when it is dead — which is why it is
+       asserted as a property and not against the 12 the `<svg>` declares. */
+const theDeleteIsADrawnMark = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  /* An image row carries the delete and no `main` button, which is what makes
+     it the row to read the mark on; the width comparison at the end needs a row
+     that carries both, and every such row gives the same pair, the controls
+     being content-sized and name-independent. */
+  const ROW = '#parts li[title="Look at sections/mark.svg"]'
+  const BOTH = '#parts li[title="Edit other.md"]'
+
+  const read = () =>
+    page.evaluate(
+      ([row, both]) => {
+        const button = document.querySelector(`${row} .trash`)
+        const svg = button?.querySelector('svg')
+        const use = svg?.querySelector('use')
+        const set = document.querySelector(`${both} .set`)
+        const box = (el) => {
+          const r = el?.getBoundingClientRect()
+          return { width: r?.width ?? 0, height: r?.height ?? 0 }
+        }
+        return {
+          text: button?.textContent ?? null,
+          label: button?.getAttribute('aria-label') ?? null,
+          /* The size it *declares*, read off the element rather than written
+             down here: this file forbids a metric literal. */
+          declared: { width: Number(svg?.getAttribute('width')), height: Number(svg?.getAttribute('height')) },
+          svg: box(svg),
+          use: box(use),
+          ink: button ? getComputedStyle(button).color : null,
+          stroke: use ? getComputedStyle(use).stroke : null,
+          trash: box(button).width,
+          set: box(set).width
+        }
+      },
+      [ROW, BOTH]
+    )
+
+  /* The pointer starts nowhere in particular, so it is put somewhere the row is
+     not before the quiet ink is read — clause 10's own lesson about a click
+     leaving the pointer on the control it pressed. */
+  await page.mouse.move(0, 0)
+  await settle(page)
+  const quiet = await read()
+
+  /* **The row before the button, and that ordering is part of the clause.** The
+     controls are `visibility: hidden` until the row is hovered, and a hidden
+     element is not hoverable — a direct hover on the button times out in both
+     engines. */
+  await page.hover(ROW)
+  await page.hover(`${ROW} .trash`)
+  await settle(page)
+  const lit = await read()
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const named = quiet.text === '' && !!quiet.label && quiet.label.includes('sections/mark.svg')
+  const resolves = quiet.use.width > 0 && quiet.use.height > 0
+  const sized = quiet.svg.width === quiet.declared.width && quiet.svg.height === quiet.declared.height
+  const inks = new Set([quiet.ink, lit.ink]).size === 2
+  const painted = quiet.stroke === quiet.ink && lit.stroke === lit.ink
+  const narrower = quiet.trash < quiet.set
+
+  note(`the button: text ${JSON.stringify(quiet.text)}, aria-label ${JSON.stringify(quiet.label)}`)
+  note(
+    `the svg ${quiet.svg.width}x${quiet.svg.height} against the ${quiet.declared.width}x${quiet.declared.height} it declares, ` +
+      `the use ${quiet.use.width}x${quiet.use.height}`
+  )
+  note(`the ink: ${quiet.ink} off the row, ${lit.ink} on the button; the stroke ${quiet.stroke} → ${lit.stroke}`)
+  note(`the controls: .trash ${quiet.trash} against .set ${quiet.set}`)
+
+  ok(
+    16,
+    "the row's delete is a drawn mark that names itself and wears the alarm ink only under the pointer",
+    named && resolves && sized && inks && painted && narrower,
+    [
+      named ? null : `it says ${JSON.stringify(quiet.text)} and is named ${JSON.stringify(quiet.label)}`,
+      resolves ? null : `the use resolved to ${quiet.use.width}x${quiet.use.height} — the reference is dead`,
+      sized ? null : `the svg is ${quiet.svg.width}x${quiet.svg.height} against ${quiet.declared.width}x${quiet.declared.height}`,
+      inks ? null : `both states read ${quiet.ink}`,
+      painted ? null : `the stroke is ${quiet.stroke} / ${lit.stroke} where the button is ${quiet.ink} / ${lit.ink}`,
+      narrower ? null : `.trash is ${quiet.trash} against .set's ${quiet.set}`
+    ]
+      .filter(Boolean)
+      .join('; ') ||
+      `named ${JSON.stringify(quiet.label)}, the use ${quiet.use.width}x${quiet.use.height} in ` +
+        `${quiet.ink} then ${lit.ink}, ${quiet.trash} against .set's ${quiet.set}`
+  )
+  return errors
+}
+
 /* ----------------------------------------------------------------- the run */
 
 const run = async ({ engine, headed, rev, doc, mutate }) => {
@@ -1266,7 +1377,8 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       theSaveMarkSaysWhatItDoes,
       theSaveSaysWhatItDidAndThenStops,
       dividerLeavesThePaneAlone,
-      viewsTakeTheirMenuEvents
+      viewsTakeTheirMenuEvents,
+      theDeleteIsADrawnMark
     ]) {
       gather(await check(browser, held.url))
     }
@@ -1281,7 +1393,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    16,
+    17,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +
