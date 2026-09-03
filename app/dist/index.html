@@ -649,13 +649,24 @@
         takes the other route entirely — `background-attachment: local` — and
         that contrast is why the two are built differently.
 
+        **The two paddings are not one decision.** The vertical is `#text`'s
+        own, and has to be: the first row is placed at the top of this content
+        box and the first line at the top of the textarea's, so a pair that
+        disagreed would offset every number by the difference. The horizontal
+        pair is free, and it is the whole of this column's width — the box has
+        no width of its own and is as wide as its widest number, 31.45px at two
+        digits. The left is dead inset, the numbers being right-aligned; it was
+        12px and gave 4 of them back. The right is measured against what a
+        reader actually sees, which is not 8px: `#text` carries 14px of its own,
+        so the numbers stand 23px clear of the text with the rule between them.
+
         `mpdf-003` Phase 8.
       */
       #lines {
         flex: none;
         overflow: hidden;
         box-sizing: border-box;
-        padding: 12px 8px 12px 12px;
+        padding: 12px 8px;
         text-align: right;
         background: var(--chrome);
         border-right: 1px solid var(--edge);
