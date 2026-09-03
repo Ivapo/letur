@@ -47,11 +47,11 @@ covers: >
   the pane does not draw, and the pane that loses both when it empties, the check that reads this file and the
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
-  because the DOM cannot show one, the sixteen clauses it
-  asserts as properties and the thirteen broken pages that falsify them, the second
+  because the DOM cannot show one, the seventeen clauses it
+  asserts as properties and the fourteen broken pages that falsify them, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
-max_lines: 755
+max_lines: 770
 generated: 2026-09-03
 ---
 
@@ -367,6 +367,18 @@ rule, and the word each says is the one its mark draws: `Files` and `Lines`.
 `app/driver/drive.mjs` read them 12x12 in the shipping
 WKWebView, each in its two inks.
 
+**The rule has since decided a third case, and the window draws five marks in
+three paint rules.** The panel row's delete is the fifth: no glyph names *move
+this to the Trash* — `🗑` is emoji-presentation on macOS and ignores `color`,
+which is the one thing that button must obey — so it is drawn too, a lidded
+basket at the footer's 12px on the footer's half-pixel grid, **and with no
+ribs**, two 1px ribs inside a 12px basket merging with the body outline exactly
+as `▥` and `☰` do above. It is what made the two rules three: its body is a
+trapezoid whose corners are joins in a single path, so it takes the *header's*
+set with `stroke-linejoin`, where these two make their only corners out of a
+`<rect rx="1.5">` that `rx` rounds. Consolidating the three was declined rather
+than missed.
+
 **It duplicates the window title**, which `main.rs:set_edited` sets to the same
 `document::title`. What the second placement buys is that the title is native chrome
 outside the content area, dimmed when the window is not frontmost and sitting above
@@ -510,8 +522,10 @@ decision about the document, a fold is where a scrollbar was.
 
 **A row carries three gestures and can carry two marks.** The body of a markdown
 row is a `button.name` that puts that file in the pane; the `main` button appears
-beside it on hover and on focus and sets which file compiles; the `trash` button
-beside *that* moves the file to the Trash. The first two were kept apart before
+beside it on hover and on focus and sets which file compiles; the basket
+beside *that* moves the file to the Trash. **One is a word and one is a mark**,
+by the rule above: `main` names a state, the delete names an action no glyph
+names, and the two are one glance apart. The first two were kept apart before
 there were two of them rather than after. **`here` is the file that
 compiles and `.holding` is the file the pane shows** — one row at every open, two
 from the first click — and `.holding` wears the text pane's own `--ground` rather
@@ -538,8 +552,10 @@ correction.** `margin-left: auto` was on `.set` "because only one of the two is
 ever on a row", meaning the button and the `◀ main` mark; a non-main markdown
 row now draws two buttons, and two elements each claiming the free space would
 push the first off that edge. So the group claims it, the buttons lose it, and
-the mark keeps it alone on the row that has no buttons at all. `.trash` wears
-`--alarm` only under the pointer, so a row does not read as a warning at rest.
+the mark keeps it alone on the row that has no buttons at all. `.trash`'s
+stroke wears `--alarm` only under the pointer, through `currentColor`, so a row
+does not read as a warning at rest. **The padding that shrank the panel names
+`.trash` and not the rule both buttons wear**, which would take `main` with it.
 
 **A refused delete is the one refusal in this panel that does reach `fail`**,
 against the rule below, and the exception is argued rather than overlooked: it
@@ -757,8 +773,8 @@ sentence — found by a mutation that falsified nothing, not by reading.
 `core:default`'s own words — the half a stub that merely omits it never tests. It also keeps
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
-asserts sixteen clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against thirteen broken copies
+asserts seventeen clauses in Playwright's Chromium and WebKit, **both of which must pass, every
+clause a property and none a metric literal**, and is falsified first against fourteen broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
 without either being redundant**, and clause 3 is where that now stands: `flex-min` reaches
 the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`

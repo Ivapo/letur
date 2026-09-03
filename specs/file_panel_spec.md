@@ -37,7 +37,7 @@ phases:
     by: null
   - name: "Phase 6 — the delete is a drawn mark"
     reviewed: 2026-09-03
-    shipped: null
+    shipped: 2026-09-03
     cut: null
     by: null
 

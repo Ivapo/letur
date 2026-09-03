@@ -149,9 +149,10 @@ field if you ask for either. It does **not** add the include marker to your mast
 where a new section belongs in a document is your decision, so write `[](…)` where you
 want it. Folders are not created — make the folder first, in Finder.
 
-**Hover any other row and a `trash` button appears beside it: it moves that file
-to the Trash.** Not a delete — the Trash, so the file is in there under Finder's
-own `Put Back` if you did not mean it. **Nothing asks you twice**, and that is
+**Hover any other row and a small basket appears beside it: it moves that file
+to the Trash.** It goes red under the pointer and is quiet the rest of the time.
+Not a delete — the Trash, so the file is in there under Finder's own `Put Back`
+if you did not mean it. **Nothing asks you twice**, and that is
 deliberate: a confirmation is what stands in for an undo where there is none,
 and this has one. The file that compiles has no such button — set another file
 as `main` first if you want that one gone — and neither does a struck-through
