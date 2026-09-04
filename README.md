@@ -171,6 +171,14 @@ the file you are editing are two different things, and the list marks each. `⌘
 the one in the pane. If it holds unsaved edits the app will not switch — it says so and
 offers `Discard`, the same way it does when a file changes underneath you.
 
+**A bibliography opens the same way.** Click `refs.bib` and it is in the pane; change a
+title and the reference list in the page beside it redraws with the new one, before you
+have saved anything — the same rule as everywhere else here, that the page is what the
+pane says rather than what the file says. What it cannot become is the file that
+compiles: `main` stays markdown, so no `main` button appears on a bibliography row. The
+caret's own page does nothing while you are in one, because a bibliography has no
+headings for it to follow.
+
 **Click a figure and it opens over the pane, which keeps the file it was holding.** So you
 can check that `emit.svg` is the diagram you meant without leaving for Preview: nothing
 compiles, the page goes on showing the whole document, and `⌘S` still writes the markdown
@@ -198,7 +206,7 @@ $ bun harness/checks.mjs
 
 `app/harness/serve.mjs` serves a copy of the front end with a stub in its head, so the
 real page can be driven outside a window; `bun harness/checks.mjs --falsify` breaks the
-page fifteen ways and checks that each break fails the one clause that owns it.
+page sixteen ways and checks that each break fails the one clause that owns it.
 
 ## Licence
 

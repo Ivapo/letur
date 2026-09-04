@@ -47,7 +47,7 @@ phases:
     by: null
   - name: "Phase 8 — a bibliography opens in the pane"
     reviewed: 2026-09-03
-    shipped: null
+    shipped: 2026-09-03
     cut: null
     by: null
 

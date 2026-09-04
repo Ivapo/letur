@@ -199,11 +199,18 @@
       const rows = drawn()
       const marked = rows.filter((r) => r.here)
       const holding = rows.filter((r) => r.holding)
+      /* **The negative half was `refs.bib` and is now an image**, corrected by
+         `mpdf-010` Phase 8: OQ-2 resolved and a bibliography row opens like a
+         section's. What the clause needs is a row that still does not, or
+         `opens` being true of everything would pass it — and after Phase 8 the
+         only kinds left are an image, which shows instead, and a marked-missing
+         row, which the showcase does not hold. */
       ok(2, 'one row carries both marks, and the sections offer to open',
         marked.length === 1 && holding.length === 1 &&
         marked[0].name === 'showcase.md' && holding[0].name === 'showcase.md' &&
         rows.some((r) => r.name === 'notes-and-sources.md' && r.opens) &&
-        !rows.some((r) => r.name === 'refs.bib' && r.opens),
+        rows.some((r) => r.name === 'refs.bib' && r.opens) &&
+        !rows.some((r) => r.name === 'emit.svg' && r.opens),
         `here ${marked.map((r) => r.name)}, holding ${holding.map((r) => r.name)}, ` +
         `${rows.filter((r) => r.opens).length} rows open`)
 

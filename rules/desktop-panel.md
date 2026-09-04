@@ -15,8 +15,9 @@ covers: >
   they are not emptied lower, the create that expands what it would otherwise
   land behind, the two rows the delete is not on and the edge two buttons share,
   the one refusal here that reaches `fail` and the two that keep their own
-  surfaces, the panel's own gesture that is on no row and the two things the
-  page holds, the surface over the text pane and the three boxes that place it,
+  surfaces, the two kinds a row's body puts in the pane and the second kind test
+  that has to move with the first, the panel's own gesture that is on no row and
+  the two things the page holds, the surface over the text pane and the three boxes that place it,
   the sentence it shows where a figure cannot be drawn, the sequence its read
   carries and the three ways back, and the disk half that is walked twice beside
   the missing half that follows the text
@@ -111,9 +112,16 @@ from the first click — and `.holding` wears the text pane's own `--ground` rat
 than `--band`, which sits a point from the panel's `--chrome` and would be
 invisible in both themes. **An image row's body is a button too, and it does
 something else**: it shows the figure over the text pane, leaving `edited` where
-it was. A bibliography and a marked-missing row open nothing and say so in their
-`title`, where OQ-2 and the disk leave them. So the panel
-is still rebuilt whole on every status, and that is still
+it was. **A bibliography's body opens like a markdown row's**, where OQ-2
+resolved: the compile is `main`'s, so a `.bib` in the pane feeds its unsaved
+bytes to the citation pass while the page draws the whole document, and the
+`main` control still appears on markdown alone. A marked-missing row is the one
+that opens nothing and says so in its `title`, naming a file the disk does not
+hold. **The `title` is a second chain with its own kind test and it moves with
+`opens`'**, or `— not edited here` lands on exactly the row the pane is
+holding; with both moved that branch is unreachable for all three kinds and is
+left standing, an unreachable branch putting no sentence in the window. So the
+panel is still rebuilt whole on every status, and that is still
 right: **the rows hold no selection.** Both files live in Rust and arrive in the
 status, and each control reads its path off the DOM at the moment it is clicked.
 

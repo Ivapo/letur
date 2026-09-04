@@ -39,8 +39,9 @@ covers: >
   the pane does not draw, and the pane that loses both when it empties, the check that reads this file and the
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
-  because the DOM cannot show one, the eighteen clauses it
-  asserts as properties and the fifteen broken pages that falsify them, the second
+  because the DOM cannot show one, the nineteen clauses it
+  asserts as properties and the sixteen broken pages that falsify them, the rule
+  that decides what a clause may read as well as what it may assert, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
 max_lines: 625
@@ -614,8 +615,8 @@ sentence — found by a mutation that falsified nothing, not by reading.
 `core:default`'s own words — the half a stub that merely omits it never tests. It also keeps
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
-asserts eighteen clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against fifteen broken copies
+asserts nineteen clauses in Playwright's Chromium and WebKit, **both of which must pass, every
+clause a property and none a metric literal**, and is falsified first against sixteen broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
 without either being redundant**, and clause 3 is where that now stands: `flex-min` reaches
 the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`
@@ -623,6 +624,11 @@ the header's, a pinned box whose children have left it. Clause 10 was the other 
 `views-one-way` went when the header gave its copies up, a copy that cannot disagree being
 no copy, and `marks-unlit` owns that clause alone. The error clause stays last and its
 number moves as clauses are added, being the only one that accumulates across the others.
+**The rule also decides what a clause may read**, which clause 18 is the record of: it
+asserts a bibliography row's click through `invoke('status')` and *notes* `#edited`
+rather than asserting it, the cell following `edited` being clause 5's own property and
+`cell-main`'s to break — a second clause reading it made that mutation fail two and stop
+isolating, and the falsification found it where no reading of the file had.
 **One clause drives two colour schemes**, `light` being written down as the default rather
 than inherited from Playwright, because the palette has to win in both directions and a
 suite run in one of them would miss half of it.

@@ -8,7 +8,8 @@ covers: >
   to and the cap that is chosen rather than derived, the two edges that answer
   as no candidate, the masters discovered in the root and the reason that search
   does not recurse, the four ways one of them becomes the file that compiles,
-  the file the pane holds beside it and the switch that moves it, the two
+  the file the pane holds beside it and the switch that moves it, the kind that
+  one of the two still is and the kind the other need not be, the two
   refusals that switch shares with the one that sets the main and the one exit
   they both name, the walk and the merge and why they
   are two functions rather than one, the filter that is each channel's own
@@ -20,7 +21,7 @@ covers: >
   fact this app remembers about a folder and where it refuses to keep it, and the
   second file beside it for the fact that is about no folder at all
 max_lines: 180
-generated: 2026-08-28
+generated: 2026-09-03
 ---
 
 # The desktop app's project
@@ -62,7 +63,19 @@ is what `document::render_project` compiles — its text, its directory, every p
 the document names resolving against it — and `Preview::edited` is what the pane
 holds, what `⌘S` writes and what the buffer stands in for inside that compile.
 They are equal at every open, because an open still puts the main in the pane,
-and free to differ from the first click on a row. `Session::set_edited` is the
+and free to differ from the first click on a row. **`main` is markdown and
+`edited` need not be**, `mpdf-010` OQ-2: the override closure is keyed on the
+path it is handed and `read_assets_with` reads the bibliography through it, so a
+`.bib` in the pane feeds its unsaved bytes to the citation pass while `main`
+goes on drawing the whole document. `set_edited` and `set_main` both test no
+kind at all — what keeps a bibliography from becoming the file that compiles is
+the panel drawing its `main` control on markdown rows alone, which
+`rules/desktop-panel.md` carries and which is a gap in the window rather than a
+refusal here. A `.bib`
+contributes no anchors either, an anchor being a heading and a heading being
+markdown, so the caret's own page does nothing while the pane holds one —
+`document::Pane` still answers `Beside` for it, being decided by directory
+containment rather than by what the master names. `Session::set_edited` is the
 switch and **is deliberately not an open**: `open_at` assigns
 `Preview { ..Preview::default() }` and zeroes `revision` and `reloaded`, where
 `app/dist/index.html`'s `clear()` — which resets the counters the page compares

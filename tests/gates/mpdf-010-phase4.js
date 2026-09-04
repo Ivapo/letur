@@ -281,8 +281,10 @@
       /* Clause 3. **Through the button a reader actually presses**, where
          clause 2 went straight to the command to control its timing. This one
          may wait: what it asserts is the wiring and the drawing, not the
-         moment. `refs.bib` is a bibliography nothing names — OQ-2 leaves its
-         body inert, and this is the gesture that reaches it all the same. */
+         moment. `refs.bib` is a bibliography, whose body opened nothing when
+         this was written and opens in the pane since `mpdf-010` Phase 8
+         resolved OQ-2 — the delete is beside that body either way, which is
+         what this clause is about and why it did not move with it. */
       const was = drawn()
       rowFor('refs.bib')?.querySelector('.trash')?.click()
       await settled()
