@@ -242,6 +242,44 @@ pub struct Status {
     pub appearance: Appearance,
 }
 
+/// One compile's three inputs, owned, and the order it started in.
+///
+/// **Nothing that runs it borrows a [`Preview`]**, and that is the structural
+/// half of `mpdf-003` Phase 22: [`Compile::run`] cannot hold the state lock
+/// because it cannot reach the state the lock guards. [`Preview::plan`] builds
+/// one under the lock, the lock is dropped, the render runs, and
+/// [`Preview::absorb`] takes the answer back under it — so a keystroke arriving
+/// mid-compile waits on nothing.
+///
+/// **No derived `PartialEq`.** Two of these fields are compared and two are not:
+/// [`Preview::current`] tests the three inputs and the serial answers a
+/// different question entirely. A derive would invite `self.plan() == Some(plan)`,
+/// which clones the buffer a second time to answer a question about three fields.
+struct Compile {
+    /// The file that compiles, resolved — [`Preview::main_path`]'s answer.
+    main: PathBuf,
+    /// The file the pane holds, whose text the buffer below stands in for.
+    edited: PathBuf,
+    /// The pane's text as it stood when this compile was planned.
+    buffer: String,
+    /// Which compile of this [`Preview`] this is, from [`Preview::started`].
+    serial: u64,
+}
+
+impl Compile {
+    /// Compile, and time it. **This is the whole of what runs outside the lock.**
+    ///
+    /// The duration is measured around the failed path too, where
+    /// [`Preview::compile`] used to take it only on the way to a success. It
+    /// costs one `Instant` on a path that had none and changes nothing
+    /// observable: [`Preview::absorb`] reads it in the success arm alone.
+    fn run(&self) -> (Result<document::Render, String>, Duration) {
+        let started = Instant::now();
+        let outcome = document::render_project(&self.main, &self.edited, &self.buffer);
+        (outcome, started.elapsed())
+    }
+}
+
 /// The pane's state, as Rust holds it.
 ///
 /// The bytes live here rather than only in the page, because the loop is what
@@ -289,6 +327,24 @@ pub struct Preview {
     elapsed: Option<Duration>,
     revision: u64,
     reloaded: u64,
+    /// How many compiles have been planned, and how many have landed.
+    ///
+    /// **[`Preview::plan`] stamps the first onto a [`Compile`] and
+    /// [`Preview::absorb`] advances the second**, and together they are what
+    /// decides between two renders in flight: the newest-*started* one wins, and
+    /// an answer older than the one already written is dropped. Start order is
+    /// the right order because every change to a file a compile reads is
+    /// followed by its own filesystem event, and that event schedules a render
+    /// which starts *after* the change — so the newest-started render that lands
+    /// is never the one missing a change that preceded it.
+    ///
+    /// **They are the one pair [`Session::open_at`] must carry across the
+    /// `Preview` it replaces**, where `revision` and `reloaded` are deliberately
+    /// reset: an Open drops both loops without joining their threads, so a render
+    /// planned before it can still be waiting on the lock, and zeroing these
+    /// would let that orphan win. `mpdf-003` Phase 22.
+    started: u64,
+    landed: u64,
     stale: bool,
     error: Option<String>,
     divergence: Option<String>,
@@ -641,6 +697,76 @@ impl Preview {
 
     /// Compile the pane's text and take in what came back.
     ///
+    /// The three steps are [`Preview::plan`], [`Compile::run`] and
+    /// [`Preview::absorb`], and what each writes is argued where it is written.
+    ///
+    /// **It compiles [`Preview::main`], not the file in the pane.** The pane's
+    /// text reaches it through the closure `document::render_project` builds,
+    /// which answers `edited` from this buffer and everything else from the
+    /// disk — so the page shows the whole document while the author edits one
+    /// file of it, and shows exactly what the pane says while the two are the
+    /// same file. A `main` this app cannot read at all leaves the message and
+    /// the *failed* state [`Preview::load`] leaves, which is where a document
+    /// that will not read has always landed.
+    ///
+    /// **Split into three since `mpdf-003` Phase 22**, and it stays whole for
+    /// its three synchronous callers — [`Preview::load`], [`Preview::reload`]
+    /// and [`Session::save_as`] — each of which is one user action that has just
+    /// moved the document wholesale, already holds `crate::main`'s own
+    /// `Mutex<Session>` for its duration, and may as well hold this one too. The
+    /// two closures that fire while a hand is on the keys take the three steps
+    /// apart instead.
+    pub fn compile(&mut self) {
+        let Some(plan) = self.plan() else {
+            return;
+        };
+        let (outcome, took) = plan.run();
+        self.absorb(&plan, outcome, took);
+    }
+
+    /// What the next compile would read, and the number that orders it.
+    ///
+    /// `None` on the two absences [`Preview::compile`] has always returned early
+    /// on. **`&mut` because it stamps the serial**: the count of compiles ever
+    /// started is bumped here and nowhere else, and the plan carries the number
+    /// out to whichever thread runs it.
+    ///
+    /// The buffer is cloned, which is this phase's whole per-compile cost: a
+    /// copy of the document, four to five orders below the compile it is handed
+    /// to.
+    fn plan(&mut self) -> Option<Compile> {
+        let (main, edited) = (self.main_path()?, self.edited.clone()?);
+
+        self.started += 1;
+        Some(Compile {
+            main,
+            edited,
+            buffer: self.buffer.clone(),
+            serial: self.started,
+        })
+    }
+
+    /// Would this plan still read what it read, if it were made now?
+    ///
+    /// **Derived and not maintained, deliberately.** The alternative was a
+    /// serial bumped on every write to `main`, `edited` or `buffer` — cheaper
+    /// per compile and wrong by construction, because those inputs are written
+    /// in six places ([`Preview::edit`], [`Preview::take`], [`Preview::save_as`],
+    /// [`Session::set_edited`] and [`Session::trash`] reaching through this
+    /// guard, and [`Session::open_at`] assigning a fresh `Preview`). A counter
+    /// over writers is a bump a future author must remember; a comparison is one
+    /// they cannot forget.
+    ///
+    /// It builds no second [`Compile`]: the cost is one `String` equality, and
+    /// it stops at the first differing byte.
+    fn current(&self, plan: &Compile) -> bool {
+        self.main_path().as_deref() == Some(plan.main.as_path())
+            && self.edited.as_deref() == Some(plan.edited.as_path())
+            && self.buffer == plan.buffer
+    }
+
+    /// Take in what a compile came back with — if it is still wanted.
+    ///
     /// A success replaces the bytes and clears both the error and the stale
     /// mark. **A failure keeps the bytes**, records the message and sets the
     /// mark: an author mid-edit passes through broken states constantly, and
@@ -653,21 +779,43 @@ impl Preview {
     /// shows and the page the pane opens on always describe the page on screen
     /// rather than the last attempt at one.
     ///
-    /// **It compiles [`Preview::main`], not the file in the pane.** The pane's
-    /// text reaches it through the closure `document::render_project` builds,
-    /// which answers `edited` from this buffer and everything else from the
-    /// disk — so the page shows the whole document while the author edits one
-    /// file of it, and shows exactly what the pane says while the two are the
-    /// same file. A `main` this app cannot read at all leaves the message and
-    /// the *failed* state [`Preview::load`] leaves, which is where a document
-    /// that will not read has always landed.
-    pub fn compile(&mut self) {
-        let (Some(main), Some(edited)) = (self.main_path(), self.edited.clone()) else {
+    /// **Two things decide whether any of that happens, and the order is the
+    /// cheap test first.** The serial: a render older than the one already
+    /// written is dropped, because start order is the order a filesystem event
+    /// puts its own render in. Then the inputs: text that has moved on since the
+    /// plan was made is a page of something the author has since changed.
+    ///
+    /// **Dropping an answer is safe because a fresher one is always already
+    /// coming.** Each of the six writers [`Preview::current`] lists is followed
+    /// by a compile — [`Preview::edit`] by the typing channel's own nudge, which
+    /// a `settle` thread mid-compile buffers and re-touches afterwards;
+    /// [`Preview::take`] by the `compile` on the next line of both its callers;
+    /// [`Session::set_edited`], [`Session::trash`] and [`Session::discard`] by
+    /// [`Preview::load`]; [`Session::open_at`] by replacing this struct whole.
+    /// So the page is never left holding bytes with nothing on the way.
+    ///
+    /// **The guard stands in front of every write, the failed arm included.** A
+    /// stale render also carries an asset list and a section list, so a dropped
+    /// compile that wrote only its shopping lists would re-arm the watch against
+    /// a document that has moved on; and a render that read a file mid-write
+    /// returns `Err`, which absorbed out of order would set the mark and the
+    /// message over a newer good page. One guard, one `return`, no partial
+    /// absorb — and `landed` advances before the outcome is looked at, so an
+    /// older answer cannot overwrite a newer failure either.
+    ///
+    /// `mpdf-003` Phase 22.
+    fn absorb(
+        &mut self,
+        plan: &Compile,
+        outcome: Result<document::Render, String>,
+        took: Duration,
+    ) {
+        if plan.serial <= self.landed || !self.current(plan) {
             return;
-        };
+        }
+        self.landed = plan.serial;
 
-        let started = Instant::now();
-        let render = match document::render_project(&main, &edited, &self.buffer) {
+        let render = match outcome {
             Ok(render) => render,
             Err(message) => {
                 self.stale = true;
@@ -675,7 +823,6 @@ impl Preview {
                 return;
             }
         };
-        let took = started.elapsed();
 
         if let Some(assets) = render.assets {
             self.assets = assets;
@@ -848,11 +995,28 @@ impl Session {
 
         {
             let mut preview = self.preview();
+            // **The one pair that survives the replacement, and the sentence it
+            // states is "an Open discards every answer in flight".** This drops
+            // the old `Watch` and typing sender without joining their threads —
+            // the premise the `edited` re-check already exists for — so a render
+            // planned before this open can still be waiting on the lock.
+            // `..Preview::default()`'s zeroes would let it win on
+            // `plan.serial > landed`, and `Preview::current` would not save us:
+            // `edited` is set to `root.join(main)` here, so any open inside the
+            // same project with a clean buffer matches all three inputs. Worse,
+            // it would leave `landed` hundreds of compiles above `started`, after
+            // which every later compile of the newly opened document is silently
+            // dropped — the render runs, nothing is written, no redraw and no
+            // error. `revision` and `reloaded` are still reset; those the page
+            // resets alongside, in `clear()`.
+            let started = preview.started;
             *preview = Preview {
                 root: Some(root.clone()),
                 main: Some(main),
                 edited: Some(document.clone()),
                 tree: document::files_under(&root),
+                started,
+                landed: started,
                 ..Preview::default()
             };
             preview.load();
@@ -867,8 +1031,11 @@ impl Session {
     /// closures guard on `Preview::edited` against a path captured when they
     /// were started, so a command that moved the pane and stopped there would
     /// leave the typing debounce compiling nothing and every filesystem event
-    /// dropped. The guard itself stays: it is what stops a thread mid-compile
-    /// from writing its page over a newer one.
+    /// dropped. The guard itself stays, and since `mpdf-003` Phase 22 it is
+    /// asked twice: once before [`Preview::plan`] and once after the render, on
+    /// the way back in. What stops a thread mid-compile from writing its page
+    /// over a newer one is no longer the guard but [`Preview::current`] and the
+    /// serial [`Preview::absorb`] tests.
     ///
     /// The old loops go before the new ones start, so no two of them ever hold
     /// the same document.
@@ -1250,12 +1417,62 @@ impl Session {
     /// save arrives here, changes nothing, and must not redraw a frame the
     /// reader has scrolled.
     fn on_change(&self, root: PathBuf, edited: PathBuf) -> impl FnMut(Changed) + Send + 'static {
+        self.on_change_with(root, edited, Compile::run)
+    }
+
+    /// The same, with the render handed in.
+    ///
+    /// **The seam is for this loop's own gate**, and it is the shape
+    /// `crate::document::render_with` already established one level down: the
+    /// expensive call is the caller's, so a test can *check* a claim about the
+    /// three steps instead of racing a real compile to argue it.
+    ///
+    /// **Two lock scopes, and this is what is in each.** The closure's body is
+    /// longer than its compile, and "preserved exactly" stops meaning atomic the
+    /// moment the lock is dropped, so the split is stated rather than left to be
+    /// read off the braces:
+    ///
+    /// 1. the `edited` guard, [`Preview::reload`] on `changed.edited`,
+    ///    [`Preview::plan`] on the bare-recompile branch, **and the
+    ///    `changed.tree` walk** — moved up here so that the only thing outside
+    ///    the lock is the render. Moving it costs nothing and closes a hole:
+    ///    `document::files_under` and the compile write disjoint fields, so the
+    ///    final state is what it was either way — but left *after* the render it
+    ///    would be an unguarded write of one project's listing into whatever
+    ///    `Preview` is live when the render returns;
+    /// 2. the render, with no lock held;
+    /// 3. the `edited` guard **re-checked**, then [`Preview::absorb`], which
+    ///    applies its own two-part guard on top.
+    ///
+    /// **[`Preview::reload`] keeps the lock across its own compile, and that is
+    /// this split's one exception.** It is a filesystem event, on the watch
+    /// thread, behind no `Mutex<Session>` — so typing can still wait on a
+    /// compile the window started by itself, for a document's full length, when
+    /// another program rewrites the file in the pane over a clean buffer. It
+    /// stays whole because taking it apart means `reload` no longer compiling
+    /// and this closure's `!taken` condition inverting. `mpdf-003` Phase 22
+    /// records the shape for the phase that meets it: `reload` returns its
+    /// [`External`] and this closure plans on [`External::Taken`] as it plans on
+    /// `changed.document`.
+    ///
+    /// **The announcement is exactly what it was**: the same three flags decide
+    /// it, and it fires once, after the second scope, whether or not `absorb`
+    /// wrote — a redundant one costs nothing, the page's own
+    /// `revision === drawnRevision` comparison being what decides a re-fetch.
+    /// The one case that announces nothing is a **failed re-check**: a different
+    /// document is open, and its own open has already announced.
+    fn on_change_with(
+        &self,
+        root: PathBuf,
+        edited: PathBuf,
+        render: impl Fn(&Compile) -> (Result<document::Render, String>, Duration) + Send + 'static,
+    ) -> impl FnMut(Changed) + Send + 'static {
         let state = Arc::clone(&self.state);
         let on_render = Arc::clone(&self.on_render);
 
         move |changed: Changed| {
             let mut announce = false;
-            {
+            let planned = {
                 let mut preview = state.lock().expect("the preview lock was poisoned");
                 if preview.edited.as_deref() != Some(edited.as_path()) {
                     return;
@@ -1269,10 +1486,12 @@ impl Session {
                     false
                 };
 
-                if (changed.document || changed.assets) && !taken {
-                    preview.compile();
+                let planned = if (changed.document || changed.assets) && !taken {
                     announce = true;
-                }
+                    preview.plan()
+                } else {
+                    None
+                };
 
                 // **A file the document does not name moved: the panel is out
                 // of date and the page is not.** This walks the disk and stops
@@ -1283,7 +1502,20 @@ impl Session {
                     preview.tree = document::files_under(&root);
                     announce = true;
                 }
+
+                planned
+            };
+
+            if let Some(plan) = planned {
+                let (outcome, took) = render(&plan);
+
+                let mut preview = state.lock().expect("the preview lock was poisoned");
+                if preview.edited.as_deref() != Some(edited.as_path()) {
+                    return;
+                }
+                preview.absorb(&plan, outcome, took);
             }
+
             if announce {
                 on_render();
             }
@@ -1292,22 +1524,58 @@ impl Session {
 
     /// What one settled pause in the typing does.
     ///
-    /// It checks the document first. Dropping a [`Watch`] or a typing channel
-    /// does not join its thread, so a thread that was mid-compile when a
-    /// second document opened could otherwise write its page over the newer
-    /// one.
+    /// It checks the document before **planning**. Dropping a [`Watch`] or a
+    /// typing channel does not join its thread, so a thread that was mid-compile
+    /// when a second document opened could otherwise plan against a document the
+    /// window no longer holds. What stands in front of the *write* is
+    /// [`Preview::current`] and the serial, one scope further down.
     fn recompile(&self, document: PathBuf) -> impl FnMut() + Send + 'static {
+        self.recompile_with(document, Compile::run)
+    }
+
+    /// The same, with the render handed in.
+    ///
+    /// **The seam is for this loop's own gate**, for
+    /// [`Session::on_change_with`]'s reason and in its shape.
+    ///
+    /// **Three steps, and the middle one holds no lock** — which is the whole of
+    /// `mpdf-003` Phase 22 as the author feels it: this is the compile that fires
+    /// 300 ms after the last keystroke, which is exactly when an author who
+    /// paused to think resumes, so [`Session::edit`] and [`Session::status`]
+    /// arriving inside it now wait on nothing rather than on a document-length
+    /// proportional render.
+    ///
+    /// The announcement is what it was: it fires after the second scope whether
+    /// or not [`Preview::absorb`] wrote, and whether or not there was anything to
+    /// plan. A **failed re-check** is the one path that announces nothing, the
+    /// document that replaced this one having announced already.
+    fn recompile_with(
+        &self,
+        document: PathBuf,
+        render: impl Fn(&Compile) -> (Result<document::Render, String>, Duration) + Send + 'static,
+    ) -> impl FnMut() + Send + 'static {
         let state = Arc::clone(&self.state);
         let on_render = Arc::clone(&self.on_render);
 
         move || {
-            {
+            let planned = {
                 let mut preview = state.lock().expect("the preview lock was poisoned");
                 if preview.edited.as_deref() != Some(document.as_path()) {
                     return;
                 }
-                preview.compile();
+                preview.plan()
+            };
+
+            if let Some(plan) = planned {
+                let (outcome, took) = render(&plan);
+
+                let mut preview = state.lock().expect("the preview lock was poisoned");
+                if preview.edited.as_deref() != Some(document.as_path()) {
+                    return;
+                }
+                preview.absorb(&plan, outcome, took);
             }
+
             on_render();
         }
     }
@@ -1316,6 +1584,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Condvar;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, Instant};
 
@@ -4046,6 +4315,373 @@ mod tests {
         assert_eq!(
             drawn, product,
             "the footer's brand cell and the bundle's `productName` name different products"
+        );
+    }
+
+    /// How long a case waits on another thread before calling it wiring rather
+    /// than slow.
+    ///
+    /// **A bound on wiring and not a measurement**, as [`wait_for`]'s is:
+    /// nothing below is timed, and no value of this changes what any case
+    /// asserts. It exists because a build that still holds the lock across a
+    /// render must fail with a sentence rather than deadlock `cargo test`,
+    /// which has no timeout of its own.
+    const WIRING: Duration = Duration::from_secs(10);
+
+    /// A render that reports itself and then blocks until it is let go.
+    ///
+    /// It is [`Compile::run`] behind a gate, and it is what the five cases for
+    /// `mpdf-003` Phase 22 rest on: with a render held open, a case is *inside*
+    /// the window this phase exists for and can drive a keystroke, an open or a
+    /// second render through it rather than race a real compile to observe one.
+    ///
+    /// **A release names a serial and not an arrival**, which is the difference
+    /// the ordering cases turn on: two closures plan under the lock and render
+    /// outside it, so which of them *entered* first is the scheduler's answer
+    /// where which of them *started* first is [`Preview::started`]'s — and start
+    /// order is the thing under test.
+    struct Gate {
+        entered: mpsc::Receiver<u64>,
+        reporting: mpsc::Sender<u64>,
+        cleared: Arc<(Mutex<Vec<u64>>, Condvar)>,
+    }
+
+    impl Gate {
+        fn new() -> Self {
+            let (reporting, entered) = mpsc::channel();
+            Self {
+                entered,
+                reporting,
+                cleared: Arc::new((Mutex::new(Vec::new()), Condvar::new())),
+            }
+        }
+
+        /// The render to hand to [`Session::recompile_with`] or
+        /// [`Session::on_change_with`]. One gate can serve several.
+        fn render(
+            &self,
+        ) -> impl Fn(&Compile) -> (Result<document::Render, String>, Duration) + Send + 'static
+        {
+            let reporting = self.reporting.clone();
+            let cleared = Arc::clone(&self.cleared);
+
+            move |plan: &Compile| {
+                let _ = reporting.send(plan.serial);
+
+                let (serials, waking) = &*cleared;
+                let mut serials = serials.lock().expect("the gate was poisoned");
+                while !serials.contains(&plan.serial) {
+                    serials = waking.wait(serials).expect("the gate was poisoned");
+                }
+                drop(serials);
+
+                plan.run()
+            }
+        }
+
+        /// The serial of the next render to enter, or a failure that says so.
+        fn entered(&self) -> u64 {
+            self.entered
+                .recv_timeout(WIRING)
+                .expect("no render entered the gate inside the deadline")
+        }
+
+        /// Let the render carrying this serial finish.
+        fn release(&self, serial: u64) {
+            let (serials, waking) = &*self.cleared;
+            serials.lock().expect("the gate was poisoned").push(serial);
+            waking.notify_all();
+        }
+    }
+
+    /// Wait for a serial to be written, so a case can order two absorbs rather
+    /// than hope for one. [`WIRING`]'s bound, and [`WIRING`]'s reason.
+    fn wait_landed(session: &Session, serial: u64) {
+        let deadline = Instant::now() + WIRING;
+        while Instant::now() < deadline {
+            if session.preview().landed >= serial {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        panic!("the render carrying serial {serial} never landed");
+    }
+
+    /// The four fields an absorb writes that an Open resets, read together.
+    fn written(session: &Session) -> (u64, Option<Vec<u8>>, Vec<String>, Vec<String>) {
+        let preview = session.preview();
+        (
+            preview.revision,
+            preview.pdf.clone(),
+            preview.assets.clone(),
+            preview.sections.clone(),
+        )
+    }
+
+    /// **The phase's own property**: a keystroke arriving while a compile is in
+    /// flight is taken rather than made to wait for it.
+    ///
+    /// The render is held open on its own thread and the `edit` command runs on
+    /// a second, answering on a channel this thread waits on **with a deadline
+    /// rather than a join** — a build that still holds the lock across the
+    /// render has to fail with a sentence, not hang the suite. No value of that
+    /// deadline lets the code before this phase pass: it cannot return until the
+    /// render does.
+    #[test]
+    fn a_keystroke_lands_while_a_compile_is_in_flight() {
+        let dir = scratch_dir("a-keystroke-during-a-compile");
+        let document = article_in(&dir);
+        let (mut session, _) = counted();
+        session.open(document.clone()).unwrap();
+        session.watch = None;
+
+        // **An `Arc` and not a `thread::scope`.** A scope joins on unwind, so a
+        // panic raised while the render is still blocked would wait on a thread
+        // that never finishes — the hang this case was written to avoid.
+        let session = Arc::new(session);
+
+        let gate = Gate::new();
+        let recompile = session.recompile_with(document, gate.render());
+        std::thread::spawn(recompile);
+        let serial = gate.entered();
+
+        let (finished, typed) = mpsc::channel();
+        let typing = Arc::clone(&session);
+        std::thread::spawn(move || {
+            typing.edit("# typed while the compile was running\n".to_string());
+            let _ = finished.send(());
+        });
+
+        let landed = typed.recv_timeout(WIRING);
+        gate.release(serial);
+        landed.expect("the keystroke waited on the compile in flight");
+    }
+
+    /// The text moved on while the compile ran, so its answer is dropped — and
+    /// the next compile puts the new text on the page.
+    #[test]
+    fn a_render_whose_text_moved_on_is_dropped_and_the_next_one_lands() {
+        let dir = scratch_dir("an-answer-whose-text-moved-on");
+        let document = article_in(&dir);
+        let (mut session, _) = counted();
+        session.open(document.clone()).unwrap();
+        session.watch = None;
+
+        let before = written(&session);
+        let error = session.preview().error.clone();
+
+        let gate = Gate::new();
+        let recompile = session.recompile_with(document, gate.render());
+        let running = std::thread::spawn(recompile);
+        let serial = gate.entered();
+
+        // **Through `Preview::edit` and not `Session::edit`.** The command
+        // nudges the typing channel, which would leave a real compile of this
+        // text due in 300 ms racing the assertions below; the command itself is
+        // the case above. And the text is *different*, which is what a keystroke
+        // is and what decides the assertion.
+        session
+            .preview()
+            .edit("# moved on\n\nAnd this names no figure at all.\n".to_string());
+
+        gate.release(serial);
+        running.join().expect("the render thread panicked");
+
+        assert_eq!(
+            written(&session),
+            before,
+            "an answer to text the author had already moved on from was absorbed"
+        );
+        assert_eq!(
+            session.preview().error,
+            error,
+            "a dropped answer wrote its message anyway"
+        );
+
+        // **Not awaited through the debounce**, which would put a 300 ms
+        // interval inside a case that calls its own interval a bound.
+        session.preview().compile();
+        assert!(
+            session.preview().revision > before.0,
+            "the text that replaced it never reached the page"
+        );
+        assert!(
+            session.preview().assets.is_empty(),
+            "the new text names no figure, so the asset list should have emptied"
+        );
+    }
+
+    /// The later-**started** render wins, whichever of the two finishes first.
+    ///
+    /// Two plans through the seam over identical inputs, so nothing but the
+    /// serial can tell them apart. No clock: the order they land in is this
+    /// case's to choose.
+    #[test]
+    fn the_later_started_render_wins_whichever_lands_first() {
+        let dir = scratch_dir("two-renders-in-flight");
+        let document = article_in(&dir);
+        let (mut session, _) = counted();
+        session.open(document.clone()).unwrap();
+        session.watch = None;
+
+        let gate = Gate::new();
+        let first = session.recompile_with(document.clone(), gate.render());
+        let second = session.recompile_with(document.clone(), gate.render());
+        let one = std::thread::spawn(first);
+        let two = std::thread::spawn(second);
+
+        let (a, b) = (gate.entered(), gate.entered());
+        let (earlier, later) = (a.min(b), a.max(b));
+
+        // Out of start order: the later-started one lands, and the earlier one,
+        // arriving after it, is dropped.
+        gate.release(later);
+        wait_landed(&session, later);
+        let after_the_later = written(&session);
+
+        gate.release(earlier);
+        one.join().expect("a render thread panicked");
+        two.join().expect("a render thread panicked");
+
+        assert_eq!(
+            written(&session),
+            after_the_later,
+            "an earlier-started render landed over a later-started one"
+        );
+
+        // And in start order: both land, the later one last.
+        let third = session.recompile_with(document.clone(), gate.render());
+        let fourth = session.recompile_with(document, gate.render());
+        let three = std::thread::spawn(third);
+        let four = std::thread::spawn(fourth);
+
+        let (c, d) = (gate.entered(), gate.entered());
+        let (earlier, later) = (c.min(d), c.max(d));
+
+        gate.release(earlier);
+        wait_landed(&session, earlier);
+        let after_the_earlier = session.preview().revision;
+
+        gate.release(later);
+        three.join().expect("a render thread panicked");
+        four.join().expect("a render thread panicked");
+
+        assert_eq!(
+            session.preview().landed,
+            later,
+            "the later-started render did not land behind the earlier one"
+        );
+        assert_eq!(
+            session.preview().revision,
+            after_the_earlier + 1,
+            "the later-started render was dropped when it arrived in start order"
+        );
+    }
+
+    /// `on_change_with` walks the disk in its first lock scope, and re-checks
+    /// its own guard in its second.
+    ///
+    /// It is the branch the two counters exist for: the listing is refreshed
+    /// before the render rather than after it, and a pane that moved while the
+    /// render ran drops the absorb without announcing.
+    #[test]
+    fn the_listing_lands_before_the_render_and_a_moved_pane_drops_the_absorb() {
+        let dir = scratch_dir("a-change-across-two-scopes");
+        let document = multi_file_in(&dir);
+        let (mut session, announcements) = counted();
+        session.open(document.clone()).unwrap();
+
+        // **Quiesced first**, or the file the walk is to find announces on its
+        // own against "nothing is announced" below.
+        session.watch = None;
+
+        let root = watch::root(&document);
+        std::fs::write(root.join("notes.md"), "# notes\n").unwrap();
+
+        let gate = Gate::new();
+        let mut on_change = session.on_change_with(root.clone(), document, gate.render());
+        let running = std::thread::spawn(move || {
+            on_change(Changed {
+                assets: true,
+                tree: true,
+                ..Changed::default()
+            })
+        });
+        let serial = gate.entered();
+
+        assert!(
+            session
+                .preview()
+                .tree
+                .iter()
+                .any(|entry| entry.path == "notes.md"),
+            "the listing was not refreshed until after the render"
+        );
+
+        let before = session.preview().revision;
+        let announced = announcements.load(Ordering::SeqCst);
+
+        // **By the field, and not through `Session::set_edited`**, whose `load`
+        // would compile and bump the revision this case requires unmoved.
+        session.preview().edited = Some(root.join("sections/introduction.md"));
+
+        gate.release(serial);
+        running.join().expect("the change thread panicked");
+
+        assert_eq!(
+            session.preview().revision,
+            before,
+            "a render whose pane had moved on was absorbed"
+        );
+        assert_eq!(
+            announcements.load(Ordering::SeqCst),
+            announced,
+            "a failed re-check announced"
+        );
+    }
+
+    /// An answer orphaned by an Open is dropped, and the newly opened document
+    /// still compiles.
+    ///
+    /// **The second half is the important one**: a fix that drops the orphan but
+    /// leaves `landed` above `started` passes the first assertion and freezes the
+    /// window.
+    #[test]
+    fn an_answer_orphaned_by_an_open_is_dropped_and_the_new_document_compiles() {
+        let dir = scratch_dir("an-answer-orphaned-by-an-open");
+        let document = article_in(&dir);
+        let (mut session, _) = counted();
+        session.open(document.clone()).unwrap();
+        session.watch = None;
+
+        let gate = Gate::new();
+        let recompile = session.recompile_with(document.clone(), gate.render());
+        let running = std::thread::spawn(recompile);
+        let orphan = gate.entered();
+
+        // **The same file again.** A different one is dropped by
+        // `Preview::current` even where the serial is wrong, so only re-opening
+        // makes all three inputs match and the drop attributable to the order.
+        session.open(document).unwrap();
+        session.watch = None;
+
+        // "Nothing" is a delta against the state the Open left, `open_at` having
+        // reset all four of these itself.
+        let after_open = written(&session);
+
+        gate.release(orphan);
+        running.join().expect("the render thread panicked");
+
+        assert_eq!(
+            written(&session),
+            after_open,
+            "an answer the Open orphaned was written over the document it opened"
+        );
+
+        session.preview().compile();
+        assert!(
+            session.preview().revision > after_open.0,
+            "the newly opened document stopped compiling: `landed` was left above `started`"
         );
     }
 }
