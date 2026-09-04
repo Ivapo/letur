@@ -19,6 +19,26 @@
         --ink: #2b3140;
         --quiet: #6b7280;
         --alarm: #a03323;
+        /*
+          The fourth ink, and the one thing `mpdf-003` Phase 23 needed that this
+          palette did not already hold. Against `--ground` the tokens above offer
+          exactly three legible foregrounds — `--ink` at 11.8:1, `--alarm` at
+          6.4:1, `--quiet` at 4.4:1 — while `--chrome`, `--edge`, `--band` and
+          `--paper` sit between 1.1 and 1.3 and cannot be text at all.
+
+          **It departs from this file's own `--edge`-and-not-a-new-token
+          precedent, and the difference between the two cases is the departure**:
+          that one reuses a *surface* token for a surface, where this wants a
+          foreground and there is no unused one to reuse. A fourth ink invented
+          out of `--edge` would be unreadable.
+
+          **Teal, and the hue is chosen against the three it sits beside.**
+          `--ink` is a desaturated navy and `--alarm` a rust red, so blue and red
+          are the neighbourhoods already spoken for; a teal is the furthest
+          fourth hue that still clears 4.5:1 at this weight. 6.8:1 here and
+          7.4:1 dark, and 6.1:1 over the caret's own band.
+        */
+        --mark: #1d5f57;
         --band: #e9e9e4;
         /*
           The colour of paper, and **it is deliberately not overridden in
@@ -58,6 +78,7 @@
           --ink: #e6e6e2;
           --quiet: #9aa1ae;
           --alarm: #e08573;
+          --mark: #5fbdad;
           --band: #242833;
         }
       }
@@ -69,6 +90,7 @@
         --ink: #e6e6e2;
         --quiet: #9aa1ae;
         --alarm: #e08573;
+        --mark: #5fbdad;
         --band: #242833;
       }
       :root[data-theme='light'] {
@@ -832,10 +854,67 @@
         pointer-events: none;
       }
       /* The row the caret is in: `#lines div.here`'s twin, and where the band
-         went when this layer could carry it. Only the ground moves — the row's
-         own ink is whatever its tokens made it. */
+         went when this layer could carry it. **Only the ground moves** — that
+         rule sets a colour as well, which here would repaint every unspanned run
+         on the row and put a second writer on the ink. A recorded known: over
+         this band `--quiet` reads at 4.0:1 against 4.4 on the ground, which is
+         under the line either way and is `--quiet`'s to answer rather than this
+         phase's. */
       #mirror div.here {
         background: var(--band);
+      }
+
+      /*
+        The four inks the three grammars choose between, and no fifth. The
+        vocabulary is the spec's table: body text is the layer's own `--ink`, so
+        it wears no class at all and costs no element.
+
+        **What may not appear in this block is the point of it.** `font-size`,
+        `letter-spacing`, `font-family` and `font-variant` all move a glyph's
+        advance, and the textarea above does not move with them — so the ink
+        would slide off the words and the gutter's numbers off the lines. Bold is
+        free: a monospace family holds its advance across weights, measured at
+        0.000px in both engines, which is why a terminal draws bold without
+        reflowing. **Italic is forbidden outright rather than allowed on runs a
+        table clears**, because whether a glyph resolves inside
+        `ui-monospace, SFMono-Regular, Menlo, monospace` or falls out to a
+        proportional face carrying a real oblique depends on the machine's
+        installed faces and is not answerable from JS.
+
+        Emphasis is the one construct the table does not name, and the prose
+        beside it does: *emphasis takes colour and weight, never slant*. So a
+        strong run is `--mark` and bold and an emphasis run is `--mark`, which is
+        the only reading of that sentence that introduces no fifth ink.
+      */
+      #mirror .quiet {
+        color: var(--quiet);
+      }
+      #mirror .link {
+        color: var(--quiet);
+      }
+      #mirror .head {
+        color: var(--mark);
+        font-weight: 700;
+      }
+      #mirror .key {
+        color: var(--mark);
+        font-weight: 700;
+      }
+      #mirror .strong {
+        color: var(--mark);
+        font-weight: 700;
+      }
+      #mirror .name {
+        color: var(--mark);
+      }
+      #mirror .em {
+        color: var(--mark);
+      }
+      #mirror .include {
+        color: var(--mark);
+      }
+      #mirror .missing {
+        color: var(--alarm);
       }
 
       /*
@@ -1869,6 +1948,12 @@
       /** Where each gutter row starts, carrying the heights it was built from.
        * @typedef {number[] & { heights: number[] }} Rows */
 
+      /** One coloured run inside one line, `[from, to)` in that line's own
+       * characters. **Flat and never overlapping**: `paint` walks them in order
+       * and fills the gaps with text nodes, so a run inside a run would draw the
+       * same characters twice.
+       * @typedef {{ from: number, to: number, cls: string }} Run */
+
       /*
         **`withGlobalTauri` puts an untyped API on `window`**, and typing it
         here would be a hand-written shim for somebody else's interface — the
@@ -2354,6 +2439,8 @@
         // empty state is `namePaneFile`'s `?? ''` — the cell collapses to
         // nothing and the brand beside it stays.
         editedPath = state.edited ?? null
+        projectEntries = state.entries
+        mainPath = state.main ?? null
         namePaneFile()
         wearAppearance(state.appearance)
 
@@ -2692,6 +2779,17 @@
           when a figure opens or closes without waiting for a status.
           @type {string | null} */
       let editedPath = null
+
+      /* What an include marker is resolved and compared against, and they are
+         `report`'s in the same statement `edited` is. **No new field on
+         `Status`**: both are already sent, already typed and already read by
+         `parts` — the marker's target is resolved against the master's own
+         directory, and a target the listing marks `missing` is what wears the
+         alarm. */
+      /** @type {Entry[]} */
+      let projectEntries = []
+      /** @type {string | null} */
+      let mainPath = null
 
       /*
         Name what the pane is holding, as a bare name. **One writer, called from
@@ -3510,10 +3608,14 @@
 
       /*
         What this phase's exit gate reads. **It ships, and that is a decision.**
-        Nothing in this repository reaches this file, so its gate is read by a
-        person at a console — and three of the quantities that gate needs, the
-        renders started, what the sizing pass cost and when the observer first
-        delivered, live inside a module and are reachable from nowhere else.
+        Nothing in this repository reached this file when it was written, so its
+        gate is read by a person at a console — and three of the quantities that
+        gate needs, the renders started, what the sizing pass cost and when the
+        observer first delivered, live inside a module and are reachable from
+        nowhere else. **`app/driver/drive.mjs` reaches it now**, for the fourth
+        quantity below and for the same reason: `execute/sync` evaluates a
+        classic script in the global context, which cannot see a module-local
+        name either.
       */
       const pane = {
         mode,
@@ -3528,6 +3630,13 @@
         sizingMs: null,
         deliveryMs: null,
         renderMs: null,
+        /* **And the text pane's own, since `mpdf-003` Phase 23.** `remirror`
+           tokenises and rebuilds the whole buffer on the keystroke path, which
+           is the quantity that phase is gated on, and a module-local function is
+           reachable from nowhere else. Written only on a pass that rebuilt: a
+           memo hit leaves the last real figure standing, which is what a gate
+           wants to read. */
+        mirrorMs: null,
         made: 0,
         released: 0
       }
@@ -4607,6 +4716,429 @@
       }
 
       /*
+        Three grammars, one pass, chosen off the extension of the file the pane
+        is holding. `mpdf-003` Phase 23.
+
+        **The highlight is a hint and never a claim.** It gates nothing, refuses
+        nothing, writes nothing and reaches no Rust; where this and
+        `md2pdf-core` disagree, the compiler is right and the colour is wrong,
+        and the page beside it is what says so. That sentence is what keeps a
+        front-end lexer from becoming a second parser with opinions.
+
+        **The markdown pass carries block state and cannot be per-line**: a
+        fence opened on line 40 makes line 41 code, and a per-line lexer would
+        colour a document as prose the moment an author typed three backticks.
+        So the whole buffer goes through at once and every line gets its runs.
+
+        **`.yml` and `.yaml` are bibliographies here** — `app/src/document.rs`'s
+        `kind_of` folds the extension and matches all three, as
+        `core/src/bibliography.rs` does — so the YAML lexer is written once and
+        used twice: for those files, and for the frontmatter block of a markdown
+        one, which renders as nothing and is invisible to the page beside it.
+      */
+
+      /** Which of the three, off the extension folded to lower case the way
+       *  `app/src/document.rs:kind_of` folds it. **Markdown is the fallback and
+       *  not an error**: the pane holds nothing else, and a null `edited` is the
+       *  empty state, whose buffer is `''`.
+       *  @param {string | null} path @returns {'markdown' | 'bibtex' | 'yaml'} */
+      function grammarOf(path) {
+        const name = path === null ? '' : path.slice(path.lastIndexOf('/') + 1)
+        const dot = name.lastIndexOf('.')
+        const extension = dot < 0 ? '' : name.slice(dot + 1).toLowerCase()
+        if (extension === 'bib') return 'bibtex'
+        if (extension === 'yml' || extension === 'yaml') return 'yaml'
+        return 'markdown'
+      }
+
+      /** One run, and never an empty one — `paint` would make an element with
+       *  nothing in it, and a row of those has no height.
+       *  @param {number} from @param {number} to @param {string} cls
+       *  @returns {Run[]} */
+      const run = (from, to, cls) => (to > from ? [{ from, to, cls }] : [])
+
+      /** A whole line in one ink. Null for an empty one, so `paint` reaches the
+       *  zero-width space rather than wrapping nothing in a span.
+       *  @param {string} line @param {string} cls @returns {Run[] | null} */
+      const whole = (line, cls) => (line === '' ? null : [{ from: 0, to: line.length, cls }])
+
+      /** Maximal spans of `chars`, from `at` to the end of the line, coalesced
+       *  so a `},` is one element rather than two.
+       *  @param {string} line @param {number} at @param {string} chars
+       *  @returns {Run[]} */
+      function punctuation(line, at, chars) {
+        const found = []
+        for (let i = at; i < line.length; i++) {
+          if (chars.indexOf(line[i]) < 0) continue
+          let j = i
+          while (j < line.length && chars.indexOf(line[j]) >= 0) j++
+          found.push({ from: i, to: j, cls: 'quiet' })
+          i = j
+        }
+        return found
+      }
+
+      /* ------------------------------------------------------------- YAML */
+
+      /** One line of YAML, which is one line of a markdown frontmatter block
+       *  too. **Block scalars are not tracked**, so a `#` inside a `|` body is
+       *  coloured as a comment: a recorded imprecision rather than an oversight,
+       *  and inside "a hint and never a claim" — this dialect's frontmatter has
+       *  no block scalars, and a fourth piece of block state for one would cost
+       *  more than the colour is worth.
+       *  @param {string} line @returns {Run[] | null} */
+      function yamlLine(line) {
+        const trimmed = line.trim()
+        if (trimmed === '') return null
+        if (trimmed === '---' || trimmed === '...' || trimmed[0] === '#') {
+          return whole(line, 'quiet')
+        }
+
+        const found = []
+        let at = line.length - line.trimStart().length
+
+        // A sequence item's own marker, before the key that may follow it.
+        const item = /^-(\s+|$)/.exec(line.slice(at))
+        if (item !== null) {
+          found.push(...run(at, at + 1, 'name'))
+          at += item[0].length
+        }
+
+        // A key, quoted or bare. The quoted alternative is not decoration: the
+        // fixture's own bibliography is keyed `"DBLP:books/lib/Knuth86a"`, whose
+        // colons a bare pattern would stop at.
+        const key = /^("[^"]*"|'[^']*'|[^:#\s][^:#]*?)(\s*):(\s|$)/.exec(line.slice(at))
+        if (key !== null) {
+          found.push(...run(at, at + key[1].length, 'key'))
+          const colon = at + key[1].length + key[2].length
+          found.push(...run(colon, colon + 1, 'quiet'))
+          at = colon + 1
+        }
+
+        // The value: its quotes, or a comment it trails.
+        const rest = line.slice(at)
+        const quoted = /^(\s*)(["'])/.exec(rest)
+        if (quoted !== null) {
+          const opens = at + quoted[1].length
+          found.push(...run(opens, opens + 1, 'quiet'))
+          const closes = rest.indexOf(quoted[2], quoted[0].length)
+          if (closes >= 0) found.push(...run(at + closes, at + closes + 1, 'quiet'))
+        } else {
+          const hash = rest.indexOf(' #')
+          if (hash >= 0) found.push(...run(at + hash + 1, line.length, 'quiet'))
+        }
+
+        return found.length > 0 ? found : null
+      }
+
+      /* ----------------------------------------------------------- BibTeX */
+
+      /** One line of BibTeX, given how deep in braces the walk already is.
+       *  **Outside an entry every byte is a comment**, which is BibTeX's own
+       *  rule and not a simplification.
+       *  @param {string} line @param {number} depth @returns {Run[] | null} */
+      function bibtexLine(line, depth) {
+        if (line.trim() === '') return null
+
+        if (depth === 0) {
+          const opens = /^(\s*)(@[A-Za-z]+)/.exec(line)
+          if (opens === null) return whole(line, 'quiet')
+          const at = opens[1].length
+          return [
+            ...run(at, at + opens[2].length, 'key'),
+            ...punctuation(line, at + opens[2].length, '{}(),')
+          ]
+        }
+
+        const field = /^(\s*)([A-Za-z][\w.:-]*)(\s*)=/.exec(line)
+        if (field === null) return punctuation(line, 0, '{}(),"')
+        const at = field[1].length
+        return [
+          ...run(at, at + field[2].length, 'name'),
+          ...punctuation(line, at + field[2].length, '{}(),="')
+        ]
+      }
+
+      /* --------------------------------------------------------- markdown */
+
+      /** Whether a markdown line can hold an inline construct at all. Four
+       *  `indexOf` scans over what is nearly always plain ASCII prose, and this
+       *  is the whole of the budget argument: the pass is on the keystroke path,
+       *  and a line that answers true here allocates nothing — no array, no
+       *  object, no element. `String.prototype.indexOf` and not one character
+       *  class, the first being the engines' own byte scan and the second not.
+       *  @param {string} line */
+      const inert = (line) =>
+        line.indexOf('`') < 0 &&
+        line.indexOf('[') < 0 &&
+        line.indexOf('*') < 0 &&
+        line.indexOf('~') < 0
+
+      /** The characters a block construct can open with, plus the indent one may
+       *  carry. A line beginning with anything else is a paragraph. */
+      const OPENS = '#`~-*+>[0123456789 \t'
+
+      /**
+       * An include marker: `[](sections/three.md)`, **the whole of its own
+       * line**, empty brackets, no title, `.md` case-insensitively, at zero
+       * indentation. Inline, the same thing is an inert link, and the two draw
+       * differently — which is the pair `app/harness/checks.mjs` clause 21 reads.
+       *
+       * **`core/src/emit.rs:lone_markdown_link` is stricter still** — it wants a
+       * top-level *paragraph*, and declines a marker inside a list or a block
+       * quote — and where the two disagree the compiler is right.
+       *
+       * @param {string} line @returns {{ from: number, to: number, dest: string } | null}
+       */
+      function includeIn(line) {
+        const found = INCLUDE.exec(line.trimEnd())
+        if (found === null || !/\.md$/i.test(found[1])) return null
+        // Derived from where the pattern matched rather than written down, so a
+        // pattern that is not anchored still answers where the destination is.
+        const from = found.index + found[0].indexOf('(') + 1
+        return { from, to: from + found[1].length, dest: found[1] }
+      }
+
+      const INCLUDE = /^\[\]\(([^()\s"]+)\)$/
+
+      /**
+       * A marker's target, resolved against **the master's own directory** and
+       * not against the root, then named.
+       *
+       * `Entry.path` is root-relative while a section path is relative to the
+       * master, so a master in a subfolder is where comparing the raw text would
+       * mark every include red.
+       *
+       * **Absent from the listing is not `missing`.** The panel is the only
+       * authority on what the disk lacks and it moves at a compile rather than
+       * at a keystroke, so a target it has never heard of is drawn as an
+       * ordinary marker: reddening one would flash every path an author is
+       * halfway through typing.
+       *
+       * @param {string} dest @returns {string}
+       */
+      function includeClass(dest) {
+        const cut = mainPath === null ? -1 : mainPath.lastIndexOf('/')
+        const out = cut < 0 ? [] : mainPath.slice(0, cut).split('/')
+        for (const part of dest.split('/')) {
+          if (part === '' || part === '.') continue
+          else if (part === '..') out.pop()
+          else out.push(part)
+        }
+        const target = out.join('/')
+        return projectEntries.some((entry) => entry.path === target && entry.missing)
+          ? 'missing'
+          : 'include'
+      }
+
+      /**
+       * The inline constructs, left to right, from `at`. Flat and never nested:
+       * a run is one element, and a colour inside a colour is not something the
+       * four inks have anything to say about.
+       *
+       * **No `_emphasis_`**, deliberately. CommonMark's underscore rules turn on
+       * word boundaries, and a lexer that got them slightly wrong would colour
+       * half of every `snake_case` name in a document about code.
+       *
+       * @param {string} line @param {number} at @returns {Run[]}
+       */
+      function inlineRuns(line, at) {
+        const found = []
+        let i = at
+        while (i < line.length) {
+          const c = line[i]
+
+          if (c === '`') {
+            let n = 1
+            while (line[i + n] === '`') n++
+            const close = line.indexOf('`'.repeat(n), i + n)
+            if (close < 0) {
+              i += n
+              continue
+            }
+            // The delimiters and the body in one ink: a code span is the inline
+            // of the fenced block, whose body the table puts at `--quiet` too.
+            found.push(...run(i, close + n, 'quiet'))
+            i = close + n
+            continue
+          }
+
+          if (c === '[' || (c === '!' && line[i + 1] === '[')) {
+            const opens = c === '!' ? i + 1 : i
+            const shuts = line.indexOf(']', opens + 1)
+            const dest = shuts < 0 ? -1 : line.indexOf(')', shuts + 2)
+            if (
+              shuts < 0 ||
+              line[shuts + 1] !== '(' ||
+              dest < 0 ||
+              /[\s"]/.test(line.slice(shuts + 2, dest))
+            ) {
+              // A citation `[@panel]`, a reference link, a bare bracket: left as
+              // body text rather than guessed at.
+              i = opens + 1
+              continue
+            }
+            found.push(...run(i, opens + 1, 'quiet'))
+            found.push(...run(shuts, shuts + 2, 'quiet'))
+            found.push(...run(shuts + 2, dest, 'link'))
+            found.push(...run(dest, dest + 1, 'quiet'))
+            i = dest + 1
+            continue
+          }
+
+          if (c === '*' || c === '~') {
+            const n = line[i + 1] === c ? 2 : 1
+            const mark = c.repeat(n)
+            const close = line.indexOf(mark, i + n)
+            if (close < 0 || close === i + n) {
+              i += n
+              continue
+            }
+            found.push(...run(i, i + n, 'quiet'))
+            // A strike takes its delimiters and keeps body ink: the table gives
+            // `--mark` to emphasis, and struck text is not emphasised.
+            if (c === '*') found.push(...run(i + n, close, n === 2 ? 'strong' : 'em'))
+            found.push(...run(close, close + n, 'quiet'))
+            i = close + n
+            continue
+          }
+
+          i++
+        }
+        return found
+      }
+
+      /** Every line of a markdown buffer, block state carried down it.
+       *  @param {string[]} source @returns {(Run[] | null)[]} */
+      function markdownRuns(source) {
+        const out = []
+        /** The fence the walk is inside: its character, and how many of them. */
+        let fence = null
+        let front = source[0] === '---'
+
+        for (let n = 0; n < source.length; n++) {
+          const line = source[n]
+
+          if (front) {
+            const closes = n > 0 && (line === '---' || line === '...')
+            if (closes) front = false
+            out.push(closes || n === 0 ? whole(line, 'quiet') : yamlLine(line))
+            continue
+          }
+
+          if (fence !== null) {
+            const shut = new RegExp(`^\\s{0,3}\\${fence.char}{${fence.length},}\\s*$`)
+            if (shut.test(line)) fence = null
+            out.push(whole(line, 'quiet'))
+            continue
+          }
+
+          // The one test that decides most lines, and it decides them without
+          // allocating: a paragraph that opens with a letter and holds none of
+          // the four inline characters has no runs at all.
+          if (OPENS.indexOf(line[0]) < 0 && inert(line)) {
+            out.push(null)
+            continue
+          }
+
+          const opens = /^\s{0,3}(`{3,}|~{3,})/.exec(line)
+          if (opens !== null) {
+            fence = { char: opens[1][0], length: opens[1].length }
+            out.push(whole(line, 'quiet'))
+            continue
+          }
+
+          const heading = /^(\s{0,3}#{1,6})(\s+)(\S.*)$/.exec(line)
+          if (heading !== null) {
+            const text = heading[1].length + heading[2].length
+            out.push([...run(0, heading[1].length, 'quiet'), ...run(text, line.length, 'head')])
+            continue
+          }
+
+          if (/^\s{0,3}#{1,6}\s*$/.test(line) || /^\s{0,3}([-*_])[ \t]*(\1[ \t]*){2,}$/.test(line)) {
+            out.push(whole(line, 'quiet'))
+            continue
+          }
+
+          const marker = includeIn(line)
+          if (marker !== null) {
+            out.push([
+              ...run(0, marker.from, 'quiet'),
+              ...run(marker.from, marker.to, includeClass(marker.dest)),
+              ...run(marker.to, line.trimEnd().length, 'quiet')
+            ])
+            continue
+          }
+
+          const quote = /^(\s{0,3}>+)(\s?)/.exec(line)
+          const bullet = quote === null ? /^(\s*)([-*+]|\d{1,9}[.)])(\s+)/.exec(line) : null
+          if (quote !== null) {
+            out.push([...run(0, quote[1].length, 'quiet'), ...inlineRuns(line, quote[0].length)])
+            continue
+          }
+          if (bullet !== null) {
+            const at = bullet[1].length
+            out.push([
+              ...run(at, at + bullet[2].length, 'quiet'),
+              ...inlineRuns(line, bullet[0].length)
+            ])
+            continue
+          }
+
+          const found = inlineRuns(line, 0)
+          out.push(found.length > 0 ? found : null)
+        }
+        return out
+      }
+
+      /** Every line's runs, in one pass.
+       *  @param {string[]} source @param {'markdown' | 'bibtex' | 'yaml'} grammar
+       *  @returns {(Run[] | null)[]} */
+      function tokenise(source, grammar) {
+        if (grammar === 'yaml') return source.map(yamlLine)
+        if (grammar === 'markdown') return markdownRuns(source)
+
+        const out = []
+        let depth = 0
+        for (const line of source) {
+          out.push(bibtexLine(line, depth))
+          for (const c of line) {
+            if (c === '{' || c === '(') depth++
+            else if (c === '}' || c === ')') depth = Math.max(depth - 1, 0)
+          }
+        }
+        return out
+      }
+
+      /** One mirror row: the line, cut into its runs. **A line with no runs is
+       *  one text node and no element**, which is what keeps the pass inside its
+       *  budget on a document that is mostly prose.
+       *
+       *  **`paintRow` and not `paint`**: the renderer a thousand lines up already
+       *  declares a `paint`, and two function declarations in one module scope
+       *  are legal JavaScript in which the second silently wins.
+       *  @param {string} line @param {Run[] | null} runs @returns {HTMLElement} */
+      function paintRow(line, runs) {
+        const row = document.createElement('div')
+        if (runs === null || runs.length === 0) {
+          // An empty line still occupies one, and an empty element does not.
+          row.textContent = line === '' ? '\u200b' : line
+          return row
+        }
+        let at = 0
+        for (const token of runs) {
+          if (token.from > at) row.appendChild(document.createTextNode(line.slice(at, token.from)))
+          const span = document.createElement('span')
+          span.className = token.cls
+          span.textContent = line.slice(token.from, token.to)
+          row.appendChild(span)
+          at = token.to
+        }
+        if (at < line.length) row.appendChild(document.createTextNode(line.slice(at)))
+        return row
+      }
+
+      /*
         Lay the mirror out and measure it. **Unconditional**, where the gutter
         below is not: `#lines` ships `hidden` and `shown` is `false`, so a
         rebuild gated the way the gutter's is would leave this box empty for
@@ -4616,6 +5148,7 @@
         the heights are one layout, so they are taken once here and read twice.
       */
       function remirror() {
+        const started = performance.now()
         const width = paneWidth()
         if (text.value === mirroredText && width === mirroredWidth) return
         mirroredText = text.value
@@ -4638,14 +5171,9 @@
            from, so assigning it back here lays the glyphs out over exactly the
            column the textarea lays its own over. */
         mirror.style.width = `${text.clientWidth}px`
-        mirror.replaceChildren(
-          ...text.value.split('\n').map((line) => {
-            const row = document.createElement('div')
-            // An empty line still occupies one, and an empty element does not.
-            row.textContent = line === '' ? '\u200b' : line
-            return row
-          })
-        )
+        const source = text.value.split('\n')
+        const runs = tokenise(source, grammarOf(editedPath))
+        mirror.replaceChildren(...source.map((line, at) => paintRow(line, runs[at])))
 
         // One layout, read twice: `regutter` is given these heights rather than
         // measuring a second time, and `markLine` counts them to clamp the
@@ -4668,6 +5196,7 @@
         // The layer follows; it does not scroll. `#lines`' arrangement, second
         // instance — here, and again on the textarea's own `scroll`.
         mirror.scrollTop = text.scrollTop
+        pane.mirrorMs = since(started)
       }
 
       /*
