@@ -1296,6 +1296,27 @@ list to one item.
   the pass is a regex sweep over 300 KB beside a `render_project` OQ-14 measured at
   23.9 ms over 267 KB, so the likely outcome is that this question is never spent.
 
+- **OQ-16** — a keystroke in `Lines` mode costs a whole-document layout, and it always
+  has. Raised 2026-09-04 by Phase 23's own gate, which measured it while measuring
+  something else. *(design call, and it belongs to whichever phase next has a reason to
+  open the gutter's cadence)*
+
+  Measured on `tests/fixtures/long.md` (300,527 bytes) against `39a4d6a`, the page as
+  Phase 8 shipped it: a keystroke costs **1.2 ms with `Lines` off and 40.7 ms with it
+  on** in Chromium, 1.0 and 36 in WebKit. The 40 ms is one `offsetHeight` sweep over
+  1,879 mirror rows, which is how a row is made as tall as its line renders, and there is
+  no cheaper way to ask a textarea where it wrapped.
+
+  **Phase 23 does not raise it and deliberately does not gate it.** That phase's own
+  budget is on the default state, where its three readings take `remirror` to 1.4 ms; a
+  budget it invented for a column Phase 8 shipped would be one phase legislating for
+  another, and the number would fail on a document nobody has complained about.
+
+  **What would answer it** is the cadence question Phase 8 answered once: the gutter's
+  rows are rebuilt on every keystroke, and a column of numbers whose heights moved by one
+  row does not need all 1,879 re-measured. **Not opened further until an author says
+  typing in `Lines` mode is slow**, which nobody has.
+
 ## 4. Implementation phases
 
 Strictly sequential; each is one plan-mode pass. Phases 1 to 3 build a
@@ -6221,14 +6242,20 @@ be *bigger*, and that is the one thing the author cannot have.
   - **`remirror()`** — unconditional. Builds `#mirror` from the buffer at the pane's
     content width and tokenises it, memoised on its own `mirroredText`/`mirroredWidth`.
   - **`regutter()`** — `if (!shown) return`. Reads the heights `remirror` just laid out
-    and writes `#lines`, memoised on **its own** pair.
+    and writes `#lines`, memoised on **its own** pair — its own *variables*, and the
+    values `remirror` wrote rather than a second `getComputedStyle` of its own. Two
+    readings of one width in one pass is a second thing that can disagree, and it settles
+    a case by construction: the gutter can only rebuild on a pass where the mirror did, so
+    a fresh gutter never meets a mirror row still wearing the caret's mark.
   - **`relines()`** stays as `remirror()` then `regutter()`, so every existing caller is
     unchanged.
 
   **The two seams inside today's function are assigned rather than left to fall out.**
   `relines`' `text.value === ''` branch splits with the function: `remirror` empties the
   mirror, nulls `rows` and calls `markLine`; `regutter` empties `#lines`. **`rows` stays
-  `remirror`'s**, produced there and read by `regutter` and `markLine` — the band no
+  `remirror`'s**, produced there — though only where `shown`, per the keystroke-path
+  paragraph below, so it is null in the default state and `markLine`'s own guard is what
+  already answers for that — and read by `regutter` and `markLine` — the band no
   longer needs its prefix sums, but `markLine`'s `rows === null` guard and its row index
   both still do.
 
@@ -6285,7 +6312,25 @@ line stays and is invisible.
 
   **The layer follows; it does not scroll.** `#lines`' arrangement, second instance:
   no scrolling of its own, `scrollTop` driven off `#text`'s by `remirror` and by the
-  existing `scroll` listener, which gains one line.
+  existing `scroll` listener, which gains one line. **`remirror`'s own follow rides a
+  `requestAnimationFrame` and the listener's does not**, and the asymmetry is measured
+  rather than stylistic: writing `mirror.scrollTop` lays out the ink layer
+  `replaceChildren` has just dirtied, which is the whole of what a keystroke was found to
+  cost, and in a frame the browser does that layout in the frame it was going to spend
+  anyway. The listener has a reader dragging a scrollbar and cannot wait a frame; a
+  rebuild's own follow has none. The exit gate carries the numbers.
+
+  **Three readings come off the keystroke path, and all three are this file's own rules
+  applied to a reading rather than to a placement.** The gate below measured
+  `remirror` at 36.2 ms in Chromium and 26 in WebKit over `tests/fixtures/long.md` against
+  a budget of 8, found the tokenise costing 0.1, and found the whole of it to be one
+  forced layout of a 300 KB document. So: the follow above; **the content width cached and
+  refreshed by the `column` `ResizeObserver`**, which is the rule `placeViewer` was
+  rewritten under and an observer that already fires for a scrollbar appearing; and
+  **`rows` measured only when the gutter draws**, which is Phase 8's *"the mode that pays
+  for the measurement is the mode that gets the band"* applied to the measurement rather
+  than to the band. **None of the three reaches the ink**, which is built unconditionally
+  either way, and clause 20 is what holds that apart.
 
   **`#text` sits above the ink and below the figure** — ink `1`, textarea `2`, `#viewer`
   `3`. `#text` is a flex item at `position: static`, on which a non-`auto` `z-index`
@@ -6501,11 +6546,71 @@ line stays and is invisible.
   subject was what a keystroke waits on, and this adds a tokenise to a rebuild that is
   already whole-buffer. Measured in the driver on `tests/fixtures/long.md` (300,527 bytes,
   1,879 lines, pure ASCII), `performance.now()` around `remirror`, median of 20
-  keystrokes appended at the end of the buffer: **the tokenise-and-build pass stays under
-  8 ms**, half a 16.7 ms frame and beside the 23.9 ms `render_project` OQ-14 measured over
-  267 KB. **If it does not, this phase is `cut` and re-specced** — the windowed
-  alternative is OQ-15 and not a branch of this gate, because a gate whose failure path
-  is an undesigned second design checks nothing.
+  keystrokes appended at the end of the buffer, **in the default state**: under **8 ms**,
+  half a 16.7 ms frame and beside the 23.9 ms `render_project` OQ-14 measured over 267 KB.
+  **If it does not, this phase is `cut` and re-specced** — the windowed alternative is
+  OQ-15 and not a branch of this gate, because a gate whose failure path is an undesigned
+  second design checks nothing.
+
+  **The first draft of this gate bounded the wrong quantity, and the correction is the
+  measurement rather than a second opinion.** It said *"the tokenise-and-build pass"*,
+  which is the thing a new lexer was expected to cost. Built and measured (Chromium /
+  WebKit, the document above, the method above):
+
+  | | ms |
+  |---|---|
+  | the three grammars, whole buffer | **0.1 / 0** |
+  | building 1,880 rows, and `replaceChildren` | 1.5 / 4 |
+  | `remirror` **as this phase first specced it** | **36.2 / 26** |
+
+  **The tokenise is free and the rebuild is nearly free; what costs is one forced layout,
+  and only ever one.** Whichever of `remirror`'s reads comes first after the buffer
+  changed pays a reflow of a 300 KB document and the rest are cheap — 16.5 / 8 ms if that
+  read is `paneWidth`'s `clientWidth`, 17.6 / 15 ms if it is the mirror's own
+  `offsetHeight` sweep, 34.2 / 22 ms if it is the `scrollTop` write, which lays out the
+  ink layer `replaceChildren` has just dirtied. Moving them past each other moves the
+  number and does not lower it, which was measured twice before it was believed.
+
+  **Against `39a4d6a`, the shipped page, on the same document**: a keystroke cost 1.2 ms
+  with `Lines` off and 40.7 ms with it on in Chromium, 1.0 and 36 in WebKit. So the
+  40 ms is Phase 8's, already shipped and unchanged; what this phase does is make it
+  **unconditional**, and that is the defect the gate found. The cost is linear in the
+  buffer at about 0.12 ms/KB and crosses 8 ms near 70 KB, so it is a thesis's problem and
+  not a paper's — which is exactly why a gate keyed to `long.md` is the one that catches
+  it.
+
+  **Three changes take it off the keystroke path, and none of them is a second design.**
+  All three are this file's own rules applied to a reading rather than to a placement, and
+  the amended figures below are measured, not projected:
+
+  - **The content width is cached and refreshed by the `column` `ResizeObserver`.**
+    *"What the page watches is the pane, not the events that resize it"* is the rule
+    `placeViewer` was rewritten under, and the reading `remirror` takes per keystroke is
+    the same claim in the other direction. That observer is over `#files`, `#lines` and
+    `#text` on their **content** boxes, so it fires for the divider, the window, the fold,
+    the gutter and — the case a naive cache gets wrong — a scrollbar appearing.
+  - **`rows` is measured only when the gutter draws.** With `Lines` off nothing reads it:
+    `regutter` returns at `!shown` and `markLine` guards on `lines.hidden`. It stays
+    `remirror`'s and stays null in the default state, which `markLine` already guards on.
+    This is Phase 8's *"the mode that pays for the measurement is the mode that gets the
+    band"*, applied to the measurement itself rather than to the band — **and it does not
+    reach the ink**, which is built unconditionally either way. Clause 20 is what holds
+    that apart.
+  - **The scroll follow is deferred to a frame.** Writing `mirror.scrollTop` is what
+    forces the ink layer's layout; in a `requestAnimationFrame` the browser does the same
+    layout in the frame it was going to spend anyway. **The `scroll` listener is not
+    deferred** and must not be: a reader dragging the pane's scrollbar would see the ink
+    trail its glyphs, where a rebuild's own follow has no such reader.
+
+  | | ms |
+  |---|---|
+  | `remirror`, default state, amended | **1.4 / 4** |
+  | the whole `input` handler, default state, amended | 2.9 / 5 |
+  | `remirror` in `Lines` mode | 35.6, and it is Phase 8's figure unchanged |
+
+  **`Lines` mode is deliberately not gated here.** That cost predates this phase, this
+  phase does not raise it, and a budget this phase invented for a column Phase 8 shipped
+  would be this phase legislating for another. It is recorded as **OQ-16** instead.
 
   By eye, against `tests/fixtures/samples/showcase/showcase.md` — **the full path, the
   short one in Phase 8's gate resolving nowhere** — with `refs.bib` beside it and a
@@ -6551,11 +6656,16 @@ line stays and is invisible.
   `cut`, and `note` is unchanged. **No `CLAUDE.md` change**: the prefix, the observable
   and the engine boundary are untouched.
 
-  **Commit plan.** One push, four commits: the `relines` split with its two memos, alone
+  **Commit plan.** One push, five commits: the `relines` split with its two memos, alone
   and unbisectable if merged with what follows; the ink layer with the band moved onto it,
   the textarea transparent and the drag suppression; the three grammars and the token
-  table; then clauses 19–22 with their mutations, the amendment, the driver item, the
+  table; **the three readings off the keystroke path**, which is its own commit because it
+  is the one thing here a measurement asked for and a reader will want to bisect against
+  the number; then clauses 19–22 with their mutations, the amendment, the driver item, the
   fixture, and the rule, README and regenerated index.
+
+  **The drafted spec lands first, on its own**, as Phases 21 and 22 did — six commits in
+  the push, five of them the plan's.
 
 <!--
 The review record is a sibling file, not a section: it lives at

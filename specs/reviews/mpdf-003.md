@@ -2,6 +2,50 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 32 — Phase 23 only — 2026-09-04 — the author, from the build — **AMENDED, RE-REVIEW OPEN**
+
+**A round opened by an implementation and not by a reviewer**, which §7 does not provide
+for and which is recorded here because the alternative is a spec that the code has
+silently outgrown. Phase 23 was built through its third commit; its own gate then failed,
+and what the failure said was not what the gate was written to hear.
+
+**The budget bounded the wrong quantity.** *"The tokenise-and-build pass stays under
+8 ms"* was written against a new lexer. Measured on `tests/fixtures/long.md` (300,527
+bytes, 1,879 lines), median of 20 appended keystrokes, Chromium / WebKit: **the three
+grammars cost 0.1 / 0 ms** and building 1,880 rows with `replaceChildren` costs 1.5 / 4.
+`remirror` as specced costs **36.2 / 26**.
+
+**All of it is one forced layout, and only ever one.** Whichever of `remirror`'s reads
+comes first after the buffer changed pays a reflow of a 300 KB document: 16.5 / 8 ms at
+`paneWidth`'s `clientWidth`, 17.6 / 15 at the mirror's `offsetHeight` sweep, 34.2 / 22 at
+the `scrollTop` write, which lays out the ink layer `replaceChildren` has just dirtied.
+Two experiments moved them past each other; the number moved with whichever read went
+first and never fell. That is why the third experiment was the one that mattered.
+
+**Against `39a4d6a` the defect is named exactly.** On the same document the shipped page
+costs 1.2 ms with `Lines` off and 40.7 with it on in Chromium, 1.0 and 36 in WebKit. The
+40 ms is Phase 8's, unchanged; **what Phase 23 did was make it unconditional**, taking the
+default state from 1 ms to 37. The cost is linear at about 0.12 ms/KB and crosses 8 ms
+near 70 KB, so a paper never meets it and a thesis always does — which is the argument for
+a gate keyed to `long.md`, made by the gate itself.
+
+**Amended rather than cut, and the human made that call**, asked and answered explicitly
+against the alternative of taking the gate's own `cut` path. The ground: the design the
+gate was protecting is sound and the thing it feared is free, while the regression it
+exposed is real and wants fixing rather than waiving. Three changes, each this file's own
+rule applied to a reading rather than to a placement — the content width cached off the
+`column` `ResizeObserver`, `rows` measured only where the gutter draws, the rebuild's
+scroll follow deferred to a frame while the `scroll` listener's stays synchronous. Built
+and measured: **`remirror` 1.4 / 4 ms in the default state, the whole `input` handler
+2.9 / 5**, and `Lines` mode unchanged at Phase 8's own figure.
+
+**`Lines` mode is left ungated and moved to OQ-16**, because a budget this phase invented
+for a column Phase 8 shipped would be one phase legislating for another.
+
+**What this round does not do is clear the phase.** The amendment is unreviewed: it
+changes the Scope, the gate and the commit plan, and it is `/review-spec --phase 23` that
+says whether it stands.
+
 ### Round 31 — Phase 23 only — 2026-09-04 — both reviewers, resumed — **READY (converged)**
 
 **Past the §7.6 cap, and the human authorised it.** Round 30 escalated with two blockers;
