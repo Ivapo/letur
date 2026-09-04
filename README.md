@@ -139,7 +139,9 @@ because that is the file the next compile will refuse on. Hover a markdown row a
 `main` button appears: click it and that file becomes the one that compiles, and the app
 remembers your choice the next time you open that folder. It remembers it in its own
 Application Support folder and writes nothing into yours. The `Files` mark in the bar, or
-`⌘B`, folds the list away and brings it back.
+`⌘B`, folds the whole list away and brings it back; a folder heading is a button of its
+own, and pressing it folds just what is under it — the mark beside the name says which
+way it is set, and the panel gives the width it was using back to the pages.
 
 **The `+` beside `Files` makes a new one.** Type the path you want it at, relative to
 the project — `sections/discussion.md` — and the app creates it empty and lists it. It
@@ -196,7 +198,7 @@ $ bun harness/checks.mjs
 
 `app/harness/serve.mjs` serves a copy of the front end with a stub in its head, so the
 real page can be driven outside a window; `bun harness/checks.mjs --falsify` breaks the
-page twelve ways and checks that each break fails the one clause that owns it.
+page fifteen ways and checks that each break fails the one clause that owns it.
 
 ## Licence
 

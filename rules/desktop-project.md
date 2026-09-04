@@ -28,7 +28,7 @@ generated: 2026-08-28
 What the window opens when the author picks one file: the folder it belongs to,
 the file under that folder which compiles, and the list of everything in it.
 `rules/desktop.md` has the crate, the commands, the watch and the bundle;
-`rules/desktop-panes.md` has the panel this feeds.
+`rules/desktop-panel.md` has the panel this feeds.
 
 **The opened file's parent is where the search starts, not where it stops.**
 `app/src/document.rs:project_root` reads every `.md` directly in that parent's
