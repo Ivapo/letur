@@ -25,6 +25,8 @@ covers: >
   asset list gives and the filter reads, the project this file hands to a rule of
   its own, the panel's status fields and the union built where no disk is
   read, the watch loop and its fourth answer and the two debounces it runs on,
+  the compile that runs with the lock released and the two guards that decide
+  whether its answer is still wanted,
   the three values the state holds where it held one and the two of them that
   are now two files, the second file beside the store and the one thing in it that
   is not about a folder, the eighteenth command and the two halves one of them is, the second
@@ -40,8 +42,15 @@ covers: >
   facts a build enforces, and the server one build carries behind a feature,
   the capability it looks to want and does not, and the setter it offers where
   the page is refused one
-max_lines: 715
-generated: 2026-09-03
+# **The last raise.** 695, then 715 at `mpdf-003` Phase 21, and 730 here for the
+# paragraph on the lock released across the compile: three consecutive raises is a
+# file outgrowing its bound rather than a bound doing its job, and a cap that does
+# not bind is not one. So the next phase needing room in here **splits this file**
+# the way Phase 7 split `desktop-panel.md` out of `desktop-panes.md`, and the seam
+# is the watch loop and the compile — what those three raises and OQ-14 all keep
+# touching.
+max_lines: 730
+generated: 2026-09-04
 ---
 
 # Desktop
@@ -486,6 +495,25 @@ the sender its handler holds, which disconnects the channel, which ends the
 thread. Dropping the typing channel ends its thread the same way. That is the
 whole mechanism by which opening a second document moves both.
 
+**The compile runs with the state lock released, and two guards decide whether its
+answer is still wanted.** `preview.rs:Preview::compile` is three steps: `Preview::plan`
+stamps a serial onto a `Compile` owning the three inputs, `Compile::run` borrows no
+`Preview` and so *cannot* hold the lock, and `Preview::absorb` takes it back.
+`Session::recompile_with` and `Session::on_change_with`'s bare-recompile branch — the two
+that fire while a hand is on the keys — drop the lock across the middle step, so a
+keystroke arriving mid-compile waits on nothing. `Preview::load` and `Session::save_as`
+keep `compile` whole, each one user action already behind `main.rs`'s own
+`Mutex<Session>`; **`Preview::reload` is the exception**, on the watch thread behind no
+such lock, kept whole because prising it apart inverts `on_change`'s `!taken`. The guards
+are `Preview::current` over the three inputs — derived, not counted, they being written in
+six places — and `Preview::started`/`landed`, on which **the newest-*started* render
+wins**: every change a compile reads is followed by an event scheduling a render that
+starts after it, and a dropped answer always has a fresher one coming, each of those six
+writers being followed by a compile. **`Session::open_at` carries `started` and levels
+`landed` to it** — *an Open discards every answer in flight* — where the zeroes `revision`
+and `reloaded` take would let an orphan land and freeze the window. Two renders can now
+overlap, doubling peak cost for that span; OQ-14 holds the measurements.
+
 ## The state
 
 `app/src/preview.rs:Preview` is what the loop writes and the pane shows. **Three
@@ -497,7 +525,7 @@ only on an explicit Open** — a click that re-rooted would strand the author be
 their own project with no way back up. Beside them: **the text the pane holds and
 the text as it stood at the last open or save**, the last good PDF bytes, how
 long they took, the asset list the filter reads, the disk walk the panel is drawn
-from, two counters, a stale flag, the error and the divergence. The two strings are what
+from, four counters, a stale flag, the error and the divergence. The two strings are what
 `app/src/preview.rs:external_change` compares, and holding them here rather than
 in the page is what keeps that rule testable at all.
 
@@ -610,9 +638,8 @@ then hands root and main to `open_at`, which `Session::set_main` also takes, so
 the store and the window cannot disagree. It clears the previous document's page
 and text, reads and compiles once, and only then calls `Session::arm` — old loops
 dropped before new started, so no two of them ever hold a document. Both callbacks
-check `edited` before writing, because dropping a `Watch` or a typing channel does
-not join its thread and a thread mid-compile could otherwise write its page over a
-newer one.
+check `edited` before **planning** and again before absorbing, dropping a `Watch` or a
+typing channel not joining its thread.
 
 **`Session::set_edited` borrows `arm` and not the rest of the open**, and
 `rules/desktop-project.md` has why. `arm` exists at all because both loop guards

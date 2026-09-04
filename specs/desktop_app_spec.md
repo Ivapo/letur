@@ -115,7 +115,7 @@ phases:
     by: null
   - name: "Phase 22 — typing never waits on a background compile"
     reviewed: 2026-09-04
-    shipped: null
+    shipped: 2026-09-04
     cut: null
     by: null
 
