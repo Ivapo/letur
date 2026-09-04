@@ -531,6 +531,34 @@
       #files li.folder .name::after {
         content: '/';
       }
+      /*
+        The fold's mark, and `mpdf-003` Phase 15's rule decides it in one step:
+        `▾` and `▸` name a disclosure exactly, are text-presentation, take
+        `color`, and are the vocabulary every tree on this platform already
+        uses. So a glyph, and nothing is drawn.
+
+        **The two states are spelled as `aria-expanded`**, so the attribute the
+        button carries for a screen reader is the same one the mark is keyed to
+        — one declaration serving both.
+
+        **In `::before` and not in the button's text**, which is load-bearing
+        rather than tidy: `app/harness/checks.mjs`'s clause 6 reads
+        `.name`'s `textContent` against the bare path segment, and a glyph
+        written into the button would fail a clause this never touches.
+
+        **The turning chevron `#views` rejected is a different question.** That
+        comment refuses one in the *bar*, on two grounds — it would not survive
+        at 10px in a bar whose entire ink is one colour, and it would stand
+        beside a second toggle marked another way. Neither reaches a panel row:
+        this is `12px/1.5 ui-monospace`, and a folder row stands beside no
+        control marked by a different device.
+      */
+      #files li.folder .name::before {
+        content: '▾ ';
+      }
+      #files li.folder .name[aria-expanded='false']::before {
+        content: '▸ ';
+      }
       /* The one that compiles. */
       #files li.here {
         color: var(--ink);
@@ -1997,6 +2025,14 @@
         // goes before the new one is asked for. Rust clears its own bytes for
         // the same reason.
         clear()
+        /* **The folds go beside `clear()` and not inside it.** An open is a new
+           project, and a fold held across one would hide rows of a tree the
+           reader has never seen — but `clear()` has a third caller, `setMain`,
+           which goes through it because Rust rebuilds the preview and restarts
+           its counters. Emptying the folds in there would unfold the reader's
+           whole tree every time they pressed a `main` button, on a tree that
+           did not change. */
+        folds.clear()
 
         try {
           await invoke('open_document', { path })
@@ -2031,6 +2067,7 @@
         if (path === null) return // nothing was waiting
 
         clear()
+        folds.clear() // beside `clear()` and not inside it, per `openDocument`
 
         try {
           await invoke('open_document', { path })
@@ -2303,6 +2340,39 @@
       */
       let folded = false
 
+      /*
+        Which folders the reader has folded, by root-relative path. **`folded`
+        above is the precedent rather than an analogy** — the same argument at a
+        finer grain: a fold decides nothing but its own drawing, nothing else
+        reads it, and it is reapplied on every status rather than held in
+        `Preview`.
+
+        **This is what keeps "the rows hold no selection" true rather than what
+        breaks it**, and the distinction is written down because a careless
+        reading has the invariant falling here: a *file* row still holds
+        nothing, and a folder row holds a fold, which is not a selection and
+        decides nothing but which rows are drawn. `parts` may go on replacing
+        the list whole.
+
+        **The two opens empty it and `clear()` deliberately does not** — see
+        `openDocument` below, whose third caller is why.
+
+        `mpdf-010` Phase 7.
+      */
+      /** @type {Set<string>} */
+      const folds = new Set()
+
+      /*
+        Whether a row sits inside a folder the reader has folded. **A prefix
+        test and not a parent test**: `parts` folded takes `parts/ch1/deep.md`
+        and the `ch1` heading with it, where a parent test would leave that
+        heading standing above nothing. It is a *proper* prefix, so a collapsed
+        folder's own row is still drawn — or there is no way back.
+
+        @param {string} path
+      */
+      const inAFold = (path) => [...folds].some((folder) => path.startsWith(`${folder}/`))
+
       /** Show the fold on every control that carries it, and on the panel. */
       function showFold() {
         for (const control of foldControls) control.setAttribute('aria-expanded', String(!folded))
@@ -2407,13 +2477,27 @@
       async function createFile(event) {
         event.preventDefault()
         newRefusal.hidden = true
+        // Read before the invoke, because the field is emptied after it.
+        const path = newName.value
         try {
-          await invoke('create_file', { path: newName.value })
+          await invoke('create_file', { path })
         } catch (problem) {
           newRefusal.textContent = String(problem)
           newRefusal.hidden = false
           return
         }
+        /* **A create expands every ancestor of its new file**, and that is a
+           decision rather than a convenience: the field takes a whole
+           root-relative path, so `parts/ch2/notes.md` may name folders the
+           reader has folded, and a create whose row does not appear is
+           indistinguishable at the window from a create that failed.
+
+           **Every ancestor and not the immediate parent** — removing
+           `parts/ch2` alone still leaves the row hidden while `parts` is
+           collapsed, which is the same failure one level up. Nothing else
+           re-expands; a fold is otherwise the reader's own until they undo it. */
+        const segments = path.split('/')
+        for (let at = 1; at < segments.length; at++) folds.delete(segments.slice(0, at).join('/'))
         newName.value = ''
         newName.focus()
       }
@@ -2445,6 +2529,10 @@
        * exactly where a path's leading segments differ from the last one's, and
        * the depth is how many segments precede the name.
        *
+       * **What is under a folder the reader folded is skipped, headings
+       * included**, per `inAFold` above. The collapsed folder's own row is
+       * still drawn, or there is no way back.
+       *
        * @param {Entry[]} entries
        * @param {string | null} main
        * @param {string | null} edited
@@ -2464,11 +2552,18 @@
           let shared = 0
           while (shared < here.length && here[shared] === folder[shared]) shared++
           for (let at = shared; at < here.length; at++) {
-            drawn.push(folderRow(here[at], at))
+            const path = here.slice(0, at + 1).join('/')
+            if (!inAFold(path)) drawn.push(folderRow(path, at))
           }
+          // **Unconditional, and that is not an oversight.** The shared-segment
+          // bookkeeping is about the entries Rust sent, not about the rows this
+          // drew, and a second entry under a collapsed folder would otherwise
+          // have its headings named as new all over again.
           folder = here
 
-          drawn.push(fileRow(entry, here.length, entry.path === main, entry.path === edited))
+          if (!inAFold(entry.path)) {
+            drawn.push(fileRow(entry, here.length, entry.path === main, entry.path === edited))
+          }
         }
         return drawn
       }
@@ -2734,14 +2829,40 @@
         if (e.key === 'Escape') hideAsset()
       })
 
-      /** @param {string} name @param {number} depth @returns {HTMLElement} */
-      function folderRow(name, depth) {
+      /**
+       * A folder heading, and the one row of this panel that holds anything.
+       *
+       * **It takes the whole root-relative path and draws the last segment.**
+       * `parts/ch1`, not `ch1`: the path is what the fold set is keyed by and
+       * what tells two `ch1`s apart, and the segment is all the rows under it
+       * leave for it to say.
+       *
+       * **The `<span>` became a `<button>`**, which is `fileRow`'s own move for
+       * a row that does something, and it carries `aria-expanded`: a disclosure
+       * that does not say which way it is set is an asymmetry with the panel's
+       * own fold control thirty lines above, and it is also the attribute the
+       * glyph rule selects on, so one declaration serves both.
+       *
+       * **The press goes through `refresh()`.** `parts` runs off a status this
+       * page does not cache, so a press that only mutated the set would redraw
+       * nothing. `status` runs no compile, and the panel is already rebuilt on
+       * every one of them.
+       *
+       * @param {string} path @param {number} depth @returns {HTMLElement}
+       */
+      function folderRow(path, depth) {
         const li = document.createElement('li')
         li.className = 'folder'
         li.dataset.depth = String(Math.min(depth, 5))
-        const label = document.createElement('span')
+        const label = document.createElement('button')
+        label.type = 'button'
         label.className = 'name'
-        label.textContent = name
+        label.textContent = path.split('/').pop() ?? path
+        label.setAttribute('aria-expanded', String(!folds.has(path)))
+        label.addEventListener('click', () => {
+          folds.has(path) ? folds.delete(path) : folds.add(path)
+          refresh()
+        })
         li.append(label)
         return li
       }

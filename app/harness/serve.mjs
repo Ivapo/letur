@@ -360,6 +360,22 @@ const MUTATIONS = {
     const statement = "          button.setAttribute('aria-label', title)\n"
     if (page.split(statement).length !== 2) die('the mutation trash-unnamed found no single explicit name')
     return page.replace(statement, '')
+  },
+
+  /* The fold's prefix test becomes a parent test. **A folder still folds and
+     still comes back** — `loose` collapsed still hides `loose/orphan.md`, whose
+     parent it is — so this is the *plausible* wrong implementation rather than
+     an obviously broken one: what it loses is a heading taken with its parent,
+     `parts` collapsed leaving `parts/ch1/deep.md` drawn under a `ch1` heading
+     that is gone.
+
+     **It is reachable by no other clause.** Every other check opens a page with
+     the fold set empty, where the predicate is never consulted, so clause 6's
+     own derivation of the same rows is untouched. */
+  'folds-one-level': (page) => {
+    const line = '      const inAFold = (path) => [...folds].some((folder) => path.startsWith(`${folder}/`))\n'
+    if (page.split(line).length !== 2) die('the mutation folds-one-level found no single prefix test')
+    return page.replace(line, "      const inAFold = (path) => folds.has(path.slice(0, path.lastIndexOf('/')))\n")
   }
 }
 

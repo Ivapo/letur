@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all fourteen. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all fifteen. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -70,7 +70,8 @@ const OWNS = {
   'receipt-sticks': 13,
   'divider-selects': 14,
   'views-deaf': 15,
-  'trash-unnamed': 16
+  'trash-unnamed': 16,
+  'folds-one-level': 17
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -1341,6 +1342,139 @@ const theDeleteIsADrawnMark = async (browser, url) => {
   return errors
 }
 
+/* 17. **A folder row folds what is under it, the fold survives the rebuild, and
+       the panel gives the width back.** The first is the gesture, the second is
+       what `parts` rebuilding the panel whole on every status puts at risk, and
+       the third is the whole reason the phase exists — the panel is
+       content-sized under a 40% cap, so folding away the rows that size it
+       gives that width to the pages.
+
+       **The expectation is derived here from the entries**, as clause 6's is,
+       so this compares two derivations and not a page with itself. The rule is
+       re-stated rather than read off the page: an entry is skipped when a
+       collapsed folder is a *proper* path prefix of it, so `parts` collapsed
+       takes `parts/ch1/deep.md` **and the `ch1` heading** while leaving the
+       `parts` row itself standing — or there is no way back. Asserted as the
+       whole ordered set, so it cannot pass on a page that dropped the right
+       number of wrong rows.
+
+       **All three folders and not one**, and the one-folder form was measured
+       and refused: folding `parts` alone changes the width by nothing at all,
+       because a content-sized panel is as wide as its *widest* row and that row
+       is `loose/orphan.md`. Folding `loose` alone does narrow it, by the 0.45px
+       that name beats `parts/ch1/deep.md`'s extra indent by — too fine to
+       assert across two engines with different font metrics. Stated as
+       narrower, never as a number, per this file's one rule. */
+const theFolderRowFolds = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  /* A row's identity, for both derivations. The folder mark is a `::before` and
+     the trailing `/` an `::after`, so neither reaches `textContent` and a
+     heading reads as the bare segment it did before this phase. */
+  const read = () =>
+    page.evaluate(() => ({
+      rows: [...document.getElementById('parts').children].map(
+        (li) =>
+          `${li.classList.contains('folder') ? '[dir] ' : ''}${
+            li.querySelector('.name')?.textContent ?? ''
+          }@${li.dataset.depth}`
+      ),
+      width: document.getElementById('files').getBoundingClientRect().width
+    }))
+
+  const press = async (name) => {
+    await page.evaluate((n) => {
+      const row = [...document.getElementById('parts').children].find(
+        (li) => li.classList.contains('folder') && li.querySelector('.name')?.textContent === n
+      )
+      row?.querySelector('button.name')?.click()
+    }, name)
+    await settle(page)
+    return read()
+  }
+
+  const entries = await page.evaluate(() => window.__harness.config.entries)
+
+  /* The heading's own root-relative path is what the fold is keyed by, so the
+     derivation carries it beside the label the page draws. */
+  const derive = (folded) => {
+    const rows = []
+    let folder = []
+    for (const entry of entries) {
+      const segments = entry.path.split('/')
+      const here = segments.slice(0, -1)
+      let shared = 0
+      while (shared < here.length && here[shared] === folder[shared]) shared++
+      for (let at = shared; at < here.length; at++) {
+        const path = here.slice(0, at + 1).join('/')
+        if (!folded.some((f) => path.startsWith(`${f}/`)))
+          rows.push(`[dir] ${here[at]}@${Math.min(at, 5)}`)
+      }
+      folder = here
+      if (!folded.some((f) => entry.path.startsWith(`${f}/`)))
+        rows.push(`${segments[segments.length - 1]}@${Math.min(here.length, 5)}`)
+    }
+    return rows
+  }
+
+  /* The row is a button and it names its folder, where today it is a `<span>`
+     and names nothing. Playwright computes the accessible name itself, so this
+     reading does not fork by engine. */
+  const heading = await page.evaluate(
+    () =>
+      [...document.getElementById('parts').children].find(
+        (li) => li.classList.contains('folder') && li.querySelector('.name')?.textContent === 'parts'
+      )?.querySelector('.name')?.tagName ?? 'none'
+  )
+  const named = await page.getByRole('button', { name: 'parts' }).count()
+
+  const open = await read()
+  const collapsed = await press('parts')
+  const survived = await page.evaluate(() => window.__harness.fire('rendered')).then(async () => {
+    await settle(page)
+    return read()
+  })
+  const restored = await press('parts')
+
+  await press('loose')
+  await press('parts')
+  const all = await press('sections')
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  const isButton = heading === 'BUTTON' && named === 1
+  const drawsAll = same(open.rows, derive([]))
+  const hides = same(collapsed.rows, derive(['parts']))
+  const holds = same(survived.rows, collapsed.rows)
+  const back = same(restored.rows, open.rows)
+  const narrower = open.width - all.width > 0.5
+
+  note(`the heading is a <${heading.toLowerCase()}>, named ${named} time(s)`)
+  note(`open ${open.rows.length} rows, parts folded ${collapsed.rows.length}, back ${restored.rows.length}`)
+  note(`#files ${open.width} open, ${all.width} with all three folded`)
+
+  ok(
+    17,
+    'a folder row folds what is under it, the fold survives the rebuild, and the panel gives the width back',
+    isButton && drawsAll && hides && holds && back && narrower,
+    [
+      isButton ? null : `the parts heading is a <${heading.toLowerCase()}> the role query found ${named} of`,
+      drawsAll ? null : `unfolded  ${JSON.stringify(open.rows)}\n          wanted    ${JSON.stringify(derive([]))}`,
+      hides ? null : `folded    ${JSON.stringify(collapsed.rows)}\n          wanted    ${JSON.stringify(derive(['parts']))}`,
+      holds ? null : `a status redrew it as ${JSON.stringify(survived.rows)}`,
+      back ? null : `pressing again left ${JSON.stringify(restored.rows)}`,
+      narrower ? null : `#files is ${all.width} with all three folded against ${open.width} open`
+    ]
+      .filter(Boolean)
+      .join('; ') ||
+      `${open.rows.length} rows became ${collapsed.rows.length} and came back, ` +
+        `${open.width} → ${all.width} with all three folded`
+  )
+  return errors
+}
+
 /* ----------------------------------------------------------------- the run */
 
 const run = async ({ engine, headed, rev, doc, mutate }) => {
@@ -1378,7 +1512,8 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       theSaveSaysWhatItDidAndThenStops,
       dividerLeavesThePaneAlone,
       viewsTakeTheirMenuEvents,
-      theDeleteIsADrawnMark
+      theDeleteIsADrawnMark,
+      theFolderRowFolds
     ]) {
       gather(await check(browser, held.url))
     }
@@ -1393,7 +1528,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    17,
+    18,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +
