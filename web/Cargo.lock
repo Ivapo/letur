@@ -1384,9 +1384,9 @@ dependencies = [
 
 [[package]]
 name = "md2pdf-core"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "999c589a745a3578ea6bf16b1eebdc20bdd34ab722e982351ac7e0389f972d9c"
+checksum = "f9869602a015e2936a759fe1add5a402a9188b39e4f26d7cbb5b6f9a4a5018f4"
 dependencies = [
  "hayagriva",
  "mitex",
