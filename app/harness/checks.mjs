@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all fifteen. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all sixteen. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -71,7 +71,8 @@ const OWNS = {
   'divider-selects': 14,
   'views-deaf': 15,
   'trash-unnamed': 16,
-  'folds-one-level': 17
+  'folds-one-level': 17,
+  'bib-opens-nothing': 18
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -1475,6 +1476,114 @@ const theFolderRowFolds = async (browser, url) => {
   return errors
 }
 
+/* 18. **A bibliography row opens in the pane, and an image row still does
+       not.** `mpdf-010` OQ-2 resolved on the finding that the reason for
+       keeping a `.bib` shut stopped being true when Phase 2 separated `edited`
+       from `main`: what compiles is the master, so the pane's own file may be
+       anything the closure can be handed.
+
+       **Three readings, and the last two are what stop this widening too far.**
+       The first is the gesture — `edited` moves and `main` does not, read off
+       `invoke('status')` rather than off the row, since a page that redrew a
+       row without asking Rust would pass a DOM-only reading. The second is the
+       row's `title`, which carries a kind test of its own: widening `opens`
+       alone would leave `— not edited here` on exactly one row, the `.bib` the
+       pane is holding, where the sentence is false and where the gesture lands.
+       The third pins Phase 5 — an image still shows over the pane and leaves
+       `edited` where it was — because **one term of one boolean is all that
+       separates the two behaviours**, and a widening that swallowed images
+       would otherwise pass everything above.
+
+       The row is found by its `.name` text and clicked through the button a
+       reader presses, clause 5's own idiom: `refs.bib` and `cover.jpg` are both
+       root-level entries of `tests/fixtures/panel/`, so neither reading depends
+       on a fold.
+
+       **`#edited` is noted and deliberately not asserted**, and the isolation
+       rule is what found that rather than a reading of the file. The cell
+       following `edited` is clause 5's own property and `cell-main` is the
+       mutation that owns it; a second clause asserting the same thing made that
+       mutation fail two clauses and stop isolating. So this one is about what
+       Rust was told — `invoke('status')` rather than the DOM, which is also the
+       stronger reading, a page that redrew a row without asking Rust passing a
+       DOM-only one. */
+const theBibliographyRowOpens = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  /* **The body being a `<button>` is what "opens" means here**, since that is
+     the one difference `fileRow` draws between a row that goes in the pane and
+     a row that does not — the click below is on the same element. */
+  const read = (name) =>
+    page.evaluate((n) => {
+      const li = [...document.querySelectorAll('#parts li')].find(
+        (el) => !el.classList.contains('folder') && el.querySelector('.name')?.textContent === n
+      )
+      return {
+        found: !!li,
+        opens: !!li?.querySelector('button.name'),
+        title: li?.title ?? null,
+        cell: document.getElementById('edited').textContent,
+        status: window.__harness.status()
+      }
+    }, name)
+
+  const click = async (name) => {
+    await page.evaluate((n) => {
+      const li = [...document.querySelectorAll('#parts li')].find(
+        (el) => !el.classList.contains('folder') && el.querySelector('.name')?.textContent === n
+      )
+      li?.querySelector('button.name')?.click()
+    }, name)
+    await settle(page)
+  }
+
+  const before = await read('refs.bib')
+  await click('refs.bib')
+  const held = await read('refs.bib')
+
+  /* Phase 5's behaviour, pinned: the figure goes up over the pane and the pane
+     keeps the file it was holding — which after the click above is the `.bib`. */
+  await click('cover.jpg')
+  await settle(page)
+  const figure = await page.evaluate(() => ({
+    drawn: !document.getElementById('viewer').hidden && !!document.querySelector('#viewer .sheet img'),
+    status: window.__harness.status()
+  }))
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const offered = before.found && before.opens && before.title === 'Edit refs.bib'
+  const took = held.status.edited === 'refs.bib' && held.status.main !== 'refs.bib'
+  const unmoved = held.status.main === before.status.main
+  const honest = held.title === 'refs.bib' && !held.title.includes('not edited here')
+  const image = figure.drawn && figure.status.edited === held.status.edited
+
+  note(`before the click: opens ${before.opens}, title ${JSON.stringify(before.title)}`)
+  note(
+    `after it: edited ${held.status.edited}, main ${held.status.main} (was ${before.status.main}), ` +
+      `cell ${JSON.stringify(held.cell)}, title ${JSON.stringify(held.title)}`
+  )
+  note(`then cover.jpg: drawn ${figure.drawn}, edited ${figure.status.edited}`)
+
+  ok(
+    18,
+    'a bibliography row opens in the pane and an image row still does not',
+    offered && took && unmoved && honest && image,
+    [
+      offered ? null : `the row was found ${before.found}, a button ${before.opens}, titled ${JSON.stringify(before.title)}`,
+      took ? null : `the click left edited ${held.status.edited} against main ${held.status.main}`,
+      unmoved ? null : `main moved ${before.status.main} → ${held.status.main}`,
+      honest ? null : `the held row's title is ${JSON.stringify(held.title)}`,
+      image ? null : `cover.jpg drew ${figure.drawn} and left edited ${figure.status.edited}`
+    ]
+      .filter(Boolean)
+      .join('; ') ||
+      `refs.bib went from ${JSON.stringify(before.title)} to ${JSON.stringify(held.title)} with main at ${held.status.main}`
+  )
+  return errors
+}
+
 /* ----------------------------------------------------------------- the run */
 
 const run = async ({ engine, headed, rev, doc, mutate }) => {
@@ -1513,7 +1622,8 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       dividerLeavesThePaneAlone,
       viewsTakeTheirMenuEvents,
       theDeleteIsADrawnMark,
-      theFolderRowFolds
+      theFolderRowFolds,
+      theBibliographyRowOpens
     ]) {
       gather(await check(browser, held.url))
     }
@@ -1528,7 +1638,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    18,
+    19,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +

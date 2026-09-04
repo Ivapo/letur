@@ -376,6 +376,24 @@ const MUTATIONS = {
     const line = '      const inAFold = (path) => [...folds].some((folder) => path.startsWith(`${folder}/`))\n'
     if (page.split(line).length !== 2) die('the mutation folds-one-level found no single prefix test')
     return page.replace(line, "      const inAFold = (path) => folds.has(path.slice(0, path.lastIndexOf('/')))\n")
+  },
+
+  /* `opens` goes back to markdown alone, which is the page exactly as it stood
+     before `mpdf-010` Phase 8 — the *previous* implementation rather than an
+     invented one, which is the strongest shape a mutation takes.
+
+     **The title's own kind test is deliberately left widened.** The two are
+     separate terms in the page and this reverts one of them, so the clause's
+     first reading fails — the row draws a `<span>` and no click reaches
+     `set_edited` — while its title reading goes on passing. That is the point:
+     it says the clause is anchored on the gesture and not on the sentence
+     beside it, and a mutation reverting both would not tell the two apart. */
+  'bib-opens-nothing': (page) => {
+    const term =
+      '        const opens =\n' +
+      "          (entry.kind === 'markdown' || entry.kind === 'bibliography') && !entry.missing && !holding\n"
+    if (page.split(term).length !== 2) die('the mutation bib-opens-nothing found no single opens term')
+    return page.replace(term, "        const opens = entry.kind === 'markdown' && !entry.missing && !holding\n")
   }
 }
 

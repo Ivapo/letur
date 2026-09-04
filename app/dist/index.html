@@ -345,10 +345,11 @@
         own left edge because of this element.
 
         **The rows open, and two gestures on a row are two gestures.** The body
-        of a markdown row puts that file in the pane; the `main` button that
-        appears beside it sets which file compiles. They were kept apart before
-        there were two of them rather than after, which is why the second one is
-        a button of its own and not a modifier on the first.
+        of a markdown row — or of a bibliography, since `mpdf-010` OQ-2 — puts
+        that file in the pane; the `main` button that appears beside it sets
+        which file compiles, and only markdown gets one. They were kept apart
+        before there were two of them rather than after, which is why the second
+        one is a button of its own and not a modifier on the first.
 
         **A row can carry two marks, because they are two facts.** `.here` is
         the file that compiles and `.holding` is the file the pane is showing;
@@ -2876,25 +2877,37 @@
        * markdown file gets one: nothing else can be the file that compiles.
        *
        * **The name is a button when the row opens or shows, and a span when it
-       * does neither.** A markdown file the pane is not already holding goes in
-       * the pane; an image is shown over the pane, the pane keeping its own
-       * file, which is where `mpdf-010` OQ-1 landed. A bibliography is still
-       * inert and says so in its title, where OQ-2 leaves it, and so is a
-       * marked-missing row, which names a file the disk does not hold. The
-       * markdown row the pane already holds is inert for the reason the `main`
-       * row has no `main` button: the gesture would ask for what is already
-       * true. **That is the one gesture a reader might expect and not get** —
-       * clicking the row you are on while a figure is up does nothing — and it
-       * is accepted rather than fixed, the alternative being a row whose
-       * drawing depends on page state where holding no selection is what lets
-       * the panel be rebuilt whole on every status.
+       * does neither.** A markdown file *or a bibliography* the pane is not
+       * already holding goes in the pane, which is where `mpdf-010` OQ-2
+       * landed: the compile is `main`'s, so a `.bib` in the pane feeds its
+       * unsaved bytes to the citation pass while the page goes on drawing the
+       * whole document. An image is shown over the pane, the pane keeping its
+       * own file, which is where OQ-1 landed. A marked-missing row is the one
+       * that opens nothing and says so in its title, naming a file the disk
+       * does not hold. The row the pane already holds is inert for the reason
+       * the `main` row has no `main` button: the gesture would ask for what is
+       * already true. **That is the one gesture a reader might expect and not
+       * get** — clicking the row you are on while a figure is up does nothing
+       * — and it is accepted rather than fixed, the alternative being a row
+       * whose drawing depends on page state where holding no selection is what
+       * lets the panel be rebuilt whole on every status.
+       *
+       * **The title is a second chain with its own kind test, and it moves
+       * with `opens`'.** Widening one without the other would put `— not
+       * edited here` on exactly one row — the `.bib` the pane is holding —
+       * where the sentence is false and where that gesture lands. With both
+       * moved the branch is unreachable for all three kinds: an image that is
+       * not missing always `shows`, and a missing row takes the first branch.
+       * It is left standing rather than deleted, an unreachable branch putting
+       * no sentence in the window.
        *
        * @param {Entry} entry @param {number} depth @param {boolean} here
        * @param {boolean} holding
        * @returns {HTMLElement}
        */
       function fileRow(entry, depth, here, holding) {
-        const opens = entry.kind === 'markdown' && !entry.missing && !holding
+        const opens =
+          (entry.kind === 'markdown' || entry.kind === 'bibliography') && !entry.missing && !holding
         const shows = entry.kind === 'image' && !entry.missing
 
         const li = document.createElement('li')
@@ -2909,7 +2922,7 @@
             ? `Edit ${entry.path}`
             : shows
               ? `Look at ${entry.path}`
-              : entry.kind === 'markdown'
+              : entry.kind === 'markdown' || entry.kind === 'bibliography'
                 ? entry.path
                 : `${entry.path} — not edited here`
 
