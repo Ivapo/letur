@@ -225,10 +225,12 @@
         flex: 1;
         display: flex;
         min-height: 0;
-        /* The containing block `#viewer` is positioned against. Nothing else
-           moves for it: `#pages` already carries its own `position`, and
-           `#mirror` is pinned at `top: -99999px; left: 0`, so no reader of an
-           `offsetTop` in this file changes its answer. */
+        /* The containing block `#viewer` and `#mirror` are both positioned
+           against, and the second of the two is why this is now load-bearing
+           twice: the ink layer takes its `top`, its `bottom` and the `left`
+           `placeInk` writes from this box, so it is as tall as the text pane
+           beside it. `#pages` already carries its own `position`, and nothing
+           else in this file moves for either. */
         position: relative;
       }
 
@@ -775,28 +777,87 @@
         background: var(--band);
       }
 
-      /* The mirror. Never seen; only measured. */
+      /*
+        The ink, and the ruler it has always been. `mpdf-003` Phase 23.
+
+        **One element, and that is the decision this layer rests on.** These
+        divs — one per logical line, at the pane's own content width, in the
+        pane's own font — are what the gutter's heights are measured from, and
+        they were thrown away every keystroke. They stay now, and they are
+        drawn: the textarea above goes transparent and this is what a reader
+        sees. **A second element for the ink would be two layouts that must
+        agree on every wrap, that nothing forces to agree, and whose
+        disagreement is invisible until a paragraph is long enough.** One
+        element cannot disagree with itself.
+
+        **Its geometry is four changes and three of them a height-only check
+        cannot see.** It loses the `top: -99999px` and the permanent
+        `visibility: hidden` it was hidden behind; it takes `#text`'s own
+        padding, the glyphs having to start where the textarea's start;
+        `remirror` assigns `width` from `text.clientWidth` and not from the
+        content width, the padding now being inside this box; and `left` is
+        `placeInk`'s, `placeViewer` early-returning on a hidden figure and so
+        not being able to host it. `top` and `bottom` rather than a height:
+        `#text` is a flex item in a stretched row, so the two boxes are as tall
+        as `main` and are as tall as each other.
+
+        **`overflow: hidden` is half of a pair, exactly as `#lines`' is**: this
+        box does not scroll itself, and its `scrollTop` is driven from the
+        textarea's. **`user-select` and `pointer-events` are the other half of
+        the transparency above**: the caret, the selection and the pointer all
+        belong to the textarea, and text under it that could be selected or
+        clicked would be a second copy of the document for them to catch on.
+
+        The four inks it draws in are declared with the grammars that choose
+        them, further down this sheet.
+      */
       #mirror {
         position: absolute;
-        top: -99999px;
-        left: 0;
-        visibility: hidden;
+        top: 0;
+        bottom: 0;
+        z-index: 1;
         box-sizing: border-box;
+        overflow: hidden;
+        padding: 12px 14px;
         white-space: pre-wrap;
         overflow-wrap: break-word;
+        color: var(--ink);
         font:
           12px/1.6 ui-monospace,
           SFMono-Regular,
           Menlo,
           monospace;
         tab-size: 4;
+        user-select: none;
+        pointer-events: none;
+      }
+      /* The row the caret is in: `#lines div.here`'s twin, and where the band
+         went when this layer could carry it. Only the ground moves — the row's
+         own ink is whatever its tokens made it. */
+      #mirror div.here {
+        background: var(--band);
       }
 
       /*
-        The text pane. A plain textarea and nothing more: no highlighting, no
-        autocomplete, no formatting commands. Its text is what compiles — the
-        file beside it need never have held that text — and every change is
-        sent to Rust, which holds the buffer and owns the debounce.
+        The text pane. **A textarea that no longer draws its own text**: the
+        buffer, the caret, the selection, the disabled state and the divider's
+        geometry are all still this element's, and the glyphs a reader sees are
+        `#mirror`'s underneath. Its text is what compiles — the file beside it
+        need never have held that text — and every change is sent to Rust, which
+        holds the buffer and owns the debounce.
+
+        **Three transparencies and a caret, and each is load-bearing.**
+        `color: transparent` is what lets the ink through; `caret-color` is what
+        a transparent colour would otherwise have taken with it, the caret
+        having no colour of its own; and `background: transparent` is what stops
+        this element painting over the layer below, `body` already carrying
+        `var(--ground)` so nothing else has to.
+
+        **`z-index` on a static flex item is not a mistake.** A flex item with a
+        non-`auto` `z-index` creates a stacking context and paints in that
+        order, which is what puts this above the ink at 1 and below the figure
+        surface at 3 — and it stays in the flex flow at full size, so
+        `#divider`'s `pointerdown` reads the box it always read.
       */
       #text {
         flex: 0 0 40%;
@@ -806,26 +867,10 @@
         padding: 12px 14px;
         border: 0;
         resize: none;
-        background: var(--ground);
-        color: var(--ink);
-        /*
-          The band under the caret's line is painted as this element's own
-          background — a gradient of one colour, sized and placed from the
-          measured row. **`local` is what makes it scroll with the text**: the
-          default would pin it to the border box and it would sit still while
-          the lines moved under it.
-
-          **`no-repeat` cost a build.** The gradient is sized to the one
-          measured row and a background repeats by default, so without it the
-          band tiles down the whole pane and every line wears one.
-
-          A band drawn as an element would need the textarea wrapped, made
-          transparent, and layered over — and the divider's geometry, which
-          reads this element's own box, would move with it. The background
-          costs none of that.
-        */
-        background-attachment: local;
-        background-repeat: no-repeat;
+        z-index: 2;
+        background: transparent;
+        color: transparent;
+        caret-color: var(--ink);
         font:
           12px/1.6 ui-monospace,
           SFMono-Regular,
@@ -833,8 +878,32 @@
           monospace;
         tab-size: 4;
       }
+      /* **Restated as the caret alone.** A `color` here is more specific than
+         the `transparent` above and would paint a disabled pane's own grey text
+         over the ink, which is the one state that would have shown the document
+         twice. */
       #text:disabled {
-        color: var(--quiet);
+        caret-color: var(--quiet);
+      }
+      /*
+        **The selection is given an explicit colour rather than left to the
+        engine, and it is the one place this arrangement is visibly wrong
+        without a rule.** The default `::selection` overrides the text colour
+        with the system's highlight-text colour — which would make this
+        element's own glyphs, transparent everywhere else, visible inside the
+        selection and drawn over the ink's. The reader would see the run twice,
+        once in the system's colour and once in its own.
+
+        So `transparent` again, and a wash the ink shows through: the textarea
+        goes on painting nothing and the selected run keeps the colours its
+        tokens gave it, which is what a reader selects text in order to read.
+        **`color-mix` and not a literal** — a selection is chrome, and every
+        other colour in this file follows the palette rather than sitting
+        outside it.
+      */
+      #text::selection {
+        color: transparent;
+        background: color-mix(in srgb, var(--ink) 22%, transparent);
       }
       /*
         **No focus ring.** The engine's default draws one around the whole pane
@@ -2664,7 +2733,37 @@
         viewer.style.width = `${text.offsetWidth}px`
       }
 
-      const column = new ResizeObserver(placeViewer)
+      /*
+        The ink's half of the same reading. **A second function rather than two
+        more lines in the one above**, and two things separate them: the figure
+        early-returns when it is hidden, which is nearly always, where the ink is
+        placed for every document; and the figure takes a `left` *and* a `width`
+        where this writes **`left` only**. `#mirror`'s width has exactly one
+        writer, `remirror`, at the reading the wraps were measured at —
+        `placeViewer`'s `offsetWidth` is a border-box cover and differs from that
+        by a classic scrollbar's track, and the wrong one of the two silently
+        moves where the ink wraps.
+
+        **It also hides a mirror the column has outgrown**, and that is the
+        second half of the suppression rather than an extra. A width this box was
+        not built at means the textarea has rewrapped and this has not: under a
+        divider drag, and under the window's own edge, which arms the same 200 ms
+        timer with no press to bracket it. Stale hides the ink and a settle at a
+        matching width brings it back — `settle` and `hideInk` are with the
+        mirror, hundreds of lines down, reached from inside a function the way
+        the observe below reaches `#lines` by id.
+      */
+      function placeInk() {
+        mirror.style.left = `${text.offsetLeft}px`
+        // `null` is a mirror that has never been built, which is this
+        // observer's own first delivery: there is nothing laid out to be stale.
+        if (mirroredWidth !== null && paneWidth() !== mirroredWidth) hideInk()
+      }
+
+      const column = new ResizeObserver(() => {
+        placeViewer()
+        placeInk()
+      })
       // By id rather than by the handles above: `#lines` is declared with the
       // gutter, hundreds of lines below this, and reaching it early is the
       // block-scoped-use-before-declaration the type check exists to catch.
@@ -4334,7 +4433,55 @@
         settling = setTimeout(() => {
           rerender()
           relines()
+          /* **The restore belongs to the remirror and not to the release**, and
+             that is the whole of it. `up()` arms this timer and rebuilds
+             nothing; `move()` writes a flex basis and calls `fit()` without
+             remirroring — so an ink restored at `pointerup` would sit at the
+             *pre-drag* wrap over text that rewrapped during the drag, for the
+             whole 200 ms until this fires.
+
+             **And the `dragging` read is what closes the other end.** This timer
+             is armed by the `pages` observer as well as by the divider, so one
+             armed just before a press would otherwise fire mid-drag and put the
+             ink back detached. */
+          if (!dragging) showInk()
         }, 200)
+      }
+
+      /*
+        Whether the divider is being held, and the ink's two states.
+
+        **The pane goes plain while you drag and colours a settle later**, and
+        neither half of that is free. The mirror's width rebuild rides the
+        200 ms timer above, which `mpdf-003` Phase 8 chose deliberately — a
+        layout per frame for a column of numbers nobody is reading mid-drag is
+        waste — and **that argument does not transfer to ink the author is
+        looking at**: for the whole drag the textarea rewraps live while the ink
+        stays laid out at the pre-drag width, visibly off the glyphs it covers.
+        Rewrapping per `pointermove` would fix it and would contradict the very
+        clause Phase 8's gate holds. So neither: it is suppressed instead.
+
+        **`dragging` is written in two places and read in one.** `pointerdown`
+        sets it and hides; `up()` clears it and arms the timer; the timer reads
+        it. **The hide itself is keyed to a stale mirror rather than to the
+        divider**, in `placeInk` — the window's own edge is the same defect by
+        the other route, reaching the same timer with no press to bracket it.
+        Stale hides it, a settle at a matching width restores it, and `dragging`
+        is what stops a stray settle restoring it for one frame mid-drag.
+
+        **`visibility: hidden` and never `display: none`**, or a `scrollHeight`
+        read taken near a drag answers 0. And the textarea gets its own colour
+        back for the length of the drag, so the pane is a plain textarea rather
+        than an empty one.
+      */
+      let dragging = false
+      const hideInk = () => {
+        mirror.style.visibility = 'hidden'
+        text.style.color = 'var(--ink)'
+      }
+      const showInk = () => {
+        mirror.style.visibility = ''
+        text.style.color = ''
       }
 
       /*
@@ -4486,7 +4633,11 @@
           return
         }
 
-        mirror.style.width = `${width}px`
+        /* **The border box and not the content width**, the padding having
+           moved onto this element: `clientWidth` is what `paneWidth` subtracts
+           from, so assigning it back here lays the glyphs out over exactly the
+           column the textarea lays its own over. */
+        mirror.style.width = `${text.clientWidth}px`
         mirror.replaceChildren(
           ...text.value.split('\n').map((line) => {
             const row = document.createElement('div')
@@ -4496,9 +4647,13 @@
           })
         )
 
-        // Kept for the band, which needs where each row starts and how tall it
-        // is, and for the gutter, whose rows are given these heights rather
-        // than measuring a second time.
+        // One layout, read twice: `regutter` is given these heights rather than
+        // measuring a second time, and `markLine` counts them to clamp the
+        // caret's row. **The running sum is no longer read** — it placed the
+        // band while the band was a background sized and offset in pixels, and
+        // a class on a row needs neither. `rows` keeps its shape because it is
+        // the one value both readers hold, and a second shape for the same
+        // measurement is what the mirror exists to avoid.
         const heights = Array.from(
           /** @type {HTMLCollectionOf<HTMLElement>} */ (mirror.children),
           (row) => row.offsetHeight
@@ -4508,6 +4663,11 @@
           [0]
         ))
         rows.heights = heights
+        marked = -1 // the rows above are new elements; none of them wears it
+
+        // The layer follows; it does not scroll. `#lines`' arrangement, second
+        // instance — here, and again on the textarea's own `scroll`.
+        mirror.scrollTop = text.scrollTop
       }
 
       /*
@@ -4515,19 +4675,26 @@
         `Lines` gate is here and nowhere above it**: this column is what the mode
         pays for, and the measurement it is written from is wanted either way.
 
-        Its empty branch is its own for the same reason the memo is: `remirror`
+        **Its own pair, but not its own reading.** The variables are separate
+        for the reason declared with them; the *values* are the ones `remirror`
+        wrote, and taking a second `getComputedStyle` here would be a second
+        layout read in the same pass and a second thing that can disagree. It
+        also settles a case by construction: this can only rebuild on a pass
+        where the mirror did, so a fresh gutter can never meet a mirror row that
+        still wears the caret's mark.
+
+        Its empty branch is its own for the same reason the pair is: `remirror`
         nulls `rows` on the way through, and a `regutter` sharing that branch
         would reach a null one.
       */
       function regutter() {
         if (!shown) return
 
-        const width = paneWidth()
-        if (text.value === gutteredText && width === gutteredWidth) return
-        gutteredText = text.value
-        gutteredWidth = width
+        if (mirroredText === gutteredText && mirroredWidth === gutteredWidth) return
+        gutteredText = mirroredText
+        gutteredWidth = mirroredWidth
 
-        if (text.value === '') {
+        if (rows === null) {
           lines.replaceChildren()
           return
         }
@@ -4562,34 +4729,44 @@
         that can disagree with the page the pane opens on — and the disagreement
         would be invisible until it was not.
 
-        Only in Lines mode. The band is placed from the measured rows, and the
-        rows are only measured when the gutter is drawing them — so the mode
-        that pays for the measurement is the mode that gets the band.
+        **The band is now a class on the mirror's own row**, which is what
+        `#lines div.here` already was, and the gradient it used to be leaves with
+        `background-attachment: local` and `background-repeat: no-repeat`. Phase
+        8 wrote that "a band drawn as an element would need the textarea wrapped,
+        made transparent, and layered over" — two of those three are now the
+        arrangement and the third is avoided by absolute positioning, so the
+        reason it was a background is spent.
+
+        **Still only in Lines mode, and that is not reopened here.** The ink is
+        ungated and the band is not: Phase 8 decided that the mode that pays for
+        the measurement is the mode that gets the band, and `README.md` describes
+        the band as what `⌘L` adds. What changed is which element wears it.
       */
       function markLine() {
         if (lines.hidden || rows === null || text.value === '') {
-          text.style.backgroundImage = ''
+          /* **The clear is the whole of this branch now**, where it used to
+             blank a background. Both columns and the index that names them:
+             without it a `⌘L` off leaves the band on a mirror row the reader can
+             still see, which `#lines[hidden] { display: none }` used to hide for
+             free. */
+          lines.children[marked]?.classList.remove('here')
+          mirror.children[marked]?.classList.remove('here')
+          marked = -1
           return
         }
 
         const line = text.value.slice(0, text.selectionStart).split('\n').length
         const i = Math.min(line - 1, rows.heights.length - 1)
 
-        // Only the two rows that change. Walking the gutter to clear it would
-        // be a pass over every line in the document on every arrow key.
+        // Only the rows that change. Walking either column to clear it would be
+        // a pass over every line in the document on every arrow key.
         if (marked !== i) {
           lines.children[marked]?.classList.remove('here')
+          mirror.children[marked]?.classList.remove('here')
           lines.children[i]?.classList.add('here')
+          mirror.children[i]?.classList.add('here')
           marked = i
         }
-
-        // Placed from the padding box, which is where a background starts, so
-        // the pane's own top padding is added to the row's offset.
-        const top = parseFloat(getComputedStyle(text).paddingTop) + rows[i]
-        text.style.backgroundImage =
-          'linear-gradient(var(--band), var(--band))'
-        text.style.backgroundSize = `100% ${rows.heights[i]}px`
-        text.style.backgroundPosition = `0 ${top}px`
       }
 
       /*
@@ -4604,6 +4781,7 @@
       */
       text.addEventListener('scroll', () => {
         lines.scrollTop = text.scrollTop
+        mirror.scrollTop = text.scrollTop
       })
 
       // A caret moves without the text changing — an arrow key, a click, a
@@ -4621,12 +4799,13 @@
         only writer of `shown` onto anything.
 
         **All four statements, and the last two are load-bearing in opposite
-        directions.** Hiding early-returns out of `relines` at its own
-        `if (lines.hidden) return`, so it is `markLine` alone that clears the
-        caret band off `text.style.backgroundImage` — without it the band stays
-        painted over a gutterless pane until the next keystroke moves it.
-        Showing needs `relines` to build the rows at all: the `ResizeObserver`'s
-        `settle()` is 200 ms away and would not do it either.
+        directions.** Hiding early-returns out of `regutter` at its own
+        `if (!shown) return`, so it is `markLine` alone that takes the band off
+        the caret's two rows — without it the band stays drawn over a gutterless
+        pane until the next keystroke moves it, and it is on the mirror now,
+        which a hidden `#lines` no longer covers for it. Showing needs `relines`
+        to write the gutter at all: the `ResizeObserver`'s `settle()` is 200 ms
+        away and would not do it either.
       */
       function showLines() {
         for (const control of lineControls) control.setAttribute('aria-pressed', String(shown))
@@ -4639,8 +4818,8 @@
          `Lines` item at `⌘L`. **No guard, and the asymmetry with `toggleFold` is
          deliberate** — this button is never hidden, the gutter over an empty
          disabled pane being a state the bar already offers, so the chord in the
-         empty state does what the button does there, which is `relines`' own
-         early return. */
+         empty state does what the button does there, which is `regutter`'s own
+         empty branch. */
       function toggleLines() {
         shown = !shown
         showLines()
@@ -4689,14 +4868,22 @@
       }
 
       /*
-        Drag the divider. Nothing is done to the pane for the length of the
-        drag any more: the `pointer-events` this used to hang on the frame
-        existed to stop WebKit's PDF view swallowing the pointer, and the frame
-        is gone.
+        Drag the divider. **One thing is done to the pane for the length of the
+        drag, and it is the ink** — the `pointer-events` this used to hang on the
+        frame existed to stop WebKit's PDF view swallowing the pointer, and the
+        frame is gone. `hideInk`'s own comment carries why the ink is the
+        exception.
       */
       const divider = document.getElementById('divider')
       divider.addEventListener('pointerdown', (down) => {
         divider.setPointerCapture(down.pointerId)
+
+        /* Pre-emptive, and it is not the same write `placeInk` makes. The
+           column observer sees a stale width only once the first `pointermove`
+           has moved one, which is a frame of ink sitting off its glyphs; this
+           costs nothing and there is no frame. */
+        dragging = true
+        hideInk()
 
         /*
           **Pointer capture routes the events; it does not cancel the gesture
@@ -4753,11 +4940,19 @@
         const up = () => {
           divider.removeEventListener('pointermove', move)
           divider.removeEventListener('pointerup', up)
+          divider.removeEventListener('pointercancel', up)
+          dragging = false
           settle()
         }
 
         divider.addEventListener('pointermove', move)
         divider.addEventListener('pointerup', up)
+        /* **A cancelled sequence has to run `up()` too**, and it is the ink that
+           made this matter: without it the two listeners merely leaked, where
+           now the flag stays set and the pane stays colourless until the next
+           drag. The engine cancels on a pointer it takes back — a system
+           gesture, a lost capture. */
+        divider.addEventListener('pointercancel', up)
       })
 
       // Every change goes to Rust, which holds the buffer and owns the
