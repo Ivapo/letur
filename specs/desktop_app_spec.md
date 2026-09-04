@@ -1108,6 +1108,76 @@ list to one item.
   not folded into OQ-11**, which asks what the bar costs a screen reader. Blocks nothing;
   it wants an author who has lived with the pinned window for a while.
 
+- **OQ-14** — what does the window do when the compile costs more than the debounce?
+  Raised 2026-09-03 by a reader's question rather than by a phase, and measured before
+  it was written down. *(design call, and a measurement it should not outlive)*
+
+  `app/src/watch.rs:TYPING_DEBOUNCE` is 300 ms and its own doc comment argues the
+  number against a compile of **0.6–1.5 ms** — two orders of magnitude below it, so
+  "the compile is not what it is protecting." **That measurement is of two single-file
+  documents and predates `mpdf-008`.** Re-measured through
+  `app/src/document.rs:render_project`, release, warm, in process, on synthetic
+  projects of uniform sections:
+
+  | sections | markdown | `render_project` |
+  |---|---|---|
+  | 50 | 17 KB | 6.4 ms |
+  | 100 | 35 KB | 14.7 ms |
+  | 200 | 71 KB | 41.3 ms |
+  | 400 | 143 KB | 133.4 ms |
+  | 800 | 286 KB | 469.0 ms |
+
+  **So there is a crossover, and it lands on an ordinary book.** At 286 KB the compile
+  is longer than the debounce that gates it, and past that point the debounce stops
+  being what decides the cadence.
+
+  **Two of the three causes are this repository's and one is not.** Split by stage at
+  800 sections: `md_to_typst` 82.6 ms, `image_paths` 82.6 ms, `bibliography_path`
+  82.6 ms, `section_paths` 1.2 ms, Typst's own layout 25.0 ms.
+
+  1. **The engine's parse is quadratic in bytes**, which is `Ivapo/md2pdf`'s and is
+     reported there. It reproduces on a *single file* with no sections and no assets —
+     36/72/143/286/572 KB gives 2.5/5.2/15.8/63.6/281.8 ms, 4.0× per doubling — so it
+     is neither `sections::assemble`, whose `push_str` loop is linear, nor
+     `Sources::segment`, which is a `partition_point`.
+  2. **This app pays it three times per compile.** `document::render_with` calls
+     `md_to_typst`'s work, then `image_paths`, then `bibliography_path`, and the three
+     cost the same because each re-parses and re-assembles the whole document to answer
+     one question about it. Even against a linear engine this is 3× the work, and it is
+     ours: the three answers want one pass. **`section_paths` is not one of them** —
+     it reads the master's own text and never assembles, which is why it is 1.2 ms
+     where the others are 82.6.
+  3. **A slow compile stops the pane, and that is the part that is not merely slow.**
+     `Session::recompile` calls `preview.compile()` **while holding** the `Preview`
+     mutex, and `Session::edit` and `Preview::status` take that same mutex. So past the
+     crossover a keystroke's own `invoke('edit', …)` blocks on the compile in flight:
+     not a page that redraws late, a pane that stops taking input. This one is
+     independent of the other two and would survive fixing both.
+
+  **The debounce's argument is also inverted, and that is a fourth thing.**
+  `watch::Debounce` is a pure trailing debounce — `touch` pushes `due` to
+  `now + interval`, `take` fires on a quiet interval, no leading edge and no max-wait.
+  So 300 ms is a floor on the gap between compiles and not a ceiling on their rate: a
+  writer who types a phrase and pauses to think gets a compile at every pause, where
+  one typing continuously gets none until they stop. The cost the comment names — *a
+  redraw moves the reader* — is paid per compile, so the debounce protects the fast
+  typist most and the pausing one least, which is backwards from who it is for.
+
+  **The shapes, none of them free and none of them yet argued.** Release the mutex
+  across the compile, which is the one with no cost on the other side and is probably
+  not a design call at all. One pass where there are three, which is
+  `document::render_with`'s own shape and wants the engine to answer three questions
+  from one parse. A debounce that scales with `Preview::elapsed`, which already records
+  the last compile's time — cheap, and it makes the window's responsiveness a function
+  of the document rather than a constant. A max-wait so continuous typing still
+  redraws. Or nothing here, on the argument that the engine's quadratic is the whole
+  problem and a linear engine puts 286 KB back under 30 ms.
+
+  **Blocks nothing, and it is deliberately not a phase yet**: three of the four have a
+  measurement and none has a decision, and the first shape may make the rest moot.
+  **Deliberately not folded into OQ-10**, which asks what checks the *page*; this is
+  about what the app does with a document too long for the loop it has.
+
 ## 4. Implementation phases
 
 Strictly sequential; each is one plan-mode pass. Phases 1 to 3 build a
