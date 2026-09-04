@@ -2,6 +2,129 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 2 — Phase 8 only — 2026-09-03 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. The blocker resolved, and the re-review went past the changelog in the way
+this step exists for: it checked the fix against the actual ternary and found that once
+the title's kind test moves, the `— not edited here` branch is **unreachable for all three
+entry kinds** — an image is always `shows` when not missing, and `missing` takes the first
+branch — so leaving the branch or deleting it gives an identical observable and nothing is
+left to guess.
+
+**It also re-verified both claims the author had leaned on**, against the files rather than
+the summary: the single closure carries into `read_assets_with` by value and reads the
+bibliography as `read(&directory.join(&named.path))` with `directory = directory(main)`; and
+`the_listing_is_the_disk_and_what_the_master_names` builds `named` as a hardcoded
+three-element literal, so a frontmatter key in `book.md` cannot reach it. It compiled the
+proposed fixture with `md2pdf 0.1.2`: exit 0, the PDF text ending
+`References / [1] I. Po, A Book the Panel Lists. 2026.` — the observable measured rather
+than argued.
+
+**One observation it declined to call a finding was fixed anyway**: OQ-2's own prose still
+said "one term" and still carried the superseded `Pane` rationale. That entry was written
+in this same uncommitted draft rather than shipped, so it is corrected in place rather than
+given a dated note.
+
+### Round 1 — Phase 8 only — 2026-09-03 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0** (asked once for this episode): *does this phase produce the observable, and if
+not is that argued?* It produces it directly — an unsaved edit to `refs.bib` redraws the
+document's bibliography beside it — and the reviewer confirmed it by compiling the fixture
+rather than taking the claim.
+
+**One blocking, accepted; six non-blocking, all accepted; none rejected.**
+
+**The blocker is the one this spec has a standing rule about.** After `opens` widens to a
+bibliography, the row `title`'s last branch — `` `${path} — not edited here` `` — is reached
+for **exactly one** row: the `.bib` the pane is holding, where the sentence is false and
+where the phase's own headline gesture lands. The scope's "one term and one string" was
+short by a term, and gate clause 4 read `status` and `#edited` and never the `title`, so
+nothing would have caught it. This is verbatim the standard §2 sets when it refuses to reuse
+`DIVERGED` because it "would put a lie in the window". Item 1 is rewritten around it and the
+gate gained a reading that asserts it.
+
+**The six non-blocking.** `Pane`'s arms are decided by *directory containment*
+— `under(main, edited)` — and not by what the master names, so the phase's rationale for a
+`.bib` having no anchors was wrong while its conclusion held; the corrected reason survives
+either arm, an anchor being a heading and a heading being markdown. The gate script and the
+two Rust tests were budgeted in neither the scope nor the commit plan. Clause 2 cited
+`document.rs`'s `scratch_dir` for a `preview.rs` clause. `drive.mjs` hardcodes
+`tests/fixtures/panel/book.md`, which is the file this phase edits, and the gate did not
+name it. The close-out did not mention the cap it shares with Phase 7. And the fixture change
+flips `refs.bib` from `Tree` to `Asset`, which is what puts this phase's own gate on the
+`Edited`-before-`Asset` path — so that ordering is load-bearing here rather than incidental,
+and the phase described the other case.
+
+### Round 2 — Phase 7 only — 2026-09-03 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. All three blockers resolved, and the re-review re-measured rather than
+accepted: **176.125 → 154.890625 in Chromium and 178.5 → 157.078125 in WebKit**, a ~21px
+margin in both, with the three surviving depth-0 headings checked at roughly 100px so the
+glyph does not eat it. It also confirmed `clear()` has exactly three callers and that the two
+open routes the item names are the only two — the header button and the `open` menu event
+both enter `openDocument`, the `opened` event enters `takePendingOpen` — so no open path
+misses the emptying.
+
+**The redraw path was the author's own specification and was checked rather than accepted.**
+`report` is called from exactly one site, inside `refresh`; `refresh` is a hoisted
+module-scope declaration reachable from the handler; and it does nothing a fold should not
+trigger — `tookReload` is false on a fold so the caret does not move, and the
+`revision === drawnRevision` return fires before `invoke('current_pdf')`, so a fold costs one
+`status` round trip and a panel rebuild with no byte fetch and no rasterisation. The two
+rendering assumptions were verified in both engines by rewriting the heading: `::before` and
+`::after` both render on the button, `aria-expanded` selects the two glyphs, `.name`'s
+`textContent` stays `"parts"` so clause 6 is safe, and the role-and-name query clause 17
+needs is takeable.
+
+**Three non-blocking, all folded in.** `folds-one-level`'s described effect was
+self-contradictory — "above nothing **with `deep.md` still under it**" — and "parent test"
+has three spellings leaving different rows behind; the mutation now names the spelling and
+what it leaves. The scope line omitted `createFile`, where item 6's ancestor expansion lands.
+And two consequences of routing a page-only gesture through a status fetch go to
+`rules/desktop-panes.md` rather than here, neither being a new rule: a fold press dismisses a
+standing refusal, `report` owning the bar; and a press landing between a compile's
+announcement and the page's own `refresh` fetches the PDF, a redraw that was arriving anyway.
+
+### Round 1 — Phase 7 only — 2026-09-03 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0** (asked once for this episode): *does this phase produce the observable, and if
+not is that argued?* It produces none, and the phase argues it explicitly — nothing reaches
+the pipeline, `Status` gains no field — with the panel's width as the measurable but weaker
+half. It was asked for at the window rather than inferred.
+
+**Three blocking, all accepted; nine non-blocking, eight accepted and one in part; none
+rejected.**
+
+1. **The gate's width reading was false on the fixture it named, and this document had
+   already learned it once.** Folding `parts` changes `#files` by **nothing** — 176.125
+   either way — because a content-sized panel is as wide as its *widest* row, and that row
+   is `loose/orphan.md`. That is `mpdf-010` Phase 6's own recorded finding, *"its two extra
+   name characters beat `parts/ch1/deep.md`'s extra 14px of indent by 0.45px"*, arriving a
+   second time; the reviewer's Δ of 0.453125 reproduces the 0.45 exactly. **The obvious
+   repair was refused as well**: keying the reading to `loose` alone asserts that same
+   0.45px across two engines with different font metrics, which is not an assertion. The
+   reading folds all three folders instead, and both the refusal and its reason are recorded
+   in the gate so the next reader does not derive it a third time.
+2. **`clear()` has three callers and the third is `setMain`.** Emptying the folds inside it
+   would have unfolded the reader's whole tree every time they pressed a `main` button, on a
+   tree that did not change. The emptying now rides the two open paths beside their
+   `clear()` rather than inside it.
+3. **The phase never said how a press redraws.** `parts` is reachable only through an
+   `await invoke('status')` round trip and the page caches no status, so a press that only
+   mutated the `Set` would have drawn nothing — and the mutation the gate specified was
+   unreachable under the design the scope specified. Item 4 now names `refresh()` and argues
+   it against the two alternatives, and the mutation is replaced.
+
+**The nine non-blocking.** The scope said "`index.html` only" while the gate required work
+in `checks.mjs` and `serve.mjs`. `OQ-9` was cited and did not exist. **Item 8's glyph would
+have failed a clause the phase never touches** — `checks.mjs` clause 6 reads `.name`'s
+`textContent` and compares it to the bare segment, so the glyph goes in `::before` and the
+two states are spelled as `aria-expanded`, which doubles as the CSS hook the disclosure
+button was missing. Item 6 said "the folder" where `a/b/c.md` needs every ancestor. There was
+no person's reading of the glyph where Phase 6 had one for its mark. And §4's intro is stale
+at eight phases — **accepted in part**: it broke when Phase 6 was appended and §6.1 does not
+rewrite old prose, but the preamble no longer leans on the ratio as though it were current.
+
 ### Round 2 — Phase 6 only — 2026-09-03 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking. All three of round 1's blockers resolved, and four non-blocking findings

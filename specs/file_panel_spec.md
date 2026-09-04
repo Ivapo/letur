@@ -40,6 +40,16 @@ phases:
     shipped: 2026-09-03
     cut: null
     by: null
+  - name: "Phase 7 — a folder folds"
+    reviewed: 2026-09-03
+    shipped: null
+    cut: null
+    by: null
+  - name: "Phase 8 — a bibliography opens in the pane"
+    reviewed: 2026-09-03
+    shipped: null
+    cut: null
+    by: null
 
 extends: null
 supersedes:
@@ -529,11 +539,47 @@ window or put state on a row that `app/dist/index.html:parts` rebuilds.
 
   **What it does not settle is the PDF row**, and that is OQ-8 below.
 
-- **OQ-2 — does a `.bib` open in the pane at all?** *(design call)* It is not
+- **OQ-2 — does a `.bib` open in the pane at all?** ~~*(design call)* It is not
   markdown, so a pane holding it compiles nothing meaningful and the page would
   show the last good PDF beside text that cannot produce one. The shapes: inert,
   which is what Phase 2 ships; editable with the compile suppressed and the
-  status line saying so; or handed to the system editor. **Blocks nothing.**
+  status line saying so; or handed to the system editor. **Blocks nothing.**~~
+  **RESOLVED 2026-09-03: the middle shape without its second half — the row
+  opens, and the compile is not suppressed.** Phase 8 below ships it.
+
+  **The reason this entry gave was already false when it was written, and that
+  is why the answer moves without any new evidence.** *"A pane holding it
+  compiles nothing meaningful"* describes a window in which the pane's file is
+  what compiles — which is exactly what Phase 2 ended. `app/src/document.rs:render_project`
+  compiles **`main`**, and the override closure it builds is keyed on the *path*
+  it is handed, `resolve(file) == resolve(edited)`, with no opinion about a file
+  kind. The bibliography is read through that same closure —
+  `app/src/document.rs:read_assets_with`, which `render_with` hands it to — so a
+  `.bib` in the pane feeds its **unsaved** buffer to the citation pass while the
+  page goes on drawing the whole document. The suppression the middle shape
+  asked for would be a rule written to hold off behaviour that already works,
+  and the third shape hands to another application the one file the panel was
+  built to stop leaving the window for.
+
+  **`app/src/preview.rs:Session::set_edited` already permits it**, confining the
+  path and refusing a dirty buffer and testing nothing else, so what this
+  resolution costs in Rust is nothing. The block is in
+  `app/dist/index.html:fileRow` — **two terms and not one**, which Phase 8's
+  round 1 found: `opens` carries a kind test and the row's `title` carries a
+  second one of its own, and moving the first without the second puts *"not
+  edited here"* on the one row the pane is holding.
+
+  **Two costs, stated rather than found later.** A `.bib` contributes no
+  anchors, so the caret's own page does nothing while the pane holds one, which
+  is already the shipped behaviour for a `README.md` beside a master. **The
+  reason is not `app/src/document.rs:Pane` putting it out of reach**, which this
+  entry first claimed: `Pane` is decided by directory containment —
+  `under(main, edited)` — so a `refs.bib` beside its master answers `Beside`
+  like any section. It holds for a simpler reason that survives either arm: an
+  anchor is a heading, a heading is markdown, and no anchor's `location.file` is
+  ever a `.bib`. And it is **three extensions and not one**: the dialect reads a
+  bibliography as `.bib`, `.yml` or `.yaml`, which `Status`'s `bibliography`
+  kind already folds together.
 
 - **OQ-3 — does the panel show the document's own exported PDF?** *(deferred by
   evidence)* It does, per §2, because a PDF is a legal figure and the list is the
@@ -607,6 +653,17 @@ window or put state on a row that `app/dist/index.html:parts` rebuilds.
   markdown, so a reader meets a PDF row by accident rather than by intent — and
   if OQ-3 is answered by hiding the export, most PDF rows go with it, which is
   why this waits on that one. **Blocks nothing.**
+
+- **OQ-9 — should a collapsed folder say it holds `main` or `edited`?** *(design
+  call, opened by Phase 7)* A fold may hide the row that carries `◀ main` or the
+  one the pane is holding, and the panel then names neither. It is not a defect
+  — the reader folded it, and `#edited` in the footer still names the pane's
+  file — but the panel is where both marks live, and a reader scanning it for
+  the file that compiles would find nothing. The shapes: leave it, which is what
+  Phase 7 ships; a mark on the folder row, which makes a folder row carry state
+  a file row carries and is the reason Phase 7 did not build it; or refusing to
+  fold a folder holding either, which trades a visible mark for an
+  unexplainable refusal. **Blocks nothing.**
 
 ## 4. Implementation phases
 
@@ -1774,6 +1831,396 @@ so every control on the widest row is width the pages do not get.
 
   **Commit plan.** One push, two commits: the mark, its name and its paint rule, with
   its clause and its mutation; then the rules and the README.
+
+### Phase 7 — a folder folds
+*Produces the observable: **no**, and it is Phase 6's argument at a larger
+scale. Nothing here reaches the pipeline: the same markdown compiles to the same
+bytes, no PDF differs, `Status` gains no field and no Rust is touched. What
+changes is how much of the window the panel takes — it is content-sized under a
+40% cap, so folding away the rows that size it gives that width to the pages.
+**Measured before it was written**, in the harness at its own 900px default over
+`tests/fixtures/panel/`: 176.125px with everything drawn, 154.89px with all
+three folders folded. The first half is again the reason: a project with
+sections, parts and figures draws a panel the author reads past to find the file
+they want.*
+
+Appended 2026-09-03, per §6.1. **Step 0 says decision**, and a sharp one:
+whether a row of this panel may hold state of its own, which
+`rules/desktop-panes.md`'s **"the rows hold no selection"** has answered *no*
+since Phase 1. Step 1 removes nothing — no shipped phase claims a folder row is
+inert; Phase 1 simply drew it as a heading. Step 2 then puts it here, `mpdf-010`
+owning the panel.
+
+**Asked for at the window**: *"can we make subfolders collapsible?"*
+
+- **Scope:** **`app/dist/index.html`** — `folderRow`, `panelRows`, one page
+  variable, the open path and two CSS rules; **`app/harness/checks.mjs`** — one
+  clause, one `OWNS` entry and one count in its header comment;
+  **`app/harness/serve.mjs`** — one mutation. **No Rust, no Cargo change, and no
+  field on `Status`** — named because Phases 3, 5 and 6 each named their
+  knock-on and this phase's answer is again that there isn't one.
+
+  **1. The fold is the page's, and `folded` is the precedent rather than an
+  analogy.** `app/dist/index.html`'s panel fold is a bare `let folded = false`
+  reapplied by `app/dist/index.html:parts` on every status, and
+  `rules/desktop-panes.md` carries the argument: *"§2's rule is about state that
+  decides behaviour, and a fold decides nothing but its own drawing."* A
+  per-folder fold is that same sentence at a finer grain, so it is **a `Set` of
+  root-relative folder paths held beside `folded`**, reapplied the same way.
+  **This is what keeps "the rows hold no selection" true rather than what breaks
+  it**, and the distinction has to be written down because a careless reading
+  has the invariant falling here: a *file* row still holds nothing, and a folder
+  row holds a fold, which is not a selection and decides nothing but which rows
+  are drawn. `parts` may go on replacing the list whole.
+
+  **2. A folder row becomes a button and gains the thing it does not have
+  today.** `app/dist/index.html:folderRow` takes `(name, depth)` and draws a
+  `<span class="name">`; it needs the folder's **whole root-relative path** —
+  `parts/ch1`, not `ch1` — because that is what the fold set is keyed by and
+  what tells two `ch1`s apart. `app/dist/index.html:panelRows` already has it:
+  it builds `here` out of the entry's own segments, so the path is
+  `here.slice(0, at + 1).join('/')` at the point the heading is pushed. The
+  `<span>` becomes a `<button type="button">`, which is
+  `app/dist/index.html:fileRow`'s own move for a row that does something, and it
+  **carries `aria-expanded`** — the panel's own fold control sets it on every
+  press, a disclosure that does not say which way it is set is an asymmetry with
+  the control thirty lines above it, and it is also the attribute the glyph rule
+  in item 8 selects on, so one declaration serves both.
+
+  **3. `panelRows` skips what is under a collapsed folder, headings included.**
+  The test is on the path and **is a prefix test rather than a parent test**: an
+  entry is skipped when any collapsed folder is a path prefix of it, so `parts`
+  collapsed hides `parts/ch1/deep.md` **and the `ch1` heading**. A parent test
+  leaves that heading stranded above nothing, which is the likeliest wrong
+  implementation and is what gate clause 4's mutation is keyed to. The collapsed
+  folder's own row is still drawn, or there is no way back.
+
+  **4. The press redraws through `refresh()`, and naming the path is not
+  pedantry.** `parts` is called from `app/dist/index.html:report` and `report`
+  only from `app/dist/index.html:refresh`, which is an `await invoke('status')`
+  round trip — **the page caches no status**, so a press that only mutated the
+  `Set` would redraw nothing. Of the three ways out, this is the one that adds
+  no state: caching the last entries would put a second thing in the page that
+  item 1's enumeration does not authorise, and hiding rows in place would move
+  the skip out of `panelRows` and contradict item 3. `status` runs no compile,
+  and the panel is already rebuilt on every one of them. **The panel fold is not
+  a precedent here and the difference is worth stating**: `.collapsed` is one
+  class on one element, so `toggleFold` redraws nothing, where a folder fold
+  changes which rows exist and has to reach `panelRows`.
+
+  **5. The two opens empty the folds, and `clear()` is deliberately not where
+  that goes.** An open is a new project and a fold held across one would hide
+  rows of a tree the reader has never seen — but `app/dist/index.html:clear` has
+  **three** callers, and the third is `app/dist/index.html:setMain`, which goes
+  through it because Rust rebuilds the preview and restarts its counters.
+  Emptying the folds inside `clear()` would therefore unfold the reader's whole
+  tree every time they pressed a `main` button, on a tree that did not change.
+  So the emptying rides the two **open** paths — the dialog and the pending
+  Finder open — beside their `clear()` rather than inside it. This is also what
+  keeps `main` and `edited` visible at the moment either moves: both move
+  through a row the reader clicked, and a row inside a collapsed folder cannot
+  be clicked.
+
+  **6. A create expands every ancestor of its new file, and that is a decision
+  rather than a convenience.** Phase 3's field takes a whole root-relative path,
+  so `parts/ch2/notes.md` may name folders the reader has folded — and a create
+  whose row does not appear is indistinguishable at the window from a create
+  that failed. **Every ancestor and not the immediate parent**: removing
+  `parts/ch2` alone still leaves the row hidden while `parts` is collapsed,
+  which is the same failure one level up. Nothing else re-expands; a fold is
+  otherwise the reader's own until they undo it.
+
+  **7. What a fold may hide is stated, and one case is left open.** A reader may
+  fold the folder holding `main` or `edited`, and both marks go with the rows.
+  That is their own action on their own panel and it is accepted; `#edited` in
+  the footer still names the pane's file whatever the panel is doing. Whether a
+  collapsed folder should *say* it holds one of them is **OQ-9**, opened in §3
+  by this phase, and it is left open rather than built because it would make a
+  folder row carry a mark — a second new concept in a phase that already
+  introduces one.
+
+  **8. The mark is a glyph, and it is drawn in `::before`.** The imported rule —
+  *a mark a glyph names is a glyph, a mark no glyph names is drawn* — is easiest
+  on disclosure: `▸` and `▾` name it exactly, are text-presentation, take
+  `color`, and are the vocabulary every tree on this platform already uses. So a
+  glyph, and **this phase draws nothing**, which is worth stating one phase
+  after the one that drew something. **The two states are spelled as
+  `aria-expanded` per item 2**, so the CSS is two rules keyed to it —
+  `#files li.folder .name::before { content: '▾' }` and its
+  `[aria-expanded='false']` counterpart. **`::before` and not the button's
+  text**, and that is load-bearing rather than tidy:
+  `app/harness/checks.mjs`'s clause 6 reads `li.querySelector('.name').textContent`
+  and compares it to the bare path segment, so a glyph written into the button's
+  text fails a clause this phase never touches. `#files li[data-depth='N']`
+  carries the indent to five levels and is untouched.
+
+  **The turning chevron was rejected once and this does not reopen it.**
+  `app/dist/index.html`'s `#views` comment records that the header's withdrawn
+  copies *"marked a folded panel with a turning chevron"* and that it would not
+  survive *"at 10px in a bar whose entire ink is one colour"*, beside a second
+  toggle marked another way. **Neither reason reaches a panel row**: the panel
+  is `12px/1.5 ui-monospace` rather than a 10px bar, and a folder row stands
+  beside no control marked by a different device. Named because a reader who
+  finds that comment will otherwise think a settled refusal was quietly dropped.
+
+- **Exit gate:**
+
+  1. `bun app/typecheck.mjs` exits 0.
+  2. **No `cargo` clause, and the phase says why**: nothing under `app/src` is
+     touched, so `cargo test --workspace` is neither run as a gate nor claimed
+     to mean anything here. `bun app/driver/drive.mjs` is **unchanged and not
+     extended** — it opens `tests/fixtures/panel/book.md` for a control over a
+     pane, and no clause of it reads a folder row, a `#parts` child or a
+     `data-depth`. It is run, and expected to pass untouched.
+  3. `bun app/harness/checks.mjs` and `--webkit` each print **eighteen clauses,
+     eighteen passed** — one added: *a folder row folds what is under it, the
+     fold survives the rebuild, and the panel gives the width back.* **It is
+     clause 17 and the uncaught-error clause becomes 18**, by that file's own
+     rule that the error clause stays last. `OWNS` gains one entry at 17; no
+     existing value moves.
+
+     Five readings, over `tests/fixtures/panel/`, whose `parts/ch1/deep.md` is
+     the only two-deep entry it holds and therefore the only one that can show a
+     nested heading taken with its parent:
+     - **the row is a button that names its folder**: the `parts` heading is a
+       `<button>` whose accessible name contains `parts`, where today it is a
+       `<span>` and names nothing;
+     - **it hides its whole subtree and nothing else**: pressing it drops the
+       `deep.md` row **and the `ch1` heading**, and every row outside `parts/`
+       is still drawn — asserted as two sets rather than as a count, so it
+       cannot pass on a page that dropped the right number of wrong rows;
+     - **it comes back**: pressing again restores exactly the rows that were
+       there, in the same order — the order being §2's and computed in Rust, so
+       this is a claim the page cannot satisfy by re-sorting;
+     - **the fold survives a status**, which is the one thing `parts` rebuilding
+       the panel whole puts at risk: fire `rendered` with a folder collapsed and
+       it is still collapsed, and its subtree is still absent;
+     - **and the panel gives width back, with all three folders folded and not
+       one.** `#files` is narrower with `loose`, `parts` and `sections` all
+       collapsed than with all three open. **The one-folder form was measured
+       and refused**, and the refusal is recorded because the first draft
+       asserted it: folding `parts` changes the width by **nothing at all**
+       (176.125 either way), because a content-sized panel is as wide as its
+       *widest* row and that row is `loose/orphan.md` — which is
+       `mpdf-010` Phase 6's own finding, *"its two extra name characters beat
+       `parts/ch1/deep.md`'s extra 14px of indent by 0.45px"*, arriving a second
+       time. Folding `loose` alone does narrow it, by that same 0.45px, which is
+       **too fine to assert across two engines with different font metrics**.
+       All three folded reads 154.89 against 176.125, a margin nothing about a
+       font is going to close. Stated as *narrower* and not as a number, the
+       suite forbidding a metric literal.
+  4. `bun app/harness/checks.mjs --falsify` reports **fifteen mutations, each
+     isolating the clause it owns**, in both engines. The one added is
+     **`folds-one-level`**, turning item 3's prefix test into a parent test: a
+     folder still folds and still comes back, and `parts` collapsed leaves the
+     `ch1` heading standing above nothing with `deep.md` still under it. It is
+     chosen over dropping the redraw because it is the *plausible* wrong
+     implementation rather than an obviously broken one, and it is reachable by
+     no other clause — no rig in this repository reads a folder row today.
+  5. **The glyph is a person's reading and the rigs are named as unable to take
+     it.** Both engines can find a `::before` and read a colour; neither can say
+     `▸` and `▾` are one glance apart at 12px in the engine that ships. So, at
+     the window on macOS: fold a folder and the mark turns, legibly, in the
+     WKWebView rather than in Playwright's Chromium — which is where `mpdf-003`
+     Phase 15's `▥`-against-`☰` finding came from and the environment Phase 6's
+     `🗑` argument was about.
+  6. `git status` clean after a full run of clauses 1, 3 and 4.
+
+- **Close-out:** **`rules/desktop-panes.md`** — the fold paragraph, which says
+  *"The fold is the page's own"* about one fold and now describes two kinds; the
+  three-gestures paragraph, whose **"the rows hold no selection"** needs item
+  1's distinction written beside it rather than left to a reader to reconcile;
+  the folder paragraph, folders being derived rather than sent and now also
+  foldable; and the harness counts, `seventeen → eighteen` and
+  `fourteen → fifteen`, in `covers:` and again in the body. **And two
+  consequences of routing a page-only gesture through a status fetch**, which
+  belong in that file rather than in this one because neither is a new rule:
+  `report` clears `#error` and `refusing` on every status, so a fold press now
+  dismisses a standing refusal that a keystroke would otherwise have cleared —
+  `report`'s documented ownership of the bar reaching one more caller; and a
+  press landing between a compile's announcement and the page's own `refresh`
+  fetches `current_pdf` and follows the caret's page, a redraw that was arriving
+  anyway and is superseded correctly by `renderSeq`.
+  **`app/harness/checks.mjs`'s own header comment** carries the mutation count
+  — *"`--falsify` runs all fourteen"* — and is part of the scope above rather
+  than of this close-out, named here because Phase 6 had to be told the same
+  thing. **`rules/desktop.md`** — none needed: the commands, the state Rust
+  holds and the file I/O are untouched, a fold being the page's. **README.md** —
+  the panel's own paragraph gains that a folder folds. **No `CLAUDE.md`
+  change.**
+
+  **The cap is the known cost, and this close-out is charged with answering it
+  rather than paying it again.** `rules/desktop-panes.md` went to
+  `max_lines: 770` in Phase 6 and sits at 764. If it moves twice in two phases,
+  the close-out says whether the file wants **splitting** — the panel is now a
+  large enough subject to be its own rule file — rather than raising the number
+  a third time. That is a question `spec-lint` asks by failing and nobody has
+  answered.
+
+  **Commit plan.** One push, two commits: the fold, its clause and its mutation;
+  then the rules and the README.
+
+### Phase 8 — a bibliography opens in the pane
+*Produces the observable: **yes** — change a title in `refs.bib` and the
+document's bibliography redraws beside it, without leaving the window and
+without saving first. That is this project's own sentence, about the one file
+the panel has listed since Phase 1 and refused to open.*
+
+Appended 2026-09-03, per §6.1. **Step 0 says decision**: it resolves OQ-2, a
+`design call` this spec has carried open since it was drafted. Step 1 removes
+nothing — Phase 2 shipped a `.bib` row inert **pending this question**, and the
+entry is the recorded placeholder, which is exactly the shape Phase 5 had when
+it resolved OQ-1 and turned image rows from inert to clickable without cutting
+anything. No shipped phase and no shipped prose asserts that a `.bib` never
+opens. Step 2 puts it here.
+
+**Asked for at the window**: *"why cant we show .bib files in the editor?"* — and
+the answer, worked in OQ-2 above, is that the recorded reason stopped being true
+when Phase 2 separated `edited` from `main`, and nobody went back to look.
+
+- **Scope:** Depends on Phase 2 and on nothing outside this repository.
+  **`app/dist/index.html`** — two terms of `fileRow` and its doc comment;
+  **`tests/fixtures/panel/book.md`** — two lines; **`app/src/document.rs`** and
+  **`app/src/preview.rs`** — one test each, the gate's first two clauses;
+  **`app/harness/checks.mjs`** and **`app/harness/serve.mjs`** — one clause and
+  one mutation; **`tests/gates/mpdf-010-phase8.js`**, which is new;
+  **`rules/desktop-panes.md`**, **`rules/desktop-project.md`** and
+  **`README.md`**. **No Rust behaviour changes**, and that is the finding rather
+  than an omission: `app/src/preview.rs:Session::set_edited` confines the path
+  and refuses a dirty buffer and asks nothing about a file kind, and
+  `app/src/document.rs:render_project`'s closure is keyed on the path it is
+  handed. OQ-2 above carries the whole argument and it is not restated here.
+
+  1. **Two terms of `fileRow`, and the second is the one a literal reading of
+     the first would ship as a lie.** `app/dist/index.html:fileRow` computes
+     `opens` as `entry.kind === 'markdown' && !entry.missing && !holding`; the
+     kind test becomes markdown **or bibliography**. But the row's `title` is a
+     second chain with its **own** kind test, and its last branch —
+     `` `${entry.path} — not edited here` `` — is reached when a row neither
+     opens nor shows. Today that is every bibliography; after the first term it
+     is exactly one row, **the `.bib` the pane is holding**, where the sentence
+     is false and where this phase's own headline gesture lands. So the title's
+     kind test moves with `opens`': a held bibliography takes the bare path,
+     which is what a held markdown row already takes. **`shows` is untouched** —
+     an image still goes to Phase 5's viewer and a `.pdf` still gets its
+     sentence. `fileRow`'s doc comment says *"A bibliography is still inert and
+     says so in its title, where OQ-2 leaves it"* and is rewritten in the same
+     commit.
+
+  2. **What the pane does with it, and what it does not.** `⌘S` writes the
+     `.bib`. The compile stays `main`'s, and the buffer reaches the citation
+     pass through the closure, so an unsaved edit is in the drawn page — which
+     is the phase. **No anchors**, so the caret's own page does nothing while
+     the pane holds a bibliography. **The reason is directory containment and
+     not naming**, which the first draft had wrong: `render_project` computes
+     `under(main, edited)`, so `app/src/document.rs:Pane` answers `Beside` for
+     any file under `main`'s own folder — `refs.bib` included, named or not —
+     and `Away` for one outside it. Either arm gives the same outcome here,
+     because no anchor's `location.file` is ever a `.bib`: anchors are headings,
+     and headings are markdown. This is
+     `app/dist/index.html:caretPage`'s existing answer for a `README.md` beside
+     a master and is correct rather than special-cased.
+
+  3. **The external-change rule needs nothing, and the fixture is the case it
+     needs.** `app/src/watch.rs:classify` tests `Edited` **before** `Asset`,
+     which Phase 2 built for exactly this shape — a file the master names that
+     the pane also holds — so an external write to the bibliography in the pane
+     runs the divergence rule rather than silently recompiling. **Item 5's
+     fixture change is what puts this phase's own gate on that path**: once
+     `book.md` declares `bibliography: refs.bib`, that path is in the asset list
+     `app/src/document.rs:render_with` builds, so it classifies `Asset` where it
+     classified `Tree` before, and the ordering is load-bearing rather than
+     incidental. A `.bib` no master names stays `Tree` until the pane holds it.
+
+  4. **`main` is still markdown, and this phase does not make it otherwise.**
+     `app/src/preview.rs:Session::set_main` confines and checks the buffer and
+     tests no kind either, but `fileRow` appends the `main` control on markdown
+     rows alone, so nothing reachable from the window can set a bibliography as
+     the file that compiles. **That gap is pre-existing and is left alone**: it
+     is a hand-typed command away from a nonsense compile, it is not what this
+     phase is about, and widening a refusal is a decision that wants its own
+     argument. Named so a reader does not read *opens* as a step toward
+     *compiles*.
+
+  5. **The fixture gains a citation and a key, and it costs Phase 1's work
+     nothing.** `tests/fixtures/panel/refs.bib` exists and `book.md` neither
+     names nor cites it, so the claim below has nothing to measure. `book.md`
+     gains `bibliography: refs.bib` in its frontmatter — `core/src/frontmatter.rs`
+     is where the dialect reads it — and one citation in its body. **No file is
+     added and no path changes**, so `tests/fixtures/panel-manifest.txt` and
+     `app/src/document.rs:the_listing_is_the_disk_and_what_the_master_names` are
+     untouched: that test's `named` list is a literal rather than a read of
+     `book.md`. This is the opposite of what Phase 5's fixture change cost, and
+     it is stated so nobody goes looking for the two edits.
+
+- **Exit gate:**
+
+  1. In the Rust suite, **in `app/src/document.rs`'s module**, over a scratch
+     copy of `tests/fixtures/panel/` — `app/src/document.rs:scratch_dir` is that
+     file's own spelling, and a copy rather than the tracked fixture because the
+     clause writes: with `main = book.md`, `edited = refs.bib` and a buffer
+     differing from that file on disk, **the compiled PDF equals the one
+     produced by writing the buffer to disk and compiling `book.md`**. This is
+     Phase 2 clause 1's shape asked of a bibliography, and it is the whole
+     phase: it is what says the override closure reaches the citation pass and
+     not merely the section reads.
+  2. **In `app/src/preview.rs`'s module**, where `set_edited`'s other tests
+     live and against **that** file's `scratch_dir`: `save` with
+     `edited = refs.bib` writes `refs.bib` and leaves `book.md` untouched
+     byte-for-byte — Phase 2 clause 3 for a file that is not markdown.
+  3. `bun app/typecheck.mjs` exits 0, and `cargo test --workspace` passes: this
+     phase changes no Rust behaviour but its first two clauses live there.
+  4. `bun app/harness/checks.mjs` and `--webkit` each print **nineteen clauses,
+     nineteen passed** — one added: *a bibliography row opens in the pane and an
+     image row still does not.* It is clause 18 and the error clause becomes 19;
+     `OWNS` gains one entry at 18. **Three readings, and the last two are what
+     stop this widening too far**: clicking `refs.bib` makes `invoke('status')`
+     report it as `edited` and `#edited` name it, while `main` is unmoved; the
+     row's `title` while it is held is the bare path and **does not contain
+     "not edited here"**, which is item 1's blocker asserted rather than
+     trusted; and clicking `cover.jpg` still shows the figure and leaves
+     `edited` where it was, which is Phase 5's behaviour pinned here because one
+     term of one boolean is all that separates them.
+  5. `bun app/harness/checks.mjs --falsify` reports **sixteen mutations, each
+     isolating the clause it owns**. The one added is **`bib-opens-nothing`**,
+     putting the kind test in `opens` back to markdown alone.
+  6. `bun app/driver/drive.mjs` is **unchanged and expected to pass**, and it is
+     named here rather than assumed because **this is the phase that edits the
+     file that rig opens** — it hardcodes `tests/fixtures/panel/book.md`, and
+     item 5 changes its frontmatter and its body. Its four clauses are about the
+     appearance and the view toggles, so nothing should move; a failure here
+     means the fixture stopped compiling.
+  7. At the window, on `tests/gates/mpdf-010-phase8.js`: open
+     `tests/fixtures/panel/book.md`, click `refs.bib`, change the title in the
+     entry the master cites, and **without saving**, the page redraws with the
+     new title in its bibliography. That is the observable, and no rig in this
+     repository can take it — the harness stubs Rust, so there is no compile
+     behind it.
+  8. `git status` clean after a full run.
+
+- **Close-out:** **`rules/desktop-panes.md`** — the sentence this phase makes
+  false is *"A bibliography and a marked-missing row open nothing and say so in
+  their `title`, where OQ-2 and the disk leave them"*, which is Phase 5's own
+  replacement text and moves the same way it did; and the harness counts,
+  `eighteen → nineteen` and `fifteen → sixteen`. **`rules/desktop-project.md`** —
+  the file the pane may hold is no longer markdown alone, which is that file's
+  subject rather than the panel's. **`rules/desktop.md`** — none needed; no
+  command, no refusal and no file I/O moves. **README.md** — that a `.bib` opens
+  like a section and its edits are in the page before they are saved.
+  **`specs/file_panel_spec.md` OQ-2 is already resolved above** — this phase
+  ships what that resolution names and adds nothing to it. **No `CLAUDE.md`
+  change.**
+
+  **The cap is a shared cost with Phase 7 and is named rather than assumed.**
+  `rules/desktop-panes.md` sits at 764 of 770 and Phase 7 spends into that
+  first. This phase's edits there are substitutions plus two count words, so
+  they are close to line-neutral — but if Phase 7 lands at the cap, this
+  close-out is the one that fails `spec-lint`, and it takes whatever answer
+  Phase 7's close-out reached rather than raising the number again on its own.
+
+  **Commit plan.** One push, four commits: the fixture's key and citation; the
+  page's two terms with its clause and its mutation; the two Rust tests and the
+  window gate script; then the rules and the README.
 
 <!--
 The review record is a sibling file, not a section: it lives at
