@@ -2211,6 +2211,70 @@ mod tests {
         );
     }
 
+    // -- the pane holds a bibliography ---------------------------------------
+    //
+    // `mpdf-010` Phase 8, and it changes nothing above it. The claim is that
+    // the override closure was never about a file kind, which is what OQ-2
+    // resolved on.
+
+    /// **Phase 8's whole observable.** The pane's unsaved bibliography reaches
+    /// the *citation* pass, and not merely the section reads.
+    ///
+    /// [`read_assets_with`] takes the same closure [`read_sections_with`]
+    /// borrowed and asks it for `directory.join(&named.path)`, so the
+    /// bibliography is one more path the override answers — there is no branch
+    /// here to test and that is the finding. What is tested is the outcome:
+    /// against a compile of the same tree, at the same absolute paths, after
+    /// the buffer has been put on the disk.
+    ///
+    /// **A scratch copy and not the tracked fixture**, because this clause
+    /// writes. Only the files `book.md` names or declares are copied — the rest
+    /// of `tests/fixtures/panel/` is the listing's concern and not the
+    /// compile's.
+    #[test]
+    fn the_panes_unsaved_bibliography_reaches_the_compile() {
+        let dir = scratch_dir("phase8-bibliography");
+        let panel = fixture("panel");
+        std::fs::create_dir_all(dir.join("sections")).unwrap();
+        std::fs::create_dir_all(dir.join("parts/ch1")).unwrap();
+        for path in [
+            "book.md",
+            "refs.bib",
+            "sections/text.md",
+            "sections/mark.svg",
+            "parts/ch1/deep.md",
+        ] {
+            let _ = std::fs::remove_file(dir.join(path));
+            std::fs::copy(panel.join(path), dir.join(path)).unwrap();
+        }
+
+        let main = dir.join("book.md");
+        let edited = dir.join("refs.bib");
+
+        // The one field the reference list prints, so a compile that ignored
+        // the buffer would draw the tracked title instead.
+        let buffer = std::fs::read_to_string(&edited)
+            .unwrap()
+            .replace("A Book the Panel Lists", "A Title Nobody Has Saved");
+        assert_ne!(
+            buffer,
+            std::fs::read_to_string(&edited).unwrap(),
+            "the buffer matches the disk, so this clause proves nothing"
+        );
+
+        let unsaved = render_project(&main, &edited, &buffer).expect("the master would not read");
+
+        std::fs::write(&edited, &buffer).unwrap();
+        let master = std::fs::read_to_string(&main).unwrap();
+        let saved = render_project(&main, &main, &master).expect("the master would not read");
+
+        assert_eq!(
+            unsaved.pdf.expect("the unsaved compile failed"),
+            saved.pdf.expect("the saved compile failed"),
+            "the pane's bibliography did not reach the citation pass"
+        );
+    }
+
     // -- one of the project's files, read for the window to draw ------------
     //
     // `mpdf-010` Phase 5. The panel has listed the project's figures since

@@ -3395,6 +3395,40 @@ mod tests {
         );
     }
 
+    /// **`mpdf-010` Phase 8.** `⌘S` writes the bibliography in the pane and
+    /// nothing else — Phase 2's clause 3 asked of a file that is not markdown.
+    ///
+    /// [`Preview::save`] writes `edited` whatever its extension and this phase
+    /// changed none of that, which is the point: the kind gate was in the page
+    /// and never here. It is asserted rather than argued because it is the
+    /// half of the gesture the compile above cannot see.
+    #[test]
+    fn the_save_writes_a_bibliography_in_the_pane_and_leaves_the_master_alone() {
+        let root = scratch_dir("phase8-save");
+        copy_tree(&fixture("panel"), &root);
+        let master = std::fs::read(root.join("book.md")).unwrap();
+
+        let mut preview = project(&root, "book.md", "refs.bib");
+        let typed = preview
+            .text()
+            .replace("A Book the Panel Lists", "A Title Nobody Has Saved");
+        assert_ne!(typed, preview.text(), "the buffer matches the file on disk");
+
+        preview.edit(typed.clone());
+        preview.save().unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(root.join("refs.bib")).unwrap(),
+            typed,
+            "the save did not reach the bibliography"
+        );
+        assert_eq!(
+            std::fs::read(root.join("book.md")).unwrap(),
+            master,
+            "the save wrote the master too"
+        );
+    }
+
     /// **Clause 5, first half.** The master moving on disk is a bare recompile,
     /// and it is one even while the pane holds work of its own.
     #[test]
