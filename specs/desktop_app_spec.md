@@ -5,7 +5,7 @@ note: >
   A macOS desktop app that shows the PDF while you write: a Tauri window wraps
   the same core crate, watches the document and its images, and re-renders.
 status: accepted
-last_updated: 2026-09-03
+last_updated: 2026-09-04
 
 phases:
   - name: "Phase 1 — the window, and one compile on screen"
@@ -1177,6 +1177,79 @@ list to one item.
   measurement and none has a decision, and the first shape may make the rest moot.
   **Deliberately not folded into OQ-10**, which asks what checks the *page*; this is
   about what the app does with a document too long for the loop it has.
+
+  **Noted 2026-09-04, and it answers one of the four outright: the engine's parse is
+  linear, and the crossover has left every real document.** `md2pdf-core` 0.1.3
+  arrived, which is cause 1's own fix in the repository it was reported to. Both
+  manifests spell the dependency `"0.1"`, so it arrived as a lock bump and nothing
+  else. Two quadratics went: the engine's `emit::line_of`, which counted line breaks
+  from the start of the document once per parser event, is now an `emit::Lines` table
+  of break offsets with a `partition_point` per lookup; and `sections::assemble`'s
+  per-marker `line_count(&joined)`, which recounted the whole joined buffer as it
+  grew, is now a running counter. **The second is the one this question ruled out.**
+  The `push_str` loop is linear, as cause 1 says, but the segment table built beside
+  it was not — which is why the sectioned table below improves by more than the byte
+  curve alone would predict.
+
+  Re-measured on both versions the same way — release, warm, in process, best of
+  three, through the entry points `document::render_with` calls. The parse and emit
+  alone, on a single file with no sections and no assets:
+
+  | one file | `md_to_typst` at 0.1.2 | at 0.1.3 |
+  |---|---|---|
+  | 35 KB | 1.0 ms | 0.4 ms |
+  | 70 KB | 1.5 ms | 0.5 ms |
+  | 139 KB | 4.8 ms | 0.8 ms |
+  | 279 KB | 17.9 ms | 1.5 ms |
+  | 558 KB | 69.2 ms | 3.1 ms |
+
+  4.0× per doubling is 2.0× per doubling. And the four calls one compile makes —
+  `section_paths`, `image_paths`, `bibliography_path`, `md_to_pdf_with_anchors` — on
+  synthetic projects of uniform sections:
+
+  | sections | markdown | 0.1.2 | 0.1.3 |
+  |---|---|---|---|
+  | 50 | 16 KB | 2.3 ms | 1.8 ms |
+  | 100 | 33 KB | 5.2 ms | 3.2 ms |
+  | 200 | 66 KB | 14.0 ms | 6.0 ms |
+  | 400 | 133 KB | 44.1 ms | 11.8 ms |
+  | 800 | 267 KB | 154.1 ms | 23.9 ms |
+
+  **The 0.1.2 column is re-measured here and runs about 3× under the table above
+  it**, which measured `render_project` on documents cut from `long.md` rather than
+  four core calls on a generator's uniform sections. The ratio between the columns is
+  the reading; the absolutes are not comparable across the two tables, and this one
+  is a like-for-like pair.
+
+  **So the last shape listed above is the one that happened** — "nothing here, on the
+  argument that the engine's quadratic is the whole problem and a linear engine puts
+  286 KB back under 30 ms" — and its own condition is met: 267 KB compiles in 23.9 ms
+  where that sentence asked for 30. Taken further at 0.1.3, 2.1 MB is 253 ms and
+  4.3 MB is 606 ms, so `app/src/watch.rs:TYPING_DEBOUNCE`'s 300 ms is passed at
+  roughly 7,500 sections and 2.5 MB of markdown. **The crossover is still real and no
+  longer lands on a book**; it lands some nine theses past one.
+
+  **Two of the four survive untouched, and this question keeps them.** The three
+  passes are still three: at 800 sections `md_to_typst`, `image_paths` and
+  `bibliography_path` measure 2.4, 2.4 and 2.4 ms, equal to the digit as they were at
+  82.6 apiece, with `section_paths` 0.3 and the whole compile 18.8. So
+  `document::render_with` still answers three questions with three parses of the same
+  document — 7 ms of the 24 now, where it was 136 of 154 — and that arithmetic is
+  ours whatever the engine costs. `preview::Session::recompile` still calls
+  `preview.compile()` while holding the `Preview` mutex, which is the one that stops
+  the pane rather than merely arriving late; its crossover moved out with everything
+  else and the defect did not move at all. The debounce's inverted argument —
+  trailing edge only, no leading edge, no max-wait — an engine release cannot touch.
+  **Still blocks nothing, and still not a phase**: the shape with no cost on the other
+  side is now most of what is left worth doing, and a document that reaches the new
+  crossover is not one this window has been shown.
+
+  **The bump moved no output, which is the other thing that had to be checked.** 0.1.3
+  emits what 0.1.2 emitted, byte for byte — the Typst source, the PDF and the anchor
+  list, over `samples/showcase/showcase.md`, `multi_file.md`, `long.md` and
+  `citations.md` — so nothing `rules/desktop-panes.md` measures off the frozen
+  showcase moved, and `app/Cargo.toml`'s note about the first engine patch that moves
+  one of those numbers is not yet spent.
 
 ## 4. Implementation phases
 
