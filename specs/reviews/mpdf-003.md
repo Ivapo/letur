@@ -2,6 +2,141 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 27 — Phase 22 only — 2026-09-04 — both reviewers, resumed — **READY (converged)**
+
+Zero blocking from both lenses, at the third and last round. The round-26 blocker is
+resolved and both reviewers worked the levelling rule case by case.
+
+**`Session::open_at` carries `started` across the replacement and sets `landed` equal to
+it**, and the rule is stated as *an Open discards every answer in flight*. Verified: one
+Open with orphans (every in-flight serial is `≤ S`, so levelling puts all of them at or
+below the bar whatever `current` says); **two Opens in quick succession**, which is the
+case that fails both under a reset and under carrying `started` while leaving `landed`
+alone; no window between the replacement and the first compile, `open_at` holding the
+state lock across `*preview = …` and `preview.load()` in one scope; and `Session::save_as`'s
+`moved` branch and `Session::arm`, neither of which replaces the `Preview`, so the counters
+stay continuous and there is nothing there for the rule to assume. `*preview = Preview{…}`
+occurs in `open_at` alone; `Session::new`'s `Preview::default()` has no renders to orphan;
+`set_main` reaching `open_at` gets the same semantics free. One reviewer noted the levelling
+is slightly stronger than strictly needed — the Open's own `load` would usually overtake a
+carried-only counter — and that it is the right direction to over-specify, because the rule
+then holds whether or not that load compiles at all.
+
+**Clause 6 was traced for writability rather than assumed.** `recompile_with`'s closure is
+`'static` over `Arc<Mutex<Preview>>`, so a test can spawn it and still hold `&mut session`
+for `Session::open`; `open` takes no lock before `open_at` and has no dirty gate; `arm`
+drops the old `Watch` and typing sender without touching the driving thread. Ordered by the
+*entered*/release channels, no clock, and it discriminates both defects — the orphan
+absorbing, and `landed` stranded above `started`.
+
+**Re-measured or re-verified this round**: `.reload()` has exactly four direct test call
+sites (`preview.rs` 2043, 2688, 2709, 2742) plus the one in `Session::on_change`, so
+"prising it apart costs four tests" is a real constraint; the `rules/desktop.md` sentence
+quoted for correction reads as quoted at 612–615, with the same claim in `Session::arm`'s
+and `Session::recompile`'s doc comments; `session.watch = None` is reachable from
+`mod tests`; `document::Render`'s four fields are `pub`, so the fake renders clauses 4 to 6
+need can carry distinguishable bytes.
+
+**Three non-blocking notes folded after the verdict.** The summary sentence claimed typing
+never waits on a compile *the two debounced loops started*, which the `reload` exception two
+paragraphs above it falsifies — `reload` runs inside one of those loops — so the qualifier is
+now the mechanism: *a compile either loop runs through the three-phase shape*. Clause 6's
+"a second document or the same file again" was a disjunction whose first arm has no teeth,
+and now requires the re-open, with the note that "wrote nothing" is a delta against the
+state the Open itself left. And two cross-references still read "clauses 2 to 5" after
+clause 6 was inserted.
+
+### Round 26 — Phase 22 only — 2026-09-04 — both reviewers, resumed — **NOT READY**
+
+Round 25's four blockers resolved; **both reviewers independently found the same new one**,
+which is why it was taken as stated rather than adapted.
+
+**`Session::open_at` assigns `Preview { ..Preview::default() }`, zeroing both new counters
+— a third writer the phase had declared did not exist.** `arm` drops the old `Watch` and
+typing sender without joining their threads, so a render planned before an Open is still
+live; with the counters zeroed it wins on `plan.serial > self.landed`, lands its stale bytes
+and asset list over the freshly opened page, and leaves `landed` hundreds of compiles above
+`started` — after which **every later compile of that document is silently dropped**: the
+render runs, nothing is written, no redraw and no error. The three-field `current` does not
+save it, `open_at` setting `edited = root.join(main)`, so any Open in the same project over
+a clean buffer matches all three. Fixed by carrying `started` and levelling `landed` to it,
+with clause 6 added for it, whose second assertion is the one that catches a fix that drops
+the orphan and freezes the window anyway.
+
+Resolved from round 25 and verified against the files: the `started`/`landed` scheme itself
+(a render dropped by `current` does not advance `landed`, so it cannot wedge a later one),
+clause 4's scoping to `#[cfg(test)]`, `on_change`'s three lock scopes with the `tree` walk
+moved into the first, and the clause 2/3 split. Moving the `tree` walk was checked against
+the suite: `files_under` writes `Preview::tree`, `absorb` writes the eight compile fields,
+the sets are disjoint and only `Preview::status` joins them at read time, and `tests::counted`
+counts announcements rather than absorbs, so no `wait_for` count moves.
+
+Also folded this round: `Preview::reload` named as the property's exception in both places
+the property is claimed — a filesystem event, on the watch thread, behind no
+`Mutex<Session>` — with the sentence claiming all three lock-keeping paths hold
+`main.rs`'s `Mutex<Session>` corrected where the split is made; clause 2 releasing the
+render before asserting and holding the session in an `Arc` rather than a `thread::scope`,
+whose join-on-unwind would hang on a blocked render; clause 3 writing its text through
+`session.preview().edit(…)` so no typing nudge races its own assertion; clause 5 quiescing
+the watcher and moving `edited` by the field; `rules/desktop.md`'s *"two counters"* becoming
+four; and the overlap bound corrected from two to four across an Open.
+
+### Round 25 — Phase 22 only — 2026-09-04 — a panel of two, fresh — **NOT READY**
+
+The first round on the phase appended that day. **Round 0, asked once for this episode:**
+the phase produces no observable and argues that explicitly; what it protects is the
+window's ability to accept input *while* the observable is being produced, which is inside
+this project's observable rather than beside it. The live question was YAGNI rather than
+correctness, since `md2pdf-core` 0.1.3 put the crossover past any real document — and the
+scope reviewer's own round-0 judgment was **do not cut**, on the grounds that the argument
+is honest, quantified, volunteers its own cut, and is in fact *understated*.
+
+A panel of two: correctness-and-grounding, and scope-YAGNI-and-gate-testability. Four
+blocking findings between them.
+
+1. **The absorb guard could not order two renders** — `document::render_project` reads
+   sections, bibliography and images off disk, so two renders with identical inputs can
+   carry different bytes and `current` has no signal about which. The interleaving: the
+   typing thread renders an old section, the watch thread renders and absorbs the new one,
+   the typing render lands last with `current` true and puts the old bytes plus a stale
+   asset list over a correct page, with nothing pending. **The failure the phase cited when
+   rejecting its own alternative, reached by the accepted design.** Fixed with
+   `started`/`landed` and newest-started-wins; "no absorb since this plan" was considered
+   and is rejected in the text, because it drops whichever render finishes second, which on
+   that interleaving is the one carrying the new section.
+2. **`Session::on_change`'s multi-lock-scope was unstated**, and both natural readings were
+   defective — continue-after-re-take leaves an unguarded `files_under` writing one
+   project's listing into whatever `Preview` is live, and return-on-drop loses the tree
+   refresh permanently, the "fresher one is coming" compile walking no disk. Fixed by
+   moving the `tree` walk into the first scope, so the only thing outside the lock is `run`.
+3. **Gate clause 4 forbade what clauses 2–3 must introduce** — no `thread::spawn` and no
+   channel type, in a gate whose tests need both. Scoped to outside `#[cfg(test)]`.
+4. **Clause 2 never said whether the keystroke's text differs**, and the two readings
+   disagree about its final assertion: with different text the answer is dropped and the
+   bytes arrive only via the 300 ms debounce, so an implementer writing the headline case
+   would fail on correct code. Split into clause 2 (the property) and clause 3 (the drop).
+
+Non-blocking, all accepted, none rejected: six input writers rather than five
+(`Session::trash` was already the sixth the phase predicted for a later one); eleven
+`compile()` test call sites rather than twelve; `plan`'s buffer clone priced beside the
+memcmp; the dropped-absorb announcement decided rather than left open; 267 KB / 23.9 ms in
+place of a pairing that crossed OQ-14's two non-comparable tables; the `rules/desktop.md`
+sentence about both callbacks checking `edited` before writing; and the observable argument
+restated at the strength the scope reviewer argued for — *below perception today, unbounded
+tomorrow*, with the ~24 ms at `long.md`'s 300 KB, `Session::status` waiting the same, and
+the compile firing 300 ms after the last keystroke, which is exactly when a pausing author
+resumes.
+
+**Deferred rather than built**: the double peak CPU and memory when two renders overlap. A
+render mutex is named in the phase as the shape that would serialize them and declined as a
+second mechanism for a transient cost in a narrow interleaving, the counters being needed
+for correctness regardless.
+
+**One close-out finding became a decision.** `rules/desktop.md` was at 712 of 715 and this
+is the third consecutive phase to raise a cap on it, so the raise to 730 is recorded as the
+last one: the next phase needing room splits the file at the watch-loop-and-compile seam,
+the way Phase 7 split `desktop-panel.md` out of `desktop-panes.md`.
+
 ### Round 24 — Phase 21 only — 2026-09-03 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking. Round 23's blocker resolved, and one non-blocking finding folded in after the
