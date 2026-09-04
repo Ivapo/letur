@@ -118,6 +118,11 @@ phases:
     shipped: 2026-09-04
     cut: null
     by: null
+  - name: "Phase 23 — the text pane shows its syntax"
+    reviewed: 2026-09-04
+    shipped: null
+    cut: null
+    by: null
 
 extends: null
 supersedes: null
@@ -1265,6 +1270,31 @@ list to one item.
   against it, since scaled to a 1–24 ms compile it would redraw far more often than
   300 ms does and a redraw moves the reader, and the max-wait still wanting an author who
   has typed through one.
+
+- **OQ-15** — if the whole-buffer tokenise costs too much, what does a windowed ink
+  layer do about the gutter? Raised 2026-09-04 by round 28 of Phase 23's review, which
+  found the question standing behind a gate clause rather than beside it.
+  *(design call, and one this project may never have to make)*
+
+  Phase 23 tokenises the whole buffer inside `remirror`, which is where the mirror is
+  already rebuilt whole, and gates that at **under 8 ms median** on
+  `tests/fixtures/long.md`. **If that budget is missed the phase is `cut`, not
+  narrowed**, and the reason is what this question holds: "tokenise only what is
+  visible" is a second design, not a smaller first one.
+
+  `#mirror` is the gutter's ruler as well as the ink, and Phase 23's own argument for
+  one element is that two layouts cannot disagree if there is only one. A layer built
+  from the visible rows alone stops being a ruler: `rows` is a running sum over **every**
+  line's height, `markLine` indexes it by the caret's logical line, and `#lines`'
+  `scrollTop` is driven off a box that would no longer be the document's full height. The
+  charitable reading — **one div per logical line always, token spans only on the rows in
+  view** — keeps all three and costs a rebuild on every scroll, which is a cadence
+  question Phase 8 answered once for the gutter and would have to answer again for ink
+  the author is reading.
+
+  **Not opened further until a measurement asks for it.** The budget is half a frame and
+  the pass is a regex sweep over 300 KB beside a `render_project` OQ-14 measured at
+  23.9 ms over 267 KB, so the likely outcome is that this question is never spent.
 
 ## 4. Implementation phases
 
@@ -6113,6 +6143,419 @@ breath, and the reasons recorded there.
   that use them, with clauses 2 to 6's five tests — **the blocked-render helper first**,
   since all five rest on it; then the rule, the two doc comments, the cap and the
   regenerated index.
+
+### Phase 23 — the text pane shows its syntax
+
+*Produces the observable: **no** — nothing here reaches the PDF at all.* Phase 8's
+wording, inherited rather than re-argued: the page is byte for byte what it was, the
+compile reads the same buffer through the same closure, and every clause below is about
+what the left pane *draws over* text it does not change. What is not inherited is that
+this phase **reverses a recorded non-goal**, so the argument it owes is not about the
+observable but about the reversal, and it is made here rather than assumed.
+
+Appended 2026-09-04, per §6.1. **Step 0 says decision, twice over**: Phase 4's scope
+recorded "no syntax highlighting, no autocomplete, no formatting commands", and Phase 8
+rejected a code editor component partly because "highlighting earns much less here than
+in LaTeX". **Step 1 does not fire, and it was checked rather than waved past**: nothing
+shipped is removed — the textarea, `relines`, the gutter and the mirror all stay, and the
+mirror is the thing this phase is built out of — and neither prior statement becomes
+misleading. Phase 4 wrote *"those are a later phase or a later spec"*, which anticipates
+this rather than forbidding it; Phase 8 rejected **a component**, on the bundler, which a
+lexer written in this file does not carry. **Step 2 puts it here**: `mpdf-003` owns the
+text pane (Phase 4), the mirror and the gutter measured off it (Phase 8), and the band
+under the caret's line (Phase 8).
+
+**Phase 8's second ground is refined here, not corrected in place**, and the distinction
+is the reason no dated note is added. "A dialect small enough that highlighting earns
+much less here than in LaTeX" was aimed at a component carrying a bundler, and of that
+component it stays true. It was never a measurement of what highlighting earns, and the
+two constructs below whose failure is *silent* are what a measurement finds.
+
+**Asked for at the window**: *"now i want to have the syntax highlighted, not just what
+is not rendered… what is the issue? is it not possible? the decision was done previously
+to focus on other things."*
+
+**The issue was one claim, and it was measured rather than argued.** The gutter's rows
+are measured off the mirror and the caret sits in the textarea, so the two must wrap on
+the same character or the colour slides off the words and the numbers off the lines.
+That forbids any styling that moves a glyph's advance width — and the question is which
+styling does. **Method, so the numbers re-derive**: Playwright 1.62.1, `chromium` and
+`webkit` headless, one `<span>` per case at `white-space: pre` carrying the pane's own
+`12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace`, width read off
+`getBoundingClientRect()`, each styled run differenced against the same string unstyled.
+Four samples: ASCII (`The quick brown fox jumps over 0123456789 [](a/b.md) *em* **st**`),
+accented (`café naïve Ångström Łódź señor`), symbols (`— ✓ ≤ → § ¶ †`) and CJK
+(`中文字符测试`). Deltas in px, Chromium / WebKit:
+
+| sample | `font-weight: 700` | `font-style: italic` |
+|---|---|---|
+| ASCII, accented, CJK | **0.000 / 0.000** | **0.000 / 0.000** |
+| `— ✓ ≤ → § ¶ †` | **0.000 / 0.000** | 1.844 / 3.469 |
+
+`font-size: 14px` on the ASCII sample drifts **77.063 / 79.125**, which is the control —
+and it re-derives: that sample is 64 characters at a measured advance of 0.6021 em
+(Chromium, Menlo) and 0.6182 em (WebKit), so a 2 px rise predicts 77.1 and 79.1.
+
+**Bold is free in both engines**, and that is the finding this phase's shape rests on: a
+monospace family holds its advance across weights, which is why a terminal draws bold
+without reflowing. **Italic is not free**, and the drift is on the symbol row alone —
+those glyphs fall out of the monospace stack into a proportional fallback carrying a real
+oblique. **Only size is impossible.** So a heading may be bold and coloured and may not
+be *bigger*, and that is the one thing the author cannot have.
+
+- **Scope:** **`app/dist/index.html`**, plus the harness files the gate names
+  (`app/harness/checks.mjs`, `app/harness/serve.mjs`, `app/driver/drive.mjs`) and the
+  fixture below. **No Rust, no dependency, no bundler, and no new field on `Status`** —
+  the file in the pane is `Status.edited`, already typed and already read by `report`,
+  and its extension, **folded to lower case as `document::kind_of` folds it**, is the
+  whole of the language switch. `refresh` calls `report` before the branch that assigns
+  `text.value`, so the grammar is current on the pass that rebuilds the mirror.
+
+  **`relines` splits in two, and this is the first decision rather than a detail.**
+  `relines` opens `if (lines.hidden) return`, `markLine` opens on the same guard, `#lines`
+  ships `hidden` and `shown` is `false` — so **in the default state the mirror is never
+  built at all**, and a phase that assumed otherwise would ship a pane that colours
+  nothing until `⌘L`. **The ink is not gated on the gutter**: a highlighting feature
+  behind the line-number toggle is not the feature. So:
+
+  - **`remirror()`** — unconditional. Builds `#mirror` from the buffer at the pane's
+    content width and tokenises it, memoised on its own `mirroredText`/`mirroredWidth`.
+  - **`regutter()`** — `if (!shown) return`. Reads the heights `remirror` just laid out
+    and writes `#lines`, memoised on **its own** pair.
+  - **`relines()`** stays as `remirror()` then `regutter()`, so every existing caller is
+    unchanged.
+
+  **The two seams inside today's function are assigned rather than left to fall out.**
+  `relines`' `text.value === ''` branch splits with the function: `remirror` empties the
+  mirror, nulls `rows` and calls `markLine`; `regutter` empties `#lines`. **`rows` stays
+  `remirror`'s**, produced there and read by `regutter` and `markLine` — the band no
+  longer needs its prefix sums, but `markLine`'s `rows === null` guard and its row index
+  both still do.
+
+  **Two memos and not one, because one is the bug.** With a single `linedText`/
+  `linedWidth`, building the mirror while the gutter is hidden leaves the memo current,
+  `showLines()`'s `relines()` returns early, `lines.replaceChildren` never runs — and
+  **shipped clause 15's `relined` fails**. The split is what keeps that clause true.
+
+  **The mirror becomes the ink and stays the ruler, and it is one element for a
+  reason.** `#mirror` already holds one `div` per logical line, at the pane's own content
+  width, in the pane's own font — the layout the gutter is measured from, thrown away
+  every keystroke. It stops being thrown away: the same divs gain `<span>`s and move onto
+  `#text`'s own box. **A second element would be the bug this phase is most likely to
+  have**: two layouts that must agree on every wrap, that nothing forces to agree, whose
+  disagreement is invisible until a paragraph is long enough. One element cannot disagree
+  with itself.
+
+  **Its geometry is stated, because three of the four differences are invisible to a
+  height-only check.** `#mirror` loses `top: -99999px` and its permanent
+`visibility: hidden`; it gains
+  `#text`'s own `padding: 12px 14px`; `mirror.style.width` today is the **content** width
+  under `box-sizing: border-box`, so with padding added the assignment becomes
+  `text.clientWidth` and the existing subtraction moves to the measurement alone; and
+  **`placeViewer` is not the host** — it early-returns on `viewer.hidden` — so a small
+  `placeInk` beside it, driven by the same `ResizeObserver`, writes **`left` only**.
+  **`width` has exactly one writer, `remirror`**, and the split is not arbitrary:
+  `placeViewer`'s precedent writes `text.offsetWidth`, a border-box cover, which differs
+  from `text.clientWidth` by a classic scrollbar track — and the wrong one of those two
+  silently moves where the ink wraps; and it is **bounded to `#text`'s box with `overflow: hidden`**, which
+is the half of the scroll-follow pair `#lines` already carries. The `​` for an empty
+line stays and is invisible.
+
+  **The textarea goes transparent and keeps the caret** — `color: transparent`,
+  `caret-color: var(--ink)`, `background: transparent`, and **`#text:disabled` restated
+  as `caret-color`-only**, since `color: var(--quiet)` is more specific than
+  `color: transparent` and would paint a disabled pane's own text over the ink. `body`
+  already carries `var(--ground)`, so nothing else paints the column. **`::selection`
+  gets an explicit colour**: the selection paints above the ink and a transparent one
+  over text the textarea does not own is the thing this arrangement gets visibly wrong.
+
+  **The band moves off the background and onto a row, and the phase gets simpler for
+  it.** Phase 8 painted it as `#text`'s `background-image` with `background-attachment:
+  local` and `background-repeat: no-repeat`, and said why: *"a band drawn as an element
+  would need the textarea wrapped, made transparent, and layered over"*. Two of those
+  three are now the arrangement and the third is avoided by absolute positioning, so the
+  reason is spent — the band becomes a class on the mirror's row, which is what
+  `#lines div.here` already is, and the gradient, the `local` and the `no-repeat` leave
+  with it. **The band stays a `Lines` affordance and `markLine` is otherwise unchanged**,
+  keeping its `lines.hidden` guard and — Phase 8's round-1 empty-pane defect — its
+  `text.value === ''` term. Phase 8 decided that *"the mode that pays for the measurement
+  is the mode that gets the band"*, `README.md:69` describes the band as what `⌘L` adds,
+  and neither is reopened here: **the ink is ungated, the band is not.** What changes is
+  the two lines that painted a gradient.
+
+  **The layer follows; it does not scroll.** `#lines`' arrangement, second instance:
+  no scrolling of its own, `scrollTop` driven off `#text`'s by `remirror` and by the
+  existing `scroll` listener, which gains one line.
+
+  **`#text` sits above the ink and below the figure** — ink `1`, textarea `2`, `#viewer`
+  `3`. `#text` is a flex item at `position: static`, on which a non-`auto` `z-index`
+  creates a stacking context. **The divider's grab is untouched**: `#divider`'s
+  `pointerdown` reads `text.getBoundingClientRect()`, `#text` stays in the flex flow at
+  full size, and the ink is absolutely positioned over it — `#viewer`'s own shape.
+
+  **The ink is suppressed for the length of a divider drag, and that is the second
+  decision.** The mirror's width rebuild rides `settle`'s 200 ms trailing timer, which
+  Phase 8 chose deliberately — *"a layout per frame for a column of numbers nobody is
+  reading mid-drag is waste"* — and that argument does **not** transfer to ink the author
+  is looking at: for the whole drag the textarea rewraps live while the ink stays laid
+  out at the pre-drag width, visibly detached from the glyphs it covers. Rewrapping per
+  `pointermove` would fix it and would **contradict Phase 8's shipped gate clause 3**,
+  the two being one element now. So neither. **`dragging` is written in two places and
+  read in one**, and the three are stated together because two earlier drafts of this
+  paragraph each got one of them wrong:
+
+  - **`#divider`'s `pointerdown`** sets `dragging`, hides `#mirror` and restores `#text`'s
+    own `color`. **`pointercancel` runs `up()`**, which the shipped handler does not
+    register — without it a cancelled sequence leaves the pane colourless rather than
+    merely leaking two listeners.
+  - **`up()`** clears `dragging` and calls `settle()`, which it already does.
+  - **`settle`'s callback** restores the ink after `relines()` — and **only when
+    `!dragging`**.
+
+  **The restore belongs to the remirror and not to the release**, and that is the whole
+  of it. `up()` arms a 200 ms timer and rebuilds nothing; `move()` writes `flexBasis` and
+  calls `fit()` without remirroring — so an ink restored at `pointerup` would sit at the
+  *pre-drag* wrap over text that rewrapped during the drag, for the whole 200 ms until
+  `settle` fires. That is the frame this decision exists to prevent, and by-eye item 3
+  forbids it. **And the `!dragging` read is what closes the other end**: `settle` is armed
+  by the `pages` `ResizeObserver` as well as by the divider, so one armed just before a
+  press would otherwise fire mid-drag and restore the ink detached. **The pane goes plain
+  while you drag and colours a settle later.**
+
+  **The hide is keyed to a stale mirror and not to the divider, because the window's own
+  edge is the same defect by the other route.** A window resize reaches `settle` through
+  the very `pages` `ResizeObserver` named above, with no press to bracket it — and the
+  argument is verbatim: the textarea rewraps live while the mirror waits on the trailing
+  timer, and with `remirror` owning `width` a stale-wide mirror overhangs the column
+  besides. So the column observer hides `#mirror` whenever it sees a width the mirror was
+  not built at, `dragging` staying as the second condition on the restore rather than the
+  first: **stale hides it, a settle at a matching width restores it, and `dragging`
+  is what stops a stray settle restoring it for one frame mid-drag.** **The hide is `visibility: hidden`, never
+  `display: none`**, or a `scrollHeight` read taken near a drag answers 0.
+
+  **Three grammars, one pass, chosen off the extension.** Markdown, BibTeX and YAML,
+  hand-written, in this file. **`.yml` and `.yaml` are bibliographies here**
+  (`app/src/document.rs:kind_of`, matching `core/src/bibliography.rs`), so the YAML lexer
+  is written once and used twice — for those files, and for the frontmatter block of a
+  markdown one, which renders as nothing and is therefore invisible to the pane beside it.
+  **The markdown lexer carries block state across lines and cannot be per-line**: a fence
+  opened on line 40 makes line 41 code, and a per-line lexer would colour a document as
+  prose the moment an author typed three backticks. One pass over the buffer emitting
+  per-line token runs.
+
+  **Four inks, and the vocabulary is derived rather than asserted.** Against
+  `--ground` (`#f4f4f2`) the existing palette offers exactly three legible foregrounds —
+  `--ink` ≈ 11.6:1, `--alarm` ≈ 6.3:1, `--quiet` ≈ 4.3:1; `--chrome`, `--edge`, `--band`
+  and `--paper` sit at 1.1–1.3:1 and cannot be text. So **one new token, `--mark`**, is
+  declared in each of the four theme blocks. That is a departure from
+  `rules/desktop-panes.md`'s recorded *"`--edge` and not a new token"*, and the departure
+  is that the precedent reuses a **surface** token for a surface; there is no unused
+  foreground to reuse, and a fourth ink invented out of `--edge` would be unreadable.
+
+  | | `--ink` | `--mark` | `--quiet` | `--alarm` |
+  |---|---|---|---|---|
+  | markdown | body text | heading text (**bold**), include marker | syntax punctuation, fence bodies, frontmatter delimiters | an include naming a file `Status.entries` marks `missing` |
+  | BibTeX | field values | `@type` and field names (**bold** on `@type`) | braces, commas, `=`, comments | — |
+  | YAML | scalar values | keys (**bold**), `-` item markers | `#` comments, `---`, quotes | — |
+
+  **No italic anywhere in the shipped ink**, and the rule is stated as a prohibition
+  rather than a condition. "Allowed on runs the table clears" is not implementable:
+  whether a glyph resolves inside `ui-monospace, SFMono-Regular, Menlo, monospace`
+  depends on the machine's installed faces and is not answerable from JS. Emphasis takes
+  colour and weight, never slant. `font-size`, `letter-spacing`, `font-family` and
+  `font-variant` are forbidden in the ink layer, and clause 19 is what holds that.
+
+  **Two markdown constructs earn `--mark` and `--alarm`, and they are why "earns much
+  less than LaTeX" is not the whole answer.** `[](sections/three.md)` **on its own line
+  is an include** and inline is an inert link. **The lexer's predicate is stated, because
+  clause 21 has to be reproducible**: a line whose entire trimmed content is a single
+  markdown link, with empty link text, no title, and a destination ending `.md` case-
+  insensitively, at zero indentation. `core/src/emit.rs:lone_markdown_link` is stricter
+  still — it wants a top-level *paragraph* and declines a marker inside a list or a block
+  quote — and where the two disagree the compiler is right; see the invariant below.
+  **A marker's target is resolved against the master's own directory, not the root**,
+  before it is compared to `Entry.path`: `Entry.path` is root-relative while a section
+  path is relative to the master, and a master in a subfolder is where matching the raw
+  text would mark every include red.
+
+  **The highlight is a hint and never a claim.** It gates nothing, refuses nothing,
+  writes nothing, and reaches no Rust; where this lexer and `md2pdf-core` disagree, the
+  compiler is right and the colour is wrong, and the page is what says so. That is the
+  sentence that keeps a front-end lexer honest and keeps this phase from being the first
+  step toward a second parser with opinions.
+
+- **Rejected:** *a code editor component.* Phase 8's, unchanged and restated because this
+  phase is where a reader will look for it: CodeMirror 6 needs a bundler, which is what
+  `withGlobalTauri` exists to avoid.
+
+  *Token spans from `md2pdf-core`.* The engine parses this dialect exactly, and a
+  highlight built from its tokens could never disagree with the compiler — the one
+  weakness of the lexer above. Refused on two grounds: it is a spec in `Ivapo/md2pdf` and
+  a version bump here, per `CLAUDE.md`; and it puts an `invoke` on the keystroke path,
+  which is the wait Phase 22 has just finished taking off it. **The shape is recorded for
+  the phase that meets it**: a compile already crosses that boundary, so tokens could
+  ride the compile's answer and colour the *last compiled* text, the lexer holding the
+  keystrokes between.
+
+  *A second element for the ink.* Argued above: two layouts, no forcing function,
+  invisible drift.
+
+  *Rewrapping the ink per `pointermove`.* Argued above: it contradicts Phase 8's shipped
+  clause 3, the mirror being one element now. Suppression buys the same correctness at a
+  200 ms cost the author is already paying for the page.
+
+  *Bigger headings.* Measured impossible. A heading is bold and coloured, and that is the
+  whole of what the pane can offer it.
+
+  *Splitting this into two phases.* Considered and declined: both round-28 reviewers
+  judged the size explicitly and neither asked for a split. What grew between round 28
+  and this draft is specification — the token table, the include predicate, the mirror's
+  geometry — not implementation.
+
+- **Exit gate:** `cargo test --workspace` passes, no `.rs` file being touched.
+  `bun app/typecheck.mjs` passes. `bun app/harness/checks.mjs` passes **in both engines**,
+  per Phase 12's gate, and `--falsify` passes, **which is what catches an isolation error
+  in the four pairings below rather than a reader's confidence in them**.
+
+  **The fixture gains three things**, and only three: `tests/fixtures/panel/book.md`
+  already opens with a frontmatter block and a `# The book` heading and already carries
+  inline code spans and a `[@panel]` citation, so what it lacks is an inline
+  `[text](other.md)` mid-sentence, an emphasis run and a fenced block. All three compile,
+  so `serve()` does not `die`, and nothing is keyed to the file's line numbers —
+  `document.rs`'s listing test compares against `tests/fixtures/panel-manifest.txt` on
+  path, kind and missing. **The missing-target
+  case cannot join them** — the engine raises `Error::MissingSection` and `serve.mjs`
+  records that it deliberately does not name `sections/missing.md` — so clause 21 **types
+  it in**, which is the first clause here to write into `#text` and is named as such: one
+  `fill`, the class read, the buffer restored.
+
+  **`tests/fixtures/long.md` is not reachable from `checks.mjs`** — `run()` serves one
+  `--doc`, defaulting to `tests/fixtures/panel`, and `--doc tests/fixtures/long.md` fails
+  clauses 5, 6, 11, 17 and 18, all keyed to `PANEL_ENTRIES`. Every clause below runs on
+  the panel fixture, narrowed until it wraps.
+
+  Four clauses appended as **19–22**, the error clause moving to **23** — it stays last
+  and its number moves as clauses are added, which is `checks.mjs`'s own rule and the
+  reason "after 18" would have collided:
+
+  19. **The ink lays out to the textarea's own height.** With the pane narrowed until the
+      fixture wraps, `#mirror.scrollHeight` equals `#text.scrollHeight` within a pixel —
+      **no padding term**, the two boxes carrying the same padding over the same content
+      width by the geometry above; subtracting one side's would assert a 24 px difference
+      and fail correct code. **Narrowed by `opened(browser, url, width)`**, not by clause
+      14's synthetic divider drag, which now trips the suppression flag. **The one-pixel
+      tolerance is measured, not assumed**: a textarea and a `pre-wrap` div carrying the
+      same font, padding and border-box width over 40 rows of blank lines and soft-wrapped
+      paragraphs both report `scrollHeight` 1789 — **Δ 0** — in Chromium and WebKit alike,
+      so the historic form-control divergence does not bite at this geometry. **The gutter comparison is deliberately not this
+      clause**: `remirror` *assigns* each gutter row's height from the mirror's own
+      `offsetHeight`, so a mirror-versus-gutter check holds by construction and proves
+      nothing about the textarea. Mutation **`ink-bigger-headings`**.
+  20. **The ink draws with `Lines` off, and the gutter does not.** In the default state
+      `#mirror` has one child per logical line and carries token spans, while `#lines` is
+      `hidden` and empty; `⌘L` then fills `#lines` without touching the ink. Mutation
+      **`ink-lines-gated`** — drop `regutter`'s own `if (!shown) return`, so `#lines`
+      fills while it is still `hidden`. **It falsifies from the gutter's side, and both
+      other shapes were tried and fail.** "Restore the single memo" fails shipped clause
+      15's `relined`, which the Scope above argues; "give `remirror` the pre-phase
+      `if (lines.hidden) return`" empties `#mirror` in the default state, which is where
+      clause 19 reads it, so it fails 19 as well. **Any mutation that removes the ink by
+      default kills both clauses that read `#mirror` there** — this one leaves `#mirror`
+      alone and fails only clause 20's *"`#lines` is `hidden` and **empty**"* half, with
+      clause 15's `relined`, `linesMoved` and `linesMarked` all still true.
+  21. **An include marker is not an inline link, and a missing target is neither.** The
+      fixture's own marker, its inline link and a typed marker naming a file the panel
+      lists `missing` carry three distinct classes. Mutation **`ink-include-anywhere`**.
+  22. **The band is on the caret's row and on one row.** In `Lines` mode `markLine` marks
+      exactly one mirror row and one gutter row, and clears both; with `Lines` off it
+      marks neither, the band being the gutter's affordance and not the ink's.
+      Mutation **`ink-band-tiles`**, the element form of the `no-repeat` bug Phase 8
+      records costing a build.
+
+  **One shipped clause is amended, and leaving it would let it pass for the wrong
+  reason.** Clause 15's `unbanded = afterHide.band === ''` reads
+  `text.style.backgroundImage`, which after this phase is `''` unconditionally — it goes
+  **vacuously true** and stops testing that `markLine` ran on the hide. It is re-keyed to
+  **the caret's own mirror row** carrying no band class after the hide — the caret's row
+  and not *any* marked row, because `markLine`'s clear is the one-element `marked`
+  bookkeeping the shipped code chose over a walk, so an assertion reading any row would
+  fail under `ink-band-tiles` and cost that mutation its isolation. It is an absence
+  assertion again only because the band stayed a `Lines` affordance; had the ink carried
+  it in both modes there would have been no reproducible target, and `ink-band-tiles`
+  would have failed 15 and 22 together.
+
+  **There is no second amendment, and the earlier draft's "clause 6" was two mistakes.**
+  *"The pane is Phase 4's textarea again"* is Phase 8's **by-eye** item, `§4` above, which
+  §6.1 forbids editing and which this phase's own by-eye list supersedes; and
+  `checks.mjs`'s clause 6 is `panelDrawsTheEntries`, which this phase must not touch. The
+  sentence that does track the code is `rules/desktop-panes.md`'s *"Off, the pane is the
+  plain textarea"*, and it is corrected in the close-out where rules are corrected.
+
+  **One driver item**, `app/driver/drive.mjs` clause 5: `rules/desktop-panes.md` records
+  that *"a claim about how the engine that ships renders is the driver's"*, and
+  `checks.mjs` records that at narrow widths WebKit agrees with Chromium and not with the
+  window. "The ink wraps where the textarea wraps" is exactly such a claim, so clause 19's
+  height comparison is taken once in the shipped binary.
+
+  **And one measurement, because `remirror` is on the keystroke path.** Phase 22's whole
+  subject was what a keystroke waits on, and this adds a tokenise to a rebuild that is
+  already whole-buffer. Measured in the driver on `tests/fixtures/long.md` (300,527 bytes,
+  1,879 lines, pure ASCII), `performance.now()` around `remirror`, median of 20
+  keystrokes appended at the end of the buffer: **the tokenise-and-build pass stays under
+  8 ms**, half a 16.7 ms frame and beside the 23.9 ms `render_project` OQ-14 measured over
+  267 KB. **If it does not, this phase is `cut` and re-specced** — the windowed
+  alternative is OQ-15 and not a branch of this gate, because a gate whose failure path
+  is an undesigned second design checks nothing.
+
+  By eye, against `tests/fixtures/samples/showcase/showcase.md` — **the full path, the
+  short one in Phase 8's gate resolving nowhere** — with `refs.bib` beside it and a
+  `refs.yml` added to that folder for the third grammar, noting that dropping one there
+  adds it to the walked project:
+
+  1. The caret sits on its glyph at the end of a long wrapped line, and a selection is
+     legible across a token boundary.
+  2. `⌘L` on and off leaves the ink exactly where it was.
+  3. Dragging the divider: the pane goes plain for the drag and colours a settle later,
+     with no frame in which colour sits off its glyphs.
+  4. The same at the window's own edge, which arms the same timer by the other route.
+  5. The figure surface still covers the column, and the divider still drags from the
+     textarea's own box.
+  6. Dark and light both read, at the four inks above and no fifth.
+
+- **Close-out:** **`rules/desktop-panes.md`** is where this lands: *"**The text pane is
+  plain** — no highlighting, no autocomplete, no formatting commands"* at line 63 stops
+  being true, the `--mark` token and the four-ink table are new, and **the in-place counts
+  move — "the nineteen clauses" and "the sixteen broken pages" at lines 42–43 and 618–619
+  become twenty-three and twenty**, named here rather than left for the linter — and so
+  does a third at line 645, *"four clauses and three mutations"* for the driver, which
+  clause 5 makes five. **Its *"Off, the pane is the plain textarea"* is the sentence the
+  earlier draft mis-filed as a shipped harness clause**, and it is corrected here, where
+  a rule is corrected against its own sources. Its `max_lines` goes **625 → 700**: the body is at 618, and an ink layer, a token table,
+  three grammars, four clauses and an amendment do not fit in seven lines.
+
+  **`rules/desktop-panel.md`** (233/235) and **`rules/desktop-geometry.md`** (346/370)
+  both declare `app/dist/index.html` in `sources`; the panel rule's `covers` names *"the
+  surface over the text pane and the three boxes that place it"*, which is the
+  `placeViewer` machinery `placeInk` sits beside, and both take a line with a cap raise if
+  one is needed. **`rules/desktop.md`** needs nothing — and the reason is Phase 8's
+  `covers`-scope one, not "no `.rs` file moves": it sources `app/dist/index.html` too, and
+  it sits at **730/730** with no headroom, so anything landing there forces a raise this
+  phase has no business making.
+
+  **`README.md`** gains a sentence where `Lines` is described: the pane colours what it is
+  holding, in all three kinds, and headings do not grow. §6's hook is not satisfied by a
+  spec.
+
+  **`rules/INDEX.md` is regenerated** — `spec-lint --write-index` in the same pass.
+  **`specs/INDEX.md` needs nothing**: the rollup is already `partial`, Phase 7 being
+  `cut`, and `note` is unchanged. **No `CLAUDE.md` change**: the prefix, the observable
+  and the engine boundary are untouched.
+
+  **Commit plan.** One push, four commits: the `relines` split with its two memos, alone
+  and unbisectable if merged with what follows; the ink layer with the band moved onto it,
+  the textarea transparent and the drag suppression; the three grammars and the token
+  table; then clauses 19–22 with their mutations, the amendment, the driver item, the
+  fixture, and the rule, README and regenerated index.
 
 <!--
 The review record is a sibling file, not a section: it lives at

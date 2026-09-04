@@ -2,6 +2,183 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 31 — Phase 23 only — 2026-09-04 — both reviewers, resumed — **READY (converged)**
+
+**Past the §7.6 cap, and the human authorised it.** Round 30 escalated with two blockers;
+the decision to run a fourth round was the human's, asked and answered explicitly, and is
+recorded here because §7.6 makes going past the cap a decision a person makes rather than
+one the loop takes.
+
+Zero blocking from both lenses. Both traced the third shaping of the `ink-lines-gated`
+pairing term by term rather than trusting the changelog, and the two traces agree.
+
+**Both round-30 blockers resolved.** The mutation now drops `regutter`'s own
+`if (!shown) return`, so `#lines` fills while still `hidden` and only clause 20's *"`#lines`
+is `hidden` and **empty**"* half fails. Traced against every term of clause 15 —
+`listening`, `foldMoved`, `foldMarked`, `linesMoved`, `linesMarked`, `relined`, `unbanded`,
+`declined` — and against clauses 19, 21, 22 and 23, all of which survive. **Two facts made
+it work that neither reviewer had to assume**: `#lines[hidden] { display: none }`
+(`app/dist/index.html:765`) means a filled-but-hidden gutter takes no width, so no geometry
+clause moves; and the seam assigned in round 29 gives `regutter` its own empty-buffer
+branch, so it never reaches a null `rows`. All four pairings isolate, `ink-band-tiles`
+passing the re-keyed clause 15 precisely because the assertion reads *the caret's own* row,
+which `marked`'s one-element clear removes.
+
+The suppression flag is three writes and one read — `pointerdown` sets `dragging` and
+hides, `up()` clears it and calls `settle()`, `settle` restores after `relines()` only when
+`!dragging` — with both ends traced: a stray `pages`-armed settle finds `dragging` true and
+does not restore; the drag's own settle finds it false and restores after the remirror.
+
+**Measured this round**, at a reviewer's insistence that clause 19's tolerance not be
+assumed: a textarea and a `pre-wrap` div carrying the same font, padding and border-box
+width over 40 rows of blank lines and soft-wrapped paragraphs both report `scrollHeight`
+**1789, Δ 0**, in Chromium and WebKit alike. The historic form-control divergence does not
+bite at this geometry, so the one-pixel tolerance is grounded rather than hoped past.
+
+**Where the two lenses proposed different fixes, the record says which was taken.** For the
+`ink-lines-gated` collision one asked that clause 19 declare it runs with `Lines` on and the
+other that the mutation falsify from the gutter's side; the second was taken, because it
+leaves clause 19 testing what it was written to test rather than moving the state it runs
+in.
+
+**Six non-blocking refinements folded after the verdict.** By-eye item 3 said the pane
+"colours **on release**", which is the behaviour the Scope now argues against while citing
+that item as its authority — corrected to "a settle later". **The suppression was keyed to
+the divider and a window resize is the same defect by the other route**, reaching the same
+timer through the `pages` observer with no press to bracket it; the hide is now keyed to a
+stale mirror, with `dragging` demoted to the second condition on the restore, and a by-eye
+item added for the window edge. `pointercancel` now runs `up()`, without which a cancelled
+sequence left the pane colourless rather than merely leaking two listeners. And three
+editorial: a duplicated fragment in the clause-15 amendment, "the two amendments" surviving
+in the commit plan after the second was dropped, and a supporting claim that
+`document.rs`'s panel tests "compare two renders to each other" when the listing test
+compares against `tests/fixtures/panel-manifest.txt` on path, kind and missing.
+
+### Round 30 — Phase 23 only — 2026-09-04 — both reviewers, resumed — **NOT READY (escalated at the §7.6 cap)**
+
+Both lenses independently found the same two blockers, both newly introduced by round 29's
+fixes, and both proposed compatible shapes for them. **Escalated rather than folded**: this
+was the third round, and §7.6 makes a fourth the human's call rather than the loop's.
+
+Round 29's four blockers verified resolved in the files by both reviewers: clause 19's
+padding term gone with the 24 px reasoning inline; the "clause 6" amendment dropped and
+correctly re-filed (`checks.mjs:427` is `panelDrawsTheEntries`, the quoted sentence is
+Phase 8's by-eye item at `specs/desktop_app_spec.md:2363`, the tracking sentence is
+`rules/desktop-panes.md:500-501`); the band kept as a `Lines` affordance, with
+`markLine`'s shipped guard confirmed as `lines.hidden || rows === null || text.value === ''`
+and `README.md:69` confirmed still true.
+
+**Outstanding blocker 1 — `ink-lines-gated` still not isolated; the collision moved from
+clause 15 to clause 19.** Clause 19 narrows by `opened(browser, url, width)`, which returns
+the default state with `Lines` off, and the ink is ungated — so a mutation that empties
+`#mirror` in that state fails 19 and 20 together. Any mutation removing the ink by default
+kills both, because both read `#mirror` there. The shape that isolates works from the other
+side: drop `regutter`'s `if (!shown) return` so `#lines` fills while hidden, failing only
+clause 20's "`#lines` is hidden and **empty**" half and leaving `#mirror`, `relined`,
+`linesMoved` and `linesMarked` untouched.
+
+**Outstanding blocker 2 — the suppression flag has two clearing points, and the stated one
+draws the frame it exists to prevent.** "`settle` clears it after the remirror" and "the
+flag is cleared in `up()` and not in `settle`" cannot both hold. `up()` is
+`removeEventListener × 2; settle()` — it arms a 200 ms timer and does not rebuild — and
+`move()` writes `flexBasis` and calls `fit()` without remirroring, so clearing at
+`pointerup` shows the pre-drag wrap over rewrapped text for 200 ms, which by-eye item 3
+forbids. Both reviewers converged on the same fix: `pointerdown` sets `dragging`, `up()`
+clears `dragging` and calls `settle()`, and `settle` restores the ink after `relines()`
+only `if (!dragging)`. Compounding it, `mirror.style.width` is left double-assigned between
+`remirror` (`text.clientWidth`) and `placeInk` (whose precedent `placeViewer` writes
+`text.offsetWidth`) — the two differ by a classic scrollbar track, and which owns it decides
+whether the suppression is load-bearing at all.
+
+**Re-measured this round**: the `font-size` control now re-derives — 64 characters × 2 px ×
+0.6021 em = 77.069 against the quoted 77.063, and × 0.6182 em = 79.130 against 79.125.
+`drive.mjs:446`'s `OPEN_DOCUMENT` is parameterised and called as
+`held.async(OPEN_DOCUMENT, [DOCUMENT])` at `:659`. `md2pdf_core::section_paths`
+(`lib.rs:392-400`) is `emit::includes` mapped to `SectionRef` and nothing else, so the
+fixture's new inline link is inert to `project_root`, `masters`, `listing` and `sections`.
+`settle()` is armed by the `pages` `ResizeObserver` at `index.html:4370` as well as by
+`up()` at `:4698`.
+
+**Non-blocking left open**: clause 15's re-keyed `unbanded` should name *the caret's* row
+rather than any marked row, which is what `ink-band-tiles`' isolation turns on; "the two
+amendments" survives in the commit plan and the `max_lines` argument after the second was
+dropped; and clause 19's one-pixel tolerance assumes a textarea and a div report
+`scrollHeight` the same way, which deserves the same measurement discipline the font table
+got before it is trusted in both engines.
+
+### Round 29 — Phase 23 only — 2026-09-04 — both reviewers, resumed — **NOT READY**
+
+Four blockers, both lenses converging on all four, every one introduced by round 28's own
+fixes — the §7.3 pattern, twice over.
+
+**Clause 19 double-counted the padding.** Once `#mirror` gained `#text`'s `padding: 12px
+14px` and the same content width, the two `scrollHeight`s agree directly; subtracting one
+side's asserted a 24 px difference against a one-pixel tolerance and would have failed
+correct code. Carried over from round 28's wording, where the mirror had no padding.
+
+**`ink-lines-gated` was not isolated.** The phase's own Scope proved it: restoring the
+single memo is exactly the state that fails shipped clause 15's `relined`. Reshaped to gate
+`remirror` instead — which round 30 then found still collides, one clause over.
+
+**Clause 15's re-key had no workable target, and the band had silently become
+mode-independent.** "`markLine` marks the mirror row always" reversed Phase 8's recorded
+*"the mode that pays for the measurement is the mode that gets the band"* with no argument
+and falsified `README.md:69`. Resolved at the root rather than by picking a reading: the
+band stays a `Lines` affordance, `markLine` keeps both guards, and `unbanded` is an absence
+assertion again. One change closed both lenses' findings.
+
+**The "clause 6" amendment was two mistakes.** The quoted sentence is Phase 8's *by-eye*
+item, which §6.1 forbids editing, and `checks.mjs`'s clause 6 is `panelDrawsTheEntries`,
+which the phase must not touch. Dropped; the sentence that tracks the code is
+`rules/desktop-panes.md`'s *"Off, the pane is the plain textarea"*, corrected in the
+close-out.
+
+**Corrected this round**: the `font-size` control was 80.297 / 82.334 carried from a
+different sample string; re-measured on the stated ASCII sample it is **77.063 / 79.125**,
+and the measured advance is now stated so it re-derives. Contrast ratios re-computed
+independently by one reviewer as 11.8 / 6.4 / 4.4 against the phase's 11.6 / 6.3 / 4.3.
+
+### Round 28 — Phase 23 only — 2026-09-04 — a panel of two, fresh — **NOT READY**
+
+**Round 0, for this episode**: Phase 23 produces no observable, argued explicitly by
+inheriting Phase 8's wording, and the argument it owes is for reversing a recorded non-goal,
+which it makes in place. It is the right thing to build — the subject is the pane the
+author's hands are in, and the claim that made the non-goal look permanent (that
+highlighting must be colour-only) was measured false before drafting rather than after.
+
+Thirteen blockers across two lenses, deduped to ten. All accepted, none rejected.
+
+**The founding premise was false.** `relines` opens `if (lines.hidden) return`, `markLine`
+on the same guard, `#lines` ships `hidden` and `shown` is `false` — so in the default state
+the mirror is never built and the phase's "rebuilt every keystroke" was wrong. Split into
+`remirror()` (unconditional) and `regutter()` (gated), with separate memos, because a single
+memo makes `showLines()`'s `relines()` return early and breaks shipped clause 15.
+
+**The divider drag would have drawn detached ink.** The mirror's width rebuild rides
+`settle`'s 200 ms timer, which Phase 8 chose for numbers nobody reads mid-drag; that
+argument does not transfer to ink under the author's eyes, and rewrapping per `pointermove`
+contradicts Phase 8's shipped clause 3. Resolved by suppressing the ink for the drag.
+
+**The gate did not work.** `ink-italic-symbols` falsified nothing — `long.md` is 300,527
+bytes of pure ASCII, zero em dashes, zero `*`, zero backticks, verified independently;
+`ink-bigger-headings` failed two clauses; clause 19's first half was a tautology, `remirror`
+assigning gutter heights from the mirror; `long.md` is unreachable from `checks.mjs`, whose
+`run()` serves one `--doc`; and clause 21 had no document, `book.md` carrying no inline link
+and no missing target, which `serve.mjs` deliberately omits.
+
+**The palette did not re-derive and no construct→ink mapping existed.** Only `--ink`,
+`--alarm` and `--quiet` are legible on `--ground`; the other four sit at 1.1–1.34:1. One new
+token `--mark`, with an argued departure from the recorded *"`--edge` and not a new token"*
+precedent, plus a full table over the three grammars.
+
+**Two rules stated as conditions were not implementable.** Italic "allowed on runs the table
+clears" is not answerable from JS, font fallback being machine-dependent — made a flat
+prohibition. And the performance escape hatch became a measured budget whose failure path is
+`cut`, with the windowed alternative moved out to **OQ-15**.
+
+**Declined**: splitting the phase. Both reviewers judged the size explicitly and neither
+asked for one; what grew between rounds is specification, not implementation.
+
 ### Round 27 — Phase 22 only — 2026-09-04 — both reviewers, resumed — **READY (converged)**
 
 Zero blocking from both lenses, at the third and last round. The round-26 blocker is
