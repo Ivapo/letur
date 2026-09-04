@@ -113,6 +113,11 @@ phases:
     shipped: 2026-09-03
     cut: null
     by: null
+  - name: "Phase 22 — a keystroke never waits on a compile"
+    reviewed: null
+    shipped: null
+    cut: null
+    by: null
 
 extends: null
 supersedes: null
@@ -1250,6 +1255,16 @@ list to one item.
   `citations.md` — so nothing `rules/desktop-panes.md` measures off the frozen
   showcase moved, and `app/Cargo.toml`'s note about the first engine patch that moves
   one of those numbers is not yet spent.
+
+  **One of the four shapes left for Phase 22 on 2026-09-04, and this question keeps the
+  other three.** The mutex — released across the compile, so a keystroke waits on no
+  render — is the one with no cost on the other side, and it is a phase rather than a
+  line here because the answer it needs is what happens to a compile whose text moved on
+  while it ran. **Not marked `RESOLVED`**: the three passes are the engine's to fold into
+  one, and both debounce shapes are still undecided — the `elapsed`-scaled one now
+  against it, since scaled to a 1–24 ms compile it would redraw far more often than
+  300 ms does and a redraw moves the reader, and the max-wait still wanting an author who
+  has typed through one.
 
 ## 4. Implementation phases
 
@@ -5760,6 +5775,189 @@ buttons."*
   **Commit plan.** One push, three commits: the menu, its two ids and the emit; the page's
   two listeners with the gutter's state made page-held, its clause and its mutation; then
   the rules and the README.
+
+### Phase 22 — a keystroke never waits on a compile
+
+*Produces no observable, and here is the argument, which is weaker than it was a week
+ago and is stated at its true strength.* Nothing here changes what the page draws: the
+same markdown compiles to the same bytes, at the same moment, and no gate below opens a
+PDF. What it changes is what the window does with the keystroke that arrives **while**
+those bytes are being made. OQ-14 measured that: `Session::recompile` calls
+`preview.compile()` holding the `Preview` mutex, `Session::edit` and `Session::status`
+take that same mutex, so a compile in flight is a pane that stops taking input rather
+than a page that redraws late.
+
+**And `md2pdf-core` 0.1.3 moved the document where that is visible out past any real
+one.** At the crossover this phase was raised against — 286 KB, an ordinary book — the
+compile is now 23.9 ms, and the first document that holds the lock longer than the
+300 ms of `app/src/watch.rs:TYPING_DEBOUNCE` is some 2.5 MB of markdown. So on every
+document this window has been shown, **this phase is invisible by construction**. It is
+not proposed on the measurement; it is proposed on the property, which is that the
+pane's responsiveness stops being a function of document length at all. A window whose
+input latency is bounded only by *how long the document takes to typeset* has a floor
+nobody can state, and the fix is small enough that stating the floor is the more
+expensive option. That is the whole argument, and if it does not persuade, the honest
+outcome is `cut` rather than a phase talked up.
+
+Appended 2026-09-04, per §6.1. **Step 0 says decision, on two counts** — what happens to
+a compile whose text moved on while it ran, which nothing has ever had to answer because
+the lock made it impossible; and which of the five compile paths pay for the property,
+which is a judgement rather than a refactor. Step 2 then puts it here: `mpdf-003` owns
+the compile (Phase 1), the loop that fires it (Phase 2) and the buffer it reads
+(Phase 4).
+
+**Asked for at the window**: *"from leturs side, was there something we could also 'fix'
+which is not overengineer?"* — with the two other shapes OQ-14 lists declined in the
+same breath, and the reasons recorded there.
+
+- **Scope:** **`app/src/preview.rs`** only. `Preview::compile` splits into three, and
+  gains no behaviour:
+
+  - **`Compile`** — `main: PathBuf`, `edited: PathBuf`, `buffer: String`, `PartialEq`.
+    The three things one compile reads, owned, so nothing that runs it borrows a
+    `Preview`. **That is the structural half of the fix**: `Compile::run` cannot hold the
+    lock because it cannot reach the state the lock guards.
+  - **`Preview::plan(&self) -> Option<Compile>`** — today's first three lines, returning
+    `None` on the same two absences that return early now.
+  - **`Compile::run(&self) -> (Result<document::Render, String>, Duration)`** — the
+    `document::render_project` call and the `Instant` around it, and nothing else.
+  - **`Preview::absorb(&mut self, plan: &Compile, outcome, took)`** — today's field
+    writes, verbatim, behind one guard.
+  - **`Preview::compile(&mut self)`** stays, as `plan` → `run` → `absorb`. Every
+    synchronous caller and all twelve test call sites keep working unchanged, which is
+    what holds this phase to one file.
+
+  **The guard is derived and not maintained, and that is the first decision.**
+  `Preview::current(&self, plan: &Compile) -> bool` compares the three inputs against
+  the live ones; `absorb` returns without writing when it is false. The alternative was
+  a serial bumped on every write to `main`, `edited` or `buffer` — cheaper per compile
+  and **wrong by construction**, because the inputs are written in five places
+  (`Preview::edit`, `Preview::take`, `Preview::save_as`, `Session::set_edited` reaching
+  through the guard, and `Session::open_at` assigning a fresh `Preview`), and a sixth
+  arrives with the next phase that touches this file. A counter is a bump a future
+  author must remember; a comparison is one they cannot forget. Its cost is one
+  `String` equality per compile — a memcmp of the document against itself, four to five
+  orders below the compile it guards, and it stops at the first differing byte.
+
+  **The guard stands in front of every write, not only the bytes.** A stale render also
+  carries an asset list and a section list, and `Preview::assets` is what
+  `Session::classifier` hands the watch filter — so a dropped compile that wrote only
+  its shopping lists would re-arm the watch against a document that has moved on. One
+  guard, one `return`, no partial absorb.
+
+  **Dropping a stale answer is safe because a fresher one is always already coming**,
+  and that is the second decision. Each of the three writers that can invalidate a plan
+  mid-render is itself followed by a compile: `Preview::edit` is what `Session::edit`
+  calls before nudging the typing channel, so the debounce has a fire pending;
+  `Preview::take` is reached only from `Preview::load` and `Preview::reload`, each of
+  which compiles on the next line; `Session::set_edited` calls `load`. So the page is
+  never left holding bytes with nothing on the way to replace them. **The alternative —
+  absorbing the stale render anyway** — was rejected: its bytes are a page of text the
+  author has since changed, `stale` would have to be set true immediately after being
+  set false, and with two threads now able to render at once the older of them could
+  land last and walk the page backwards.
+
+  **Two paths pay for the property and three do not**, which is the third decision, and
+  the split is by what is typing at the time. `Session::recompile` — the typing pause —
+  and `Session::on_change`'s bare-recompile branch — an asset or the master rewritten on
+  disk — both fire while a hand is on the keys, and both take the three-phase shape:
+  decide and plan under the lock, drop the guard, `run`, re-take and `absorb`.
+  `Preview::load` (an Open), `Preview::reload`'s take (the author's own file replaced
+  under them) and `Session::save_as`'s move all keep `Preview::compile` whole: each is a
+  single user action that has just moved the document wholesale, and a pane that is busy
+  for one compile at the moment the author asked for one is the behaviour, not a defect.
+  `on_change`'s branch order — `Change::Edited` decided before both, `reload` before the
+  bare recompile, the `tree` walk after — **is preserved exactly**, and its own tests
+  are what say so.
+
+  **No new thread, no channel, no async, and nothing is spawned.** The compile runs on
+  the same `app/src/watch.rs:settle` thread it runs on today; the only thing that
+  changes is how long the guard is held on it. Two compiles can now overlap where they
+  could not — the typing thread's and the watch thread's — and **that is deliberately
+  not deduplicated**: today two events in the same instant compile twice and bump
+  `revision` twice, and this phase leaves that arithmetic alone rather than smuggling a
+  second change in behind the first.
+
+  **The one seam this phase adds is for its own gate.** `Session::recompile_with(document,
+  render)` takes the render as a parameter and `Session::recompile(document)` passes
+  `Compile::run`; `Session::on_change_with` the same. It is the shape
+  `document::render_with` already established one level down — the file read is the
+  caller's, so a test can *check* a claim about the loop instead of arguing it — and it
+  is what makes clauses 2 and 3 below deterministic rather than a race against a real
+  compile.
+
+  **Not in scope, and each has a reason on record.** The three passes one compile makes
+  (OQ-14's cause 2) want the engine to answer three questions from one parse and are
+  `Ivapo/md2pdf`'s to give, per `CLAUDE.md`'s division. A debounce that scales with
+  `Preview::elapsed` is now *worse* than the constant — scaled to a 1–24 ms compile it
+  would redraw far more often than 300 ms does, and a redraw moves the reader. A
+  max-wait for continuous typing is a real question with no author behind it and stays
+  in OQ-14. And `Preview::status`, `document::files_under` and the disk walk in
+  `on_change`'s `tree` branch keep the lock: none of them is a compile, and widening this
+  phase to "everything the lock is held across" is the version of it that is not worth
+  reviewing.
+
+- **Exit gate:**
+  1. `cargo test --workspace` passes with **116 + 12 unchanged plus the two below**, and
+     `cargo clippy --workspace --all-targets` is clean. The count is stated because the
+     three synchronous callers and the twelve test sites are supposed to be untouched: a
+     suite that needed edits is the signal that `compile`'s split changed behaviour.
+  2. **A keystroke lands while a compile is in flight.** Through `recompile_with`, a
+     render that signals *entered* and then blocks: on a second thread the closure is
+     driven, the main thread waits for *entered*, then calls `Session::edit` and requires
+     it to return, then releases the render and requires the bytes to arrive. **The
+     interval is a timeout and not a measurement** — correct code returns in
+     microseconds, and no value of the timeout lets today's code pass, because today's
+     code cannot return until the render does. The clause names it so that the file's
+     own claim about its clock-free tests is corrected rather than quietly broken.
+  3. **A stale answer is dropped, and no clock is involved.** Same seam: enter the
+     render, call `Preview::edit` with a different text, release. `revision` is unchanged,
+     `Preview::pdf` still holds the previous bytes, `assets` and `sections` are the
+     previous lists, and `error` is untouched — then one plain `Preview::compile` puts
+     the new text on the page, which is the "a fresher one is always coming" half made
+     checkable.
+  4. **No thread is spawned and no dependency is added**: the diff carries no
+     `thread::spawn`, no channel type and no new line in `app/Cargo.toml`, and
+     `app/harness/checks.mjs`, `app/driver/drive.mjs` and `app/dist/index.html` are
+     untouched — this phase does not reach the page at all.
+  5. **At the window, on a document past nothing.** Open `tests/fixtures/long.md`, type
+     into it continuously for several seconds, save, switch a row in the panel, and
+     rewrite a section from another program: the page redraws when the typing pauses, the
+     status shows a time as it did, the gutter follows, and nothing about the loop reads
+     differently. This clause proves no property — the property is invisible on a 300 KB
+     document, which is the phase's own argument — and it is here to catch a plan/absorb
+     split that dropped a write.
+
+- **Close-out:** **No earlier phase takes a dated note.** Phase 1's account of the
+  compile and Phase 2's of the loop both stand: what runs, in what order, and what the
+  page is told are unchanged, and this phase adds only where the guard is dropped.
+
+  **`rules/desktop.md`** — its `covers:` gains the compile that runs with the lock
+  released and the comparison that decides whether the answer still describes the
+  document, and its body gains that paragraph beside the two debounces it already
+  carries. **It sits at 712 of its 715 lines**, so this close-out **raises the cap or
+  trims** and does not quietly exceed it; Phases 20 and 21 both met the same arithmetic
+  and it is named here rather than found late.
+
+  **`rules/desktop-panes.md`, `rules/desktop-panel.md`, `rules/desktop-project.md`,
+  `rules/desktop-geometry.md`** — none needed: no command, no refusal, no status field,
+  no geometry and nothing the page draws moves.
+
+  **`rules/INDEX.md` is regenerated, not hand-edited** — `spec-lint --write-index` runs
+  in the same pass.
+
+  **`README.md`**: none needed, and the reason is the observable argument above — there
+  is no behaviour here a reader of the README could act on.
+
+  **No `CLAUDE.md` change**: the id prefix, the observable and the engine's boundary are
+  untouched.
+
+  **OQ-14 takes a line** naming which of its four shapes left for this phase and that the
+  other three stay open, per §4's resolve-inline rule — it is not marked `RESOLVED`,
+  because three quarters of it is not.
+
+  **Commit plan.** One push, two commits: the split, its guard and the two closures that
+  use it, with clauses 2 and 3's tests; then the rule and the regenerated index.
 
 <!--
 The review record is a sibling file, not a section: it lives at
