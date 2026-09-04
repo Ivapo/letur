@@ -4419,10 +4419,18 @@
          gutter. Said here rather than left for a reader to trip over. */
       let shown = false
 
-      // What the gutter was last built for, so an event that changed neither
-      // costs nothing.
-      let linedText = null
-      let linedWidth = null
+      // What the mirror was last built for, and what the gutter was, so an
+      // event that changed neither costs nothing.
+      //
+      // **Two pairs and not one, and one pair is the bug.** The two rebuilds
+      // are gated differently — the mirror is built for every document and the
+      // gutter only in `Lines` mode — so a single pair would be marked current
+      // by a mirror built while the gutter was hidden, and `showLines()`'s
+      // `relines()` would then return before `lines.replaceChildren` ever ran.
+      let mirroredText = null
+      let mirroredWidth = null
+      let gutteredText = null
+      let gutteredWidth = null
 
       // Where each row starts, plus the heights beside it. Null until measured.
       /** @type {Rows | null} */
@@ -4432,23 +4440,43 @@
       // element rather than a walk.
       let marked = -1
 
-      function relines() {
-        if (lines.hidden) return
-
+      /**
+       * The pane's own content width, which both rebuilds are measured at and
+       * memoised on.
+       *
+       * **`clientWidth` and not `offsetWidth`**: on a machine set to show
+       * classic scrollbars the two differ by the track, and a mirror laid out at
+       * the wrong one of them wraps where the textarea does not.
+       *
+       * @returns {number}
+       */
+      function paneWidth() {
         const style = getComputedStyle(text)
-        const width =
+        return (
           text.clientWidth -
           parseFloat(style.paddingLeft) -
           parseFloat(style.paddingRight)
+        )
+      }
 
-        if (text.value === linedText && width === linedWidth) return
-        linedText = text.value
-        linedWidth = width
+      /*
+        Lay the mirror out and measure it. **Unconditional**, where the gutter
+        below is not: `#lines` ships `hidden` and `shown` is `false`, so a
+        rebuild gated the way the gutter's is would leave this box empty for
+        every document nobody has pressed `⌘L` on.
+
+        It owns `rows`, which `regutter` and `markLine` read and neither writes:
+        the heights are one layout, so they are taken once here and read twice.
+      */
+      function remirror() {
+        const width = paneWidth()
+        if (text.value === mirroredText && width === mirroredWidth) return
+        mirroredText = text.value
+        mirroredWidth = width
 
         if (text.value === '') {
-          lines.replaceChildren()
+          mirror.replaceChildren()
           rows = null
-          marked = -1
           // And the band with them. `clear()` reaches here, and this is the
           // only path to it: the two other callers of `markLine` need a
           // focused, enabled textarea, which a cleared pane is not. Without
@@ -4468,31 +4496,61 @@
           })
         )
 
-        // One read of the whole mirror, then one write of the whole gutter.
+        // Kept for the band, which needs where each row starts and how tall it
+        // is, and for the gutter, whose rows are given these heights rather
+        // than measuring a second time.
         const heights = Array.from(
           /** @type {HTMLCollectionOf<HTMLElement>} */ (mirror.children),
           (row) => row.offsetHeight
         )
+        rows = /** @type {Rows} */ (heights.reduce(
+          (at, height) => (at.push(at[at.length - 1] + height), at),
+          [0]
+        ))
+        rows.heights = heights
+      }
+
+      /*
+        Write the gutter from the heights the mirror was just measured at. **The
+        `Lines` gate is here and nowhere above it**: this column is what the mode
+        pays for, and the measurement it is written from is wanted either way.
+
+        Its empty branch is its own for the same reason the memo is: `remirror`
+        nulls `rows` on the way through, and a `regutter` sharing that branch
+        would reach a null one.
+      */
+      function regutter() {
+        if (!shown) return
+
+        const width = paneWidth()
+        if (text.value === gutteredText && width === gutteredWidth) return
+        gutteredText = text.value
+        gutteredWidth = width
+
+        if (text.value === '') {
+          lines.replaceChildren()
+          return
+        }
+
         lines.replaceChildren(
-          ...heights.map((height, i) => {
+          ...rows.heights.map((height, i) => {
             const row = document.createElement('div')
             row.style.height = `${height}px`
             row.textContent = String(i + 1)
             return row
           })
         )
-
-        // Kept for the band, which needs where each row starts and how tall it
-        // is — the same measurement, so it is taken once and read twice.
-        rows = /** @type {Rows} */ (heights.reduce(
-          (at, height) => (at.push(at[at.length - 1] + height), at),
-          [0]
-        ))
-        rows.heights = heights
         marked = -1 // the rows above are new elements; none of them wears it
 
         lines.scrollTop = text.scrollTop
         markLine()
+      }
+
+      /* The two, in the order the second depends on: every caller this file had
+         before the split calls this and is unchanged. */
+      function relines() {
+        remirror()
+        regutter()
       }
 
       /*
