@@ -466,10 +466,13 @@ twenty saves under each of three write strategies, tabulated in its own doc
 comment. `app/src/watch.rs:TYPING_DEBOUNCE` is 300 ms, and it is not protecting
 the compile: twenty compiles of each sample through the pane's path put the warm
 median at 1.5 ms and 0.6 ms, against 24.6 ms and 12.5 ms for the first compile of
-a process, which the app pays at the open. It is set to the pause between phrases
-rather than the gap between keystrokes, because a redraw moves the reader —
-narrowed but not removed by the anchor, which returns them to the top of the
-section they are in. `app/src/watch.rs:Debounce` takes the time as a parameter, so both tests
+a process, which the app pays at the open. **Both samples are single files**, and
+a project of 800 sections is 23.9 ms warm against `md2pdf-core` 0.1.3 — an order
+of magnitude under the interval where an article is two, the crossover past it at
+some 2.5 MB of markdown, and `mpdf-003`'s OQ-14 holds the tables. It is set to
+the pause between phrases rather than the gap between keystrokes, because a
+redraw moves the reader — narrowed but not removed by the anchor, which returns
+them to the top of the section they are in. `app/src/watch.rs:Debounce` takes the time as a parameter, so both tests
 need no clock and cannot flake.
 
 `app/src/watch.rs:settle` is the thread both intervals run on: it folds a stream

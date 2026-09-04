@@ -301,7 +301,7 @@ pub fn render_project(main: &Path, edited: &Path, buffer: &str) -> Result<Render
 /// Read a document's text, in the words the terminal uses for a file it cannot
 /// read.
 ///
-/// The read left [`render`] when the pane's text became what compiles, and it
+/// The read left `render` when the pane's text became what compiles, and it
 /// landed here rather than at the caller because this sentence is one of the
 /// two the app owes the CLI. Phase 1 built it inside the compile; the same
 /// string reaches the page from one function further out.

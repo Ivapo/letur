@@ -42,9 +42,9 @@ pub const DEBOUNCE: Duration = Duration::from_millis(100);
 /// this one is measured against the compile it gates and against the hand that
 /// is typing.
 ///
-/// Twenty compiles of each document through the pane's own path — a
-/// [`crate::document::render`] call in process, release build, no spawn — on
-/// this machine on 2026-08-10:
+/// Twenty compiles of each document through the pane's own path — in process,
+/// release build, no spawn — on this machine on 2026-08-10, through the call
+/// `mpdf-008` has since split into [`crate::document::render_project`]:
 ///
 /// | document                     | first compile of the process | median of the twenty |
 /// |------------------------------|------------------------------|----------------------|
@@ -57,10 +57,20 @@ pub const DEBOUNCE: Duration = Duration::from_millis(100);
 /// same two documents at 8.5 ms and 28.7 ms through the release binary; those
 /// include a process spawn each, which is the whole of the difference.
 ///
-/// Three hundred milliseconds is therefore two orders of magnitude above the
-/// compile itself, and the compile is not what it is protecting. It is set to
-/// the pause between phrases rather than the gap between keystrokes, for a
-/// reason particular to this app: **a redraw moves the reader**, so a page
+/// **Both of those documents are single files, and this app is about long
+/// ones.** `mpdf-003`'s OQ-14 re-measured after `mpdf-008` and again on
+/// 2026-09-04, against `md2pdf-core` 0.1.3 — whose parse is linear in bytes
+/// where the engine behind the table above was quadratic in them. A project of
+/// 800 uniform sections, 267 KB of markdown, costs 23.9 ms warm through the four
+/// core calls one compile makes; the crossover where a compile outlasts this
+/// interval is at some 2.5 MB. OQ-14 carries both tables and what is still open
+/// past them.
+///
+/// Three hundred milliseconds is therefore an order of magnitude above the
+/// compile of any document this window has been shown — two above an article —
+/// and the compile is not what it is protecting. It is set to the pause between
+/// phrases rather than the gap between keystrokes, for a reason particular to
+/// this app: **a redraw moves the reader**, so a page
 /// redrawn mid-word costs more here than the compile behind it does. The pane
 /// now opens on the heading above the caret rather than on page 1, which
 /// narrows that cost without removing it — the reader still loses wherever
