@@ -2,6 +2,101 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 39 — Phase 24 only — 2026-09-04 — both reviewers, resumed — **READY (converged)**
+
+Zero blocking from both lenses, at the third and last round. Both traced the two reshaped
+cases against the files rather than the changelog.
+
+**The `|`-as-delimiter reading is safe structurally and not by luck**, which one reviewer
+derived rather than assumed: every case in `inlineRuns` consumes forward past what it
+pushed, so a `|` inside a code span, a link destination or an emphasis body is already
+inside an emitted run and the loop never sees it — `` | a `b|c` | *d|e* | `` draws its
+structural pipes and leaves the inner ones alone. **And `.name`'s reuse cannot collide**:
+`tokenise` dispatches one grammar per buffer, and the single case where two uses share one
+— a markdown frontmatter block routed to `yamlLine` — puts them on different lines.
+
+**The clause numbering was wrong and one lens caught it.** `checks.mjs` prints twenty-three
+clauses today with the error at 23, so three appended take **23–25** with the error moving
+to **26** — not 24–26 and 27, which left 23 unassigned and asserted twenty-seven numbers
+over twenty-six clauses. The rule's count follows: twenty-three → twenty-six clauses beside
+twenty → twenty-three pages. The other lens recorded that it had taken the earlier figure
+on trust.
+
+**The three mutations were traced isolated against the pinned fills**, not argued: with the
+inline link's destination not ending `.md`, `ink-include-anywhere`'s surviving `.md$` gate
+matches only the include line; with the footnote- and link-definition cases ahead of the
+caption in step 3, `ink-captions-anywhere` can reach no bracket span; and none of the twenty
+shipped mutations reaches the new clauses in return.
+
+Four editorial folded after the verdict: two stale `clause 24` pointers the renumber missed,
+a *"scan doubling"* that outlived the measurement correcting it, and the alignment row
+gaining the detection rule it lacked — cells of only `-`, `:` and space.
+
+### Round 38 — Phase 24 only — 2026-09-04 — both reviewers, resumed — **NOT READY**
+
+**Two blockers, both introduced by round 37's own rewrite** — the §7.3 pattern for the
+third time in this spec's history.
+
+**The name lost its ink.** Moving `{#fig:x}` into `inlineRuns` to make the caption correct
+dropped the sentence saying what colour it is, so the class list closed at three and the ink
+was derivable only by inference — and clause 25 plus by-eye item 4 both passed whichever way
+an implementer guessed, including a bold one. It now reuses the shipped `.name` class, which
+already means *a payload that is not a heading*, with the `{`-opening-no-name-stays-prose
+term the phase's own standard requires.
+
+**The table row was left silent, and silence there was subtractive.** Every other multi-part
+case is a prefix — *"the rest through `inlineRuns`"* — but a row's pipes are scattered
+through its cells, and `| a *table* | yes |` has its emphasis drawn today. One reading of
+the text deleted that, which §6.1 step 1 forbids; the other needed the second array the
+phase exists to avoid. Specified as a **scan mode**: `markdownRuns` decides the line is a row
+and hands it to `inlineRuns` with `|` as one more delimiter. A reviewer confirmed this is
+the *smaller* implementation, not the larger.
+
+Also folded: the three fills pinned with the constraints three isolation properties turn on,
+shipped clause 21's *"the only clause here that writes into `#text`"* added to the count
+list, `covers` restored with §8.1's reason, and a bare closing `:::` given its own arm.
+
+### Round 37 — Phase 24 only — 2026-09-04 — a panel of two, fresh — **NOT READY**
+
+**Round 0**: the phase produces no observable, argued by inheriting Phase 23's wording — the
+non-goal was reversed there, with a measurement, and is not reversed again. It is the right
+thing to build: the pane draws a dialect it half-knows, and `[](#fig:pipeline)` is drawn
+**as a different construct** — an ordinary link — which is worse than drawn as prose.
+
+**Sixteen blockers across two lenses.** The draft was thin for the surface it took on, and
+two findings reshaped the design rather than correcting it.
+
+**The fixture file could not exist.** `document.rs:masters` is every top-level `.md` whose
+`section_paths` is non-empty, so a `dialect.md` carrying the include marker a clause needs
+**becomes a second master** and fails `discovery_is_every_markdown_that_names_a_section`;
+and a twelfth row moves `PANEL_ENTRIES`, the manifest, the listing test's literal and a doc
+comment reading *"the fixture does not grow"* — against a gate opening *"no `.rs` file being
+touched"*. Both lenses found it. **The clauses fill the pane instead**, shipped clause 21's
+idiom, and `PANEL_ENTRIES` already carries the present/missing pair the include distinction
+needs.
+
+**Names and inline math had to move into `inlineRuns`.** Every case in `markdownRuns`'
+chain ends in `continue`, so a caption could never take its marker, its emphasis *and* its
+name — and the showcase's own caption has all three. One scanner, one flat ascending array,
+no merge, which is what `paintRow`'s `at = token.to` walk requires.
+
+**Three constructs were specified and undrawable.** A hard break's `\` and an autolink's
+`<` reach neither `inert` nor `OPENS`, so both were unreachable behind the fast path — cut
+by name, the two costing whole-line scans for ordinary CommonMark. And `$$` had to be block
+state **before** the fast path, or a display body holding no trigger character drops to
+prose; clause 25 now asserts exactly that line.
+
+**Four numbers were wrong.** The `indexOf` count, a claim that `long.md` holds no table or
+caption when it holds both, an unrecorded "1,592" fast-path figure, and a quote attributed
+to the wrong section. Re-measured: **1,585 → 1,581** lines, four `indexOf` to six.
+
+Also: every new case gained a positional predicate, `:::` gained the one the dialect states
+itself, the three new CSS rules were admitted, images kept their shipped row, indented code
+blocks became a recorded limit, the budget gained Phase 23's `cut` failure path, and the
+split refusal became an explicit bullet. **OQ-17** raised for checking citation keys,
+footnote labels and cross-reference targets, which had been a deferred design inside a
+*Rejected* bullet where nothing would force it.
+
 ### Round 36 — Phase 23 only — 2026-09-04 — the author, from the build — **AMENDED, no re-review**
 
 Two facts the gate found that no reviewer could have, and one of them was a clause passing

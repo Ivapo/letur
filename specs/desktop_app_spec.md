@@ -123,6 +123,11 @@ phases:
     shipped: 2026-09-04
     cut: null
     by: null
+  - name: "Phase 24 — the pane knows which dialect it is holding"
+    reviewed: 2026-09-04
+    shipped: null
+    cut: null
+    by: null
 
 extends: null
 supersedes: null
@@ -1316,6 +1321,26 @@ list to one item.
   rows are rebuilt on every keystroke, and a column of numbers whose heights moved by one
   row does not need all 1,879 re-measured. **Not opened further until an author says
   typing in `Lines` mode is slow**, which nobody has.
+
+- **OQ-17** — could the pane check a citation key, a footnote label or a cross-reference
+  target without lying under the author's hands? Raised 2026-09-04 by round 1 of Phase 24's
+  review, which found the shape sitting inside a *Rejected* bullet where nothing would ever
+  force it. *(design call)*
+
+  All three are drawn and none is judged, and the reason is the same in each case: the page
+  cannot see what would settle them. The bibliography's keys are not in `Status`; a footnote
+  definition *"may sit anywhere in the document, above or below the reference and in any of
+  its files"*, and `{#…}` names are spread the same way, while the pane holds one file.
+
+  **The shape, recorded rather than designed**: a compile already crosses that boundary, so
+  a set of the keys and names the project defines could ride a compile's answer the way
+  Phase 23 records tokens could — the ink judging at a compile's cadence and the lexer
+  holding the keystrokes between. **What that costs is the question**: the panel moves at a
+  compile and the ink at a keystroke, so a check that lagged would flash red under an author
+  halfway through typing a key, which is the failure Phase 23's include marker avoids by
+  drawing an unknown target as ordinary rather than as missing.
+
+  **Not opened further until an author says an unchecked citation cost them something.**
 
 ## 4. Implementation phases
 
@@ -6814,6 +6839,339 @@ line stays and is invisible.
   that shipped — the sweep moving into `regutter`, `unmark()`, and `placeInk` arming the
   timer, all of which land with the fourth.
 
+### Phase 24 — the pane knows which dialect it is holding
+
+*Produces the observable: **no**.* Phase 23's wording, inherited rather than re-argued:
+the page is byte for byte what it was, the compile reads the same buffer through the same
+closure, and every clause below is about what the left pane *draws over* text it does not
+change. **The reversal Phase 23 owed is not owed again** — the non-goal was reversed there,
+with a measurement; this extends the vocabulary of a layer that already ships.
+
+Appended 2026-09-04, per §6.1. **Step 0 says decision**: Phase 23's token table is the list
+of what the pane colours, and this changes it. **Step 1 does not fire**: nothing shipped is
+removed — the four inks, the three grammars, the include marker, the geometry and every
+class stay. **Step 2 puts it here**: `mpdf-003` owns the text pane (Phase 4) and the ink
+layer (Phase 23).
+
+**Asked for at the window**: *"are we also highlighting our dialect? or just normal
+markdown?"*
+
+**The answer was measured rather than recalled, and it is: mostly normal markdown.** The
+shipped lexer was run over a probe carrying every construct the showcase uses. It knows
+**three** dialect things — the include marker with its missing-target check, the
+`.bib`/`.yml`/`.yaml` grammar switch, and the frontmatter block lexed as YAML — and draws
+the CommonMark around them. Drawn as nothing today: `:::` groups and their closing line, a
+caption paragraph opening `: `, a name `{#fig:pipeline}`, `[@key]` in its three forms,
+`[^note]` and its definition, `$…$` and `$$` blocks, pipe tables and their alignment rows,
+`[text][ref]`, `[ref]: url`, autolinks, indented code blocks and a hard break's trailing
+`\`.
+
+**And one is drawn wrongly, which is the finding this phase turns on.**
+`[](#fig:pipeline)` draws as an ordinary inline link, its destination `--quiet`, the ink a
+URL gets. The showcase records that *"it is the **empty** brackets that make a reference"*,
+so `[](…)` is **two** dialect constructs: a section include when the destination ends
+`.md`, a cross-reference when it is an anchor. Phase 23's predicate caught the first and
+let the second fall to the generic branch. **A construct drawn as a different construct is
+worse than one drawn as prose**, and it is why this is a phase now rather than a someday.
+
+**The four inks carry all of it, and the sort is over roles rather than constructs.** Every
+run below is a **payload** the author chose (`--mark`), a **delimiter** the dialect requires
+(`--quiet`), **prose** (`--ink`), or **a refusal the project can see** (`--alarm`). Two
+inherited rows sit outside that sort and stay where Phase 23 put them — a code span's body
+and an inline link's destination are payloads drawn `--quiet`, because a body the pane does
+not speak and a URL are both things a reader skims rather than reads. A fifth ink is
+rejected below; that the dialect fits in four is the check on the vocabulary.
+
+- **Scope:** **`app/dist/index.html`** — `markdownRuns`, `inlineRuns`, the two constants
+  they gate on, and the `#mirror` ink rules — plus `app/harness/checks.mjs` for the
+  clauses, `app/harness/serve.mjs` for their mutations, and `app/driver/drive.mjs`,
+  unchanged and named because its clause 5 is what re-asserts the budget.
+  **No Rust, no dependency, no bundler, no new field on `Status`, and no new fixture
+  file.** The three grammars stay three; `remirror`, `regutter`, `paintRow`, the geometry,
+  the suppression and the box cache are untouched.
+
+  **The pipeline is stated in full, because three of the review's findings were about
+  where a case goes rather than what it does.** `markdownRuns` walks the buffer once and
+  each line takes the first case that matches:
+
+  1. **block state** — frontmatter, a code fence, **and now a `$$` display block**;
+  2. **the fast path**, `OPENS.indexOf(line[0]) < 0 && inert(line)`, which returns `null`
+     and allocates nothing;
+  3. **the block cases** — fence openers, headings, rules, the include marker, a `$$`
+     opener, a `:::` line, a table row, a footnote or link definition, a caption, a block
+     quote, a list marker;
+  4. **`inlineRuns`** over what is left of the line.
+
+  **`$$` joins step 1 and not step 3, and that is the correction that matters**: a display
+  body like `a^2 + b^2 = c^2` holds no trigger character, so a `$$` state checked after the
+  fast path would let its body fall through to prose. Being a block state, what is between
+  the fences is not read as markdown at all — a code fence's rule, applied to the other
+  language this dialect embeds.
+
+  **Every new case carries a positional predicate, and they are written down because a
+  construct with no predicate is the wrong implementation waiting to happen.** The dialect
+  states three of them itself.
+
+  | construct | fires when | runs |
+  |---|---|---|
+  | `$$` fence | `^\s{0,3}\$\$\s*$` — trailing space allowed, the showcase's own closing fence carries one | fence and body `--quiet` |
+  | `:::` | `^:::` at column 0, and the previous line is blank or the buffer's start | colons `--quiet`; the word after an opener `--mark`, a bare closing line taking the colons alone |
+  | caption | `^: ` at column 0 | the `: ` `--quiet`, **the rest through `inlineRuns`** |
+  | table row | trimmed line begins **and** ends `\|` | **an alignment row** — one whose cells hold only `-`, `:` and space — whole `--quiet`; any other row **scanned with `\|` as one more delimiter** |
+  | footnote definition | `^\[\^[^\]]+\]:` | the label `--mark`, the brackets and colon `--quiet`, the rest through `inlineRuns` |
+  | link definition | `^\[[^\]^]+\]:` | the label `--mark`, the rest `--quiet` |
+
+  **`:::` gets a positional term because the dialect gives it one**: *"Everywhere but the
+  start of a paragraph, `:::` is ordinary text — inside a sentence, on a later line of a
+  paragraph, and inside a code block."* The previous-line test is an **approximation** of
+  "the start of a paragraph" and is named as one: a per-line lexer holds no paragraph
+  state, and the case it gets wrong — a `:::` on a paragraph's second line — is the case
+  Phase 23's *"the highlight is a hint and never a claim"* was written for.
+
+  **A table row is the one case that is a scan mode rather than a prefix, and saying so is
+  what stops it removing ink that ships.** Every other multi-part case is a prefix — the
+  caption and the two definitions each read *"the rest through `inlineRuns`"*, which is a
+  concatenation. A row's pipes are **scattered through** its cells, and the cells are not
+  prose: `| a *table* | yes |` reaches `inlineRuns` today and its emphasis is drawn.
+  Emitting the pipes and stopping would take that away, which §6.1 step 1 forbids; emitting
+  them separately and merging would be the second array this phase is built to avoid. So
+  `markdownRuns` decides the line **is** a row and hands it to `inlineRuns` with `|` as one
+  more delimiter — one scanner, one ascending array, and the cells keep every construct
+  they already draw. **An alignment row is the exception and is whole-line `--quiet`**,
+  having no cells to keep — *"only `-`, `:` and space between the pipes"* being what tells
+  it from a row of prose, and the cost of getting that wrong being one shade of `--quiet`
+  rather than a construct drawn as another.
+
+  **A caption's body goes through `inlineRuns` and this is not a detail.** The showcase's
+  own caption is `: The conversion pipeline, with the *emitter* in the middle.
+  {#fig:pipeline}` — a marker, an emphasis run and a name on one line. **Names and inline
+  math therefore live in `inlineRuns` and not in the block chain**, which is what makes the
+  three runs one flat ascending array: `paintRow` walks runs in order filling gaps from
+  `at = token.to`, so a second scanner producing its own array would have to be merged, and
+  an out-of-order run would duplicate text and move `#mirror.scrollHeight` — clause 19's
+  subject. One scanner, one array, no merge.
+
+  **`inlineRuns` gains four shapes and keeps two.** The bracket branch decides in this
+  order, first match winning:
+
+  | | shape | class | ink |
+  |---|---|---|---|
+  | cross-reference | `[](#name)` | `ref` | `--mark` |
+  | citation | `[@key]`, `[+@key]`, `[@a; @b]` | `cite` on each key; `[`, `+`, `;`, `]` `--quiet` | `--mark` |
+  | footnote | `[^label]` | `note` | `--mark` |
+  | reference link | `[text][ref]` | `link` on the ref | `--quiet` |
+  | inline link | `[text](dest)` | `link`, shipped | `--quiet` |
+  | image | `![alt](dest)` | `link`, **shipped and unchanged** | `--quiet` |
+
+  And one shape that opens `{` rather than `[`:
+
+  | | shape | class | ink |
+  |---|---|---|---|
+  | name | `{#fig:pipeline}`, `{#tab:steps}`, `{#unprefixed}` | braces and `#` `--quiet`, the name **`name`** | `--mark` |
+
+  **The name reuses a shipped class rather than taking a fourth new one**, and that is a
+  decision rather than thrift: `#mirror .name` already means *a payload that is not a
+  heading* — a YAML sequence marker, a BibTeX field name — and `{#fig:pipeline}` is one
+  more of exactly that. So three new classes and not four. **A `{` opening no name stays
+  prose**, the same sentence `@`, `:` and `$` each get and for the same reason: `{` enters
+  `inert`, so every braced line now reaches the scan, and a lexer colouring a bare `{`
+  would paint every brace in a document about code. It takes a clause term with them.
+
+  **The include marker is decided in `markdownRuns` and not here**, which the review is
+  right that an earlier draft blurred: it is a whole-line construct, `includeIn` gates it on
+  `/\.md$/i`, and `[](#anchor)` can therefore never match it and always falls to the
+  cross-reference case. **Phase 23's `INCLUDE` literal is not touched**, and that is
+  load-bearing beyond tidiness: the shipped `ink-include-anywhere` mutation patches that
+  exact string and `die`s if it is not found once.
+
+  **A texted anchor link stays a link**, and it earns a clause term rather than a sentence:
+  the showcase says `[this one](#fig:pipeline)` *"is still an ordinary link rather than a
+  cross-reference"*, and a lexer that keyed on `#` alone would reintroduce this phase's own
+  defect in mirror image.
+
+  **Inline `$…$` is a code span's twin** — delimiters and body one `--quiet` run, no
+  parsing of what is inside — and a lone `$` opening nothing stays prose, which is what
+  `$5` needs. **It inherits the twin's own limit, recorded rather than fixed**: two dollars
+  on one line pair up, so `$5 and $7` draws as math. A code span has read that shape the
+  same way since Phase 23, the dialect escapes a bare `$` for the author anyway, and the
+  alternative is a heuristic about what looks like a formula — which is the second parser
+  this spec refuses.
+
+  **`--alarm` is spent once and not twice, and the reason is what the page can see.** A
+  missing include is red because `Status.entries` says the disk lacks it. **A citation key,
+  a footnote label and a cross-reference target cannot be checked here**: the bibliography's
+  keys are not in `Status` and adding them is the field this phase refuses; a footnote
+  definition *"may sit anywhere in the document, above or below the reference and in any of
+  its files"*, and `{#…}` names are spread the same way, while the pane holds one file. So
+  all three are drawn and none is judged.
+
+  **An unbracketed `@` stays prose**, and it is stated because it is the wrong
+  implementation this phase is most likely to have. The dialect records that *"the brackets
+  are required, because an unbracketed `@` is load-bearing in ordinary text"*, and that
+  `a@b.com` and `@thing` reach the page as themselves. A lexer that coloured a bare `@`
+  would paint every email address in a document. The same holds for a `:` that opens no
+  caption and a `$` that opens no math; each gets a clause term.
+
+  **Three new classes and three new CSS rules**, named because the Scope's *"and nothing
+  else"* has to admit them: `#mirror .ref`, `.cite` and `.note`, all `color: var(--mark)`,
+  beside the nine Phase 23 declared. Without them the classes inherit `#mirror`'s own
+  `--ink` and draw as prose — and **no clause would catch it**, clause 23 reading class
+  names rather than colour, which is why by-eye item 4 is the one that does.
+
+  **The fast path's cost is measured and not estimated.** `OPENS` gains `$`, `:` and `|`,
+  all line-start constructs; `inert` gains `$` and `{`, the two that fire mid-line. Over
+  `tests/fixtures/long.md` — 1,880 lines, and it carries a pipe table, an alignment row and
+  a caption with a trailing name, which an earlier draft of this phase wrongly said it did
+  not — the allocation-free path goes **1,585 → 1,581 lines**. Four. **The scan grows by half,
+  from four `indexOf` to six** — not double, which an earlier draft said — and the gate
+  re-measures rather than reasoning from either number.
+
+- **Rejected:** *splitting this into two phases.* The seam is real — the bracket family
+  against the block family — and it is declined: the two share `inlineRuns`, the caption
+  case is only correct because names live there, and a split pays the rule's cap raise and
+  the README twice for one subject. **What made Phase 23 large was the layer, the geometry
+  and the keystroke path**, none of which this touches; its lexer commit measured 0.1 ms
+  and was the part nobody had trouble with.
+
+  *A hard break's trailing `\` and autolinks `<https://…>`.* Both are ordinary CommonMark
+  rather than this dialect's, and both are **invisible to the fast path**: `break instead,\`
+  and `<you@example.com>` open with a letter and hold no trigger character, so drawing them
+  costs `inert` two more whole-line scans on every line of every document for two constructs
+  a reader already recognises. That is the trade this phase declines by name.
+
+  *Indented code blocks.* A four-space indent and a list continuation are the same
+  characters, so telling them apart needs list state the lexer does not keep — and a wrong
+  guess would draw a wrapped list item as code. Recorded as a **known limit**: an indented
+  block draws as prose, and the constructs inside one draw as themselves.
+
+  *A fixture file of its own.* An earlier draft added `tests/fixtures/panel/dialect.md`.
+  It is refused, and the reason is worth keeping: `document.rs:masters` is every top-level
+  `.md` whose `section_paths` is non-empty, so a file carrying the include marker clause 23
+  needs **becomes a second master** and fails
+  `document.rs:discovery_is_every_markdown_that_names_a_section`; and a twelfth row moves
+  `PANEL_ENTRIES`, `tests/fixtures/panel-manifest.txt`, the listing test's literal and a doc
+  comment that says the fixture does not grow — against a gate that opens *"no `.rs` file
+  being touched"*. **The clauses fill the pane instead**, which is shipped clause 21's own
+  idiom, and `PANEL_ENTRIES` already carries both a `sections/text.md` the disk holds and a
+  `sections/missing.md` it does not.
+
+  *A fifth ink.* Argued above.
+
+  *Checking a citation key, a footnote label or a cross-reference target.* Argued above.
+  **The shape is OQ-17**, not a sentence in this bullet.
+
+  *Bolding `abstract` and `keywords` apart from an author's own group kind.* That list is
+  the engine's and would be a fourth thing here to drift; "the word after the colons" is a
+  shape.
+
+  *Teaching the pane the eleven frontmatter keys.* Same objection, one level worse: the
+  keys are `md2pdf-core`'s and a pane that greyed an unrecognised one would be wrong the day
+  the engine gained a twelfth.
+
+- **Exit gate:** `cargo test --workspace` passes, **no `.rs` file being touched and no
+  fixture changed** — which the refusal above is what makes true. `bun app/typecheck.mjs`
+  passes. `bun app/harness/checks.mjs` passes **in both engines** and `--falsify` passes,
+  twenty-three mutations each isolated. **`bun app/driver/drive.mjs` prints five clauses,
+  five passed**, and `--falsify` three isolated.
+
+  **Clause 5 re-asserts the 8 ms budget over a lexer that has grown, and its failure path
+  is Phase 23's**: if the median misses 8 ms **this phase is `cut` and re-specced**. The
+  scan's growth is the thing at risk and the phase says so; a gate whose failure path is an
+  undesigned second design checks nothing, and OQ-15's `cut` sentence is written about
+  Phase 23's pass rather than about these additions, so it is restated here rather than
+  inherited.
+
+  Three clauses appended as **23–25**, the error clause moving to **26**. **They take the
+  number the error vacates and the two after it**, which is Phase 23's own arithmetic —
+  `checks.mjs` prints twenty-three clauses today with the error at 23 — and is why the
+  count is twenty-six and not twenty-seven. **Each fills the
+  pane and restores it**, clause 21's idiom, so no fixture and no `.rs` file moves.
+
+  **Three constraints on what they fill, because three isolation properties turn on it**
+  and `--falsify` is a slow way to be told: the filled inline link's destination must **not**
+  end `.md`, or the shipped `ink-include-anywhere` — whose relaxed pattern is still
+  `.md$`-gated — claims it and fails clause 23 as well as 21; no filled line may carry `: `
+  before a bracket construct unless it is a definition, or `ink-captions-anywhere` reaches
+  clause 23; and **only clause 25 fills math**, which is a constraint on the other two
+  rather than a fact about them.
+
+  23. **The bracket family reads five ways, and an unbracketed `@` is none of them.** A
+      cross-reference, a citation, a footnote reference, an inline link and an include
+      marker carry five distinct classes, read off the span whose text is the destination or
+      the label so the clause encodes no class name. **Three negative terms carry equal
+      weight**: `a@b.com` and a bare `@thing` carry no span, and `[this one](#fig:x)` — a
+      *texted* anchor link — carries the same class as an ordinary link and not the
+      cross-reference's.
+      Mutation **`ink-anchor-is-a-link`**, which drops the cross-reference case so
+      `[](#name)` falls to the link branch — the defect this phase exists to fix, made into
+      the thing that fails a clause. **Isolated**: clause 21 reads three spans by
+      destination text — `sections/text.md`, `other.md` and a typed `sections/missing.md` —
+      none of them an anchor, so its three classes are unmoved; 19, 20, 22 and shipped 15
+      read heights, counts, `textContent` and `.here`, none of which a class name moves.
+  24. **A group, a caption and a name are drawn, and a `:` inside a sentence is not a
+      caption.** The `:::` opener's kind word, a caption's marker and a `{#fig:…}` name each
+      carry a span, and the caption's own emphasis run still carries its — which is the
+      one-array claim. A colon mid-sentence carries none. Mutation
+      **`ink-captions-anywhere`**, dropping the start-of-line term. **Isolated, and the
+      caption's body is why**: because that body goes through `inlineRuns`, a spuriously
+      captioned line keeps its bracket spans, so clause 23 is unmoved — where a caption
+      whose body were prose would have cost 23 its spans and the mutation its isolation.
+  25. **Display math is one ink and is not read as markdown.** A `$$` body carries the
+      fence's class **even on a line holding no trigger character**, which is the block-state
+      claim and the fast-path ordering together; and `$5` in prose carries none. Mutation
+      **`ink-math-per-line`**, dropping the block state so the body is lexed as prose.
+      **Isolated**: no other clause fills math, and the mutation changes no class any of
+      them reads.
+
+  By eye, against `tests/fixtures/samples/showcase/showcase.md` and its five sections,
+  which between them carry every construct above:
+
+  1. The five bracket shapes read apart at a glance, and a citation does not read as a link.
+  2. A `$$` block reads as a block, and the prose either side of it does not change colour.
+  3. A caption reads as a caption, its emphasis and its name inside it, and the sentence
+     above it does not.
+  4. **The three new classes are `--mark` and not `--ink`** — the one thing no clause here
+     asserts, colour being what a class name cannot say.
+  5. Dark and light both read, at the four inks and no fifth.
+
+- **Close-out:** **`rules/desktop-panes.md`**'s `## The ink`: the construct table gains the
+  rows above, the pipeline's four steps become a stated rule, the bracket family's order
+  becomes another, and the three things **drawn and not judged** are named with the reason.
+  **Two in-place counts move** and are named here rather than left for the linter — *"the
+  twenty-three clauses"* and *"the twenty broken pages"* at lines 51–52 and 720–721 become
+  twenty-six and twenty-three. **Its `covers` gains the new constructs**, which §8.1 makes the target `/sync-rules`
+  regenerates against — the present enumeration runs down to *"the marker that is the whole
+  of its own line"* and would otherwise name none of them. `max_lines` goes **720 → 780**:
+  the body is at 717, and
+  Phase 23 named a figure and missed it by 17, so this one is sized against a section that
+  is being extended rather than written.
+
+  **Three more counts, in files the close-out would otherwise leave false**:
+  `app/harness/checks.mjs`'s header *"`--falsify` runs all twenty"* and `README.md`'s
+  *"breaks the page twenty ways"* both become twenty-three, and clause 21's own
+  *"it is the only clause here that writes into `#text`"* stops being true the moment three
+  more fill — one line in a file this phase edits anyway, and in no rule. **`serve.mjs`'s and
+  `checks.mjs`'s "eleven rows" do not move**, which is the fixture refusal paying for
+  itself.
+
+  **`rules/desktop-panel.md` and `rules/desktop-geometry.md` need nothing** — this phase
+  moves no box, no observer and no published figure. **`rules/desktop.md` needs nothing
+  either**, and the reason is Phase 8's `covers`-scope one restated: it sources
+  `app/dist/index.html` and sits at 730/730, so anything landing there forces a raise this
+  phase has no business making.
+
+  **`README.md`**: the sentence Phase 23 added says the pane colours what it is holding; it
+  gains that the colours are this dialect's and not markdown's in general — a citation, a
+  cross-reference, a caption and a name are told apart — and keeps the sentence that the
+  colour is a hint and the page is the verdict.
+
+  **`rules/INDEX.md` is regenerated.** **`specs/INDEX.md` needs nothing**: the rollup stays
+  `partial`, Phase 7 being `cut`.
+
+  **Commit plan.** One push, three commits: the bracket family with its five shapes and the
+  cross-reference correction; the block family with `$$`, `:::`, captions, names and tables;
+  then clauses 23–25 with their mutations, the rule, the README and the regenerated index.
+  The drafted spec lands first, on its own.
 <!--
 The review record is a sibling file, not a section: it lives at
 specs/reviews/mpdf-003.md, append-only, one heading per round. See §7 of the
