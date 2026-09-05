@@ -453,6 +453,49 @@ const MUTATIONS = {
      is the row the re-keyed clause 15 reads after the hide — so 15 goes on
      passing while clause 22's "on one row" fails. A mutation that broke the
      clear as well would fail both and tell the two apart from neither. */
+  /* A cross-reference falls back to the link branch — **the defect `mpdf-003`
+     Phase 24 exists to fix, made into the thing that fails a clause**. Before
+     that phase `[](#fig:pipeline)` drew with its destination at `link`, the ink a
+     URL gets, where the dialect records that it is the empty brackets that make a
+     reference.
+
+     **It cannot reach clause 21**: that clause reads three spans by destination
+     text — `sections/text.md`, `other.md` and a typed `sections/missing.md` —
+     and none of them is an anchor. */
+  'ink-anchor-is-a-link': (page) => {
+    const term = "              const cls = empty && target[0] === '#' ? 'ref' : 'link'\n"
+    if (page.split(term).length !== 2) die('the mutation ink-anchor-is-a-link found no single cross-reference term')
+    return page.replace(term, "              const cls = 'link'\n")
+  },
+
+  /* A caption anywhere on a line rather than at the start of one, so a `:` in a
+     sentence opens one.
+
+     **It cannot reach clause 23, and the caption's body is why**: that body goes
+     through `inlineRuns`, so a spuriously captioned line keeps every bracket span
+     it had. The footnote and link definitions also sit ahead of the caption in
+     the chain, so neither `[^note]: …` nor `[ref]: url` reaches this arm. */
+  'ink-captions-anywhere': (page) => {
+    const term = "          if (line.startsWith(': ')) {\n"
+    if (page.split(term).length !== 2) die('the mutation ink-captions-anywhere found no single caption test')
+    return page.replace(term, "          if (line.includes(': ')) {\n")
+  },
+
+  /* Display math per line rather than as block state, which is the defect a
+     per-line fence lexer would have in the construct where it is cheapest to
+     see: the body is lexed as prose, so a line inside `$$` holding no trigger
+     character falls through the fast path and draws as nothing. */
+  'ink-math-per-line': (page) => {
+    const term =
+      '          if (math) {\n' +
+      '            if (MATH.test(line)) math = false\n' +
+      "            out.push(whole(line, 'quiet'))\n" +
+      '            continue\n' +
+      '          }\n'
+    if (page.split(term).length !== 2) die('the mutation ink-math-per-line found no single math state')
+    return page.replace(term, '          if (math && MATH.test(line)) math = false\n')
+  },
+
   'ink-band-tiles': (page) => {
     const pair =
       "          lines.children[i]?.classList.add('here')\n" +

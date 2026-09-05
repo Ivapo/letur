@@ -42,18 +42,24 @@ covers: >
   grammars chosen off one extension and the one of them written once and used
   twice, the four inks and the properties the layer may not carry, the marker that
   is the whole of its own line and the compiler that is right where it disagrees,
+  the four steps a line takes and the two of them that decide most lines without
+  allocating, the bracket family that reads five ways and the empty brackets that
+  tell two of them apart, the three payloads it draws and never judges, the block
+  state that holds a display body out of the markdown, the row whose pipes are
+  scanned rather than prefixed, and the two constructs left undrawn because the
+  scan they would cost is not theirs to spend,
   the gutter whose rows are as tall
   as their lines render, the follow
   that keeps the numbers against their lines, the caret's two marks, the third
   the pane does not draw, and the pane that loses both when it empties, the check that reads this file and the
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
-  because the DOM cannot show one, the twenty-three clauses it
-  asserts as properties and the twenty broken pages that falsify them, the rule
+  because the DOM cannot show one, the twenty-six clauses it
+  asserts as properties and the twenty-three broken pages that falsify them, the rule
   that decides what a clause may read as well as what it may assert, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
-max_lines: 720
+max_lines: 780
 generated: 2026-09-03
 ---
 
@@ -634,7 +640,7 @@ and `--alarm` a rust red and those neighbourhoods are spoken for.
 
 | | `--ink` | `--mark` | `--quiet` | `--alarm` |
 |---|---|---|---|---|
-| markdown | body text, a link's own text | heading text (**bold**), emphasis, strong (**bold**), include marker | punctuation, fence and code-span bodies, frontmatter delimiters, an inline link's destination | an include naming a file the listing marks `missing` |
+| markdown | body text, a link's own text, a table's cells | heading text (**bold**), emphasis, strong (**bold**), include marker, cross-reference, citation key, footnote label, `{#name}`, a `:::` group's kind, a link definition's label | punctuation, fence and code-span bodies, frontmatter delimiters, an inline link's destination, `$…$` and a `$$` body, a caption's `: `, a table's pipes and its alignment row | an include naming a file the listing marks `missing` |
 | BibTeX | field values | `@type` (**bold**) and field names | braces, commas, `=`, comments | — |
 | YAML | scalar values | keys (**bold**), `-` item markers | `#` comments, `---`, quotes | — |
 
@@ -647,6 +653,47 @@ than allowed on runs a table clears: whether a glyph resolves inside the stack o
 falls out to a proportional face carrying a real oblique depends on the machine's
 installed faces and is not answerable from JS. **A heading may be bold and
 coloured and may not be bigger.**
+
+**A line takes four steps and the first two decide most of them.** Block state —
+frontmatter, a code fence, a `$$` display block — then the fast path, six `indexOf`
+scans that return no runs and allocate nothing; then the block cases; then
+`inlineRuns` over what is left. **`$$` is block state and sits before the fast
+path**, or a body like `a^2 + b^2 = c^2`, holding none of the six characters, falls
+through and draws as prose. What is between the fences is another language and is
+not read as markdown, which is the code fence's rule applied to the other thing
+this dialect embeds.
+
+**The bracket family reads five ways, and the empty brackets tell two of them
+apart.** A cross-reference, a citation, a footnote, a reference link and an inline
+link all open `[`, and one branch answered for all of them until `mpdf-003` Phase
+24: `[](#fig:pipeline)` drew as an inline link, its destination the ink a URL gets,
+where the dialect records that *it is the empty brackets that make a reference*. So
+`[](…)` is a section include when the destination ends `.md` and a cross-reference
+when it is an anchor — and **a *texted* anchor link is an ordinary link**, which is
+why the emptiness is the term and the `#` is not. **An unbracketed `@` is prose**,
+the dialect's own rule, without which every email address in a document is painted.
+
+**Three payloads are drawn and none judged.** A citation's key, a footnote's label
+and a cross-reference's target all take `--mark` and none is checked: the
+bibliography's keys are not in `Status`, and footnote definitions and `{#…}` names
+live in files the pane is not holding. `mpdf-003`'s OQ-17 carries what checking
+them would cost.
+
+**A table row is scanned rather than prefixed**, the one case that is: its pipes are
+scattered through cells that keep every construct they already draw, so the row is
+handed to `inlineRuns` with `|` as one more delimiter. An alignment row has no cells
+to keep and is whole-line quiet. **A caption's body takes the same scan**, which is
+why names and inline math live in `inlineRuns` rather than the block chain — the
+marker, an emphasis run and a `{#fig:x}` come out of one scanner in one ascending
+array, where a second array would have to be merged.
+
+**Two constructs are deliberately undrawn.** A hard break's trailing `\` and an
+autolink's `<https://…>` reach neither the fast path's scan nor the characters a
+block construct may open with, so drawing them costs two more whole-line scans on
+every line of every document — for two constructs that are ordinary markdown rather
+than this dialect. An indented code block is a third, and a limit rather than a
+choice: four spaces and a list continuation are the same characters, and telling
+them apart needs list state the lexer does not keep.
 
 **An include marker is the whole of its own line at zero indentation**, empty
 brackets, no title, `.md` case-insensitively; inline it is an inert link, and the
@@ -717,8 +764,8 @@ sentence — found by a mutation that falsified nothing, not by reading.
 `core:default`'s own words — the half a stub that merely omits it never tests. It also keeps
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
-asserts twenty-three clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against twenty broken copies
+asserts twenty-six clauses in Playwright's Chromium and WebKit, **both of which must pass, every
+clause a property and none a metric literal**, and is falsified first against twenty-three broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
 without either being redundant**, and clause 3 is where that now stands: `flex-min` reaches
 the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`

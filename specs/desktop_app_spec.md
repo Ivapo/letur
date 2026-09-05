@@ -125,7 +125,7 @@ phases:
     by: null
   - name: "Phase 24 — the pane knows which dialect it is holding"
     reviewed: 2026-09-04
-    shipped: null
+    shipped: 2026-09-05
     cut: null
     by: null
 

@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all twenty. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all twenty-three. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -76,7 +76,10 @@ const OWNS = {
   'ink-bigger-headings': 19,
   'ink-lines-gated': 20,
   'ink-include-anywhere': 21,
-  'ink-band-tiles': 22
+  'ink-band-tiles': 22,
+  'ink-anchor-is-a-link': 23,
+  'ink-captions-anywhere': 24,
+  'ink-math-per-line': 25
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -1769,8 +1772,9 @@ const theInkDrawsWithLinesOff = async (browser, url) => {
        clause encodes no class name — it asserts that the three are distinct,
        which is the property, and would go on holding if the names changed.
 
-       **It types the third case in, and it is the only clause here that writes
-       into `#text`.** `sections/missing.md` cannot join the fixture: the engine
+       **It types the third case in.** It was the only clause here that wrote into
+       `#text` until `mpdf-003` Phase 24 added three that do the same, and the
+       idiom below is the one they took. `sections/missing.md` cannot join the fixture: the engine
        raises `Error::MissingSection` and `serve.mjs` would `die` before a clause
        ran, which is why `book.md` deliberately does not name it. So one `fill`,
        the class read, the buffer restored — and the panel already lists that path
@@ -1900,6 +1904,238 @@ const theBandIsOnTheCaretsRow = async (browser, url) => {
 }
 
 
+/* 23. **The bracket family reads five ways, and an unbracketed `@` is none of
+       them.** `mpdf-003` Phase 24. Every construct here opens `[`, and before
+       that phase one branch answered for all of them — which is how
+       `[](#fig:pipeline)` came to draw as an inline link, its destination the ink
+       a URL gets, where the dialect records that *it is the empty brackets that
+       make a reference*. A construct drawn as a different construct is worse than
+       one drawn as prose.
+
+       **The class is read off the span whose text is the destination or the
+       label**, so this clause encodes no class name: what it asserts is that the
+       five are distinct, which is the property, and it would go on holding if the
+       names changed.
+
+       **Three negative terms, and they carry equal weight.** `a@b.com` and a bare
+       `@thing` must draw nothing — the dialect records that the brackets are
+       required *because an unbracketed `@` is load-bearing in ordinary text*, and
+       a lexer without that term paints every email address in a document. And
+       `[this one](#fig:x)` — a **texted** anchor link — must read as an ordinary
+       link, which the dialect also states; keying on the `#` alone would
+       reintroduce this phase's own defect in mirror image.
+
+       **The fill is pinned by three constraints and they are not incidental**:
+       the inline link's destination does not end `.md`, or the shipped
+       `ink-include-anywhere` claims it and this clause fails under a mutation it
+       does not own; no line carries `: ` before a bracket outside a definition,
+       for `ink-captions-anywhere`; and no line carries math, which is clause 25's
+       to fill. */
+const theBracketFamilyReadsFiveWays = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  const held = await page.evaluate(() => document.getElementById('text').value)
+  await page.fill(
+    '#text',
+    [
+      '[](sections/text.md)',
+      'A reference to [](#fig:pipeline) and a link [this one](#fig:pipeline).',
+      'A citation [@quill2019] and a footnote[^note].',
+      'A link [text](https://typst.app) beside a@b.com and a bare @thing.'
+    ].join('\n')
+  )
+  await settle(page)
+
+  const read = await page.evaluate(() => {
+    const classOf = (want) => {
+      for (const span of document.querySelectorAll('#mirror span')) {
+        if (span.textContent === want) return span.className
+      }
+      return null
+    }
+    const text = /** @type {HTMLTextAreaElement} */ (document.getElementById('text'))
+    return {
+      include: classOf('sections/text.md'),
+      ref: classOf('#fig:pipeline'),
+      cite: classOf('quill2019'),
+      note: classOf('note'),
+      link: classOf('https://typst.app'),
+      /* The texted anchor's own span, which shares its text with the reference's
+         — so it is read as the *last* of the two rather than by text alone. */
+      texted: [...document.querySelectorAll('#mirror span')]
+        .filter((s) => s.textContent === '#fig:pipeline')
+        .map((s) => s.className),
+      /* Nothing on the last line may wear a span but the link's own four. */
+      bare: [...document.getElementById('mirror').children[3].querySelectorAll('span')].map(
+        (s) => s.textContent
+      )
+    }
+  })
+
+  await page.fill('#text', held)
+  await settle(page)
+  const restored = await page.evaluate(() => document.getElementById('text').value)
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const five = [read.include, read.ref, read.cite, read.note, read.link]
+  const found = five.every((c) => c !== null)
+  const apart = found && new Set(five).size === 5
+  const texted = read.texted.length === 2 && read.texted[0] !== read.texted[1]
+  const prose = !read.bare.some((t) => t.includes('@'))
+
+  note(`the five: ${JSON.stringify(five)}`)
+  note(`the anchor twice, as a reference then as a texted link: ${JSON.stringify(read.texted)}`)
+  note(`spans on the prose line: ${JSON.stringify(read.bare)}`)
+
+  ok(
+    23,
+    'the bracket family reads five ways, and an unbracketed @ is none of them',
+    apart && texted && prose && restored === held,
+    [
+      found ? null : `one drew no span at all: ${JSON.stringify(five)}`,
+      !found || apart ? null : `they are not five: ${JSON.stringify(five)}`,
+      texted ? null : `a texted anchor read the same as a reference: ${JSON.stringify(read.texted)}`,
+      prose ? null : `an unbracketed @ was drawn: ${JSON.stringify(read.bare)}`,
+      restored === held ? null : 'the fill left the buffer changed'
+    ]
+      .filter(Boolean)
+      .join('; ') || `${JSON.stringify(five)}, and the anchor ${read.texted.join(' then ')}`
+  )
+  return errors
+}
+
+/* 24. **A group, a caption and a name are drawn, and a `:` inside a sentence is
+       not a caption.** The `:::` opener's kind word is the one thing the author
+       chose; a caption's marker opens a paragraph; a name may fall anywhere.
+
+       **The caption is read with its own emphasis run inside it**, which is the
+       one-array claim: names and inline math live in `inlineRuns` rather than the
+       block chain precisely so a caption's marker, its emphasis and its name come
+       out of one scanner in one ascending array — `paintRow` fills gaps from
+       `at = token.to`, so a second array would have to be merged and an
+       out-of-order run would draw the text twice.
+
+       **The negative is the dialect's own**: it records that *everywhere but the
+       start of a paragraph, `:::` is ordinary text*, and the same holds for the
+       colon — a `:` mid-sentence is a colon. */
+const aGroupACaptionAndAName = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  const held = await page.evaluate(() => document.getElementById('text').value)
+  await page.fill(
+    '#text',
+    [
+      '::: abstract',
+      '',
+      ': A caption with an *emphasis* run. {#fig:pipeline}',
+      '',
+      'Prose with a : colon mid-sentence and a { brace that opens no name.'
+    ].join('\n')
+  )
+  await settle(page)
+
+  const read = await page.evaluate(() => {
+    const rows = document.getElementById('mirror').children
+    const spans = (i) =>
+      [...rows[i].querySelectorAll('span')].map((s) => `${s.className}:${s.textContent}`)
+    return { group: spans(0), caption: spans(2), prose: spans(4) }
+  })
+
+  await page.fill('#text', held)
+  await settle(page)
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const kind = read.group.some((s) => s.endsWith(':abstract'))
+  const marker = read.caption.some((s) => s.startsWith('quiet:'))
+  const inside = read.caption.some((s) => s.endsWith(':emphasis'))
+  const named = read.caption.some((s) => s.endsWith(':fig:pipeline'))
+  const prose = read.prose.length === 0
+
+  note(`the group: ${JSON.stringify(read.group)}`)
+  note(`the caption: ${JSON.stringify(read.caption)}`)
+  note(`the prose line drew ${read.prose.length} spans`)
+
+  ok(
+    24,
+    "a group, a caption and a name are drawn, and a colon inside a sentence is not a caption",
+    kind && marker && inside && named && prose,
+    [
+      kind ? null : `the group's kind drew ${JSON.stringify(read.group)}`,
+      marker ? null : 'the caption drew no marker',
+      inside ? null : `the caption lost its own emphasis run: ${JSON.stringify(read.caption)}`,
+      named ? null : `the caption's name drew nothing: ${JSON.stringify(read.caption)}`,
+      prose ? null : `a colon or a brace in prose was drawn: ${JSON.stringify(read.prose)}`
+    ]
+      .filter(Boolean)
+      .join('; ') || 'the kind, the marker, the emphasis and the name, and prose left alone'
+  )
+  return errors
+}
+
+/* 25. **Display math is one ink and is not read as markdown.** A `$$` block is
+       block state, and it is checked *before* the fast path — which is the whole
+       of this clause. A body line like `a plain body line` holds none of the six
+       characters `inert` scans for, so a `$$` state checked after that path would
+       let it fall through and draw as nothing at all.
+
+       **The body line this fills is deliberately trigger-free**, because a body
+       holding a `*` would be caught by a per-line lexer too and the clause would
+       pass on the implementation it exists to reject.
+
+       And `$5` alone is not math: the twin pairs two dollars on one line, so one
+       opens nothing. */
+const displayMathIsOneInk = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  const held = await page.evaluate(() => document.getElementById('text').value)
+  await page.fill(
+    '#text',
+    ['$$', 'a plain body line with no trigger character', '$$', '', 'It cost $5 in prose.'].join(
+      '\n'
+    )
+  )
+  await settle(page)
+
+  const read = await page.evaluate(() => {
+    const rows = document.getElementById('mirror').children
+    const spans = (i) =>
+      [...rows[i].querySelectorAll('span')].map((s) => `${s.className}:${s.textContent}`)
+    return { open: spans(0), body: spans(1), shut: spans(2), prose: spans(4) }
+  })
+
+  await page.fill('#text', held)
+  await settle(page)
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const fenced = read.open.length === 1 && read.shut.length === 1
+  const body = read.body.length === 1 && read.body[0].startsWith(read.open[0].split(':')[0])
+  const prose = read.prose.length === 0
+
+  note(`the fences: ${JSON.stringify(read.open)} / ${JSON.stringify(read.shut)}`)
+  note(`the body: ${JSON.stringify(read.body)}`)
+  note(`the prose line drew ${read.prose.length} spans`)
+
+  ok(
+    25,
+    'a display block is one ink, its body included, and a lone dollar in prose is not math',
+    fenced && body && prose,
+    [
+      fenced ? null : `the fences drew ${JSON.stringify(read.open)} and ${JSON.stringify(read.shut)}`,
+      body
+        ? null
+        : `the body drew ${JSON.stringify(read.body)} — a trigger-free line fell through to prose`,
+      prose ? null : `a lone dollar was drawn as math: ${JSON.stringify(read.prose)}`
+    ]
+      .filter(Boolean)
+      .join('; ') || 'both fences and the body in one ink, and $5 left alone'
+  )
+  return errors
+}
+
+
 const run = async ({ engine, headed, rev, doc, mutate }) => {
   passed = 0
   failed = 0
@@ -1941,7 +2177,10 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       theInkLaysOutToThePane,
       theInkDrawsWithLinesOff,
       anIncludeIsNotAnInlineLink,
-      theBandIsOnTheCaretsRow
+      theBandIsOnTheCaretsRow,
+      theBracketFamilyReadsFiveWays,
+      aGroupACaptionAndAName,
+      displayMathIsOneInk
     ]) {
       gather(await check(browser, held.url))
     }
@@ -1956,7 +2195,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    23,
+    26,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +
