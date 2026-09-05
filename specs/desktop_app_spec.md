@@ -1342,6 +1342,36 @@ list to one item.
 
   **Not opened further until an author says an unchecked citation cost them something.**
 
+- **OQ-18** — is the text pane a hand-rolled ink layer or a code editor after all? Raised
+  2026-09-05 at the window, when Phase 24's cost was being weighed. *(design call, blocked
+  on a measurement nobody has taken)*
+
+  **Phase 8 rejected CodeMirror 6 because it "needs a bundler, which is what
+  `withGlobalTauri` exists to avoid", and that premise has weakened.** `pdf.js` is already
+  vendored as two static `.mjs` modules under `app/dist/pdfjs/`, loaded straight from a
+  module script — a pre-built editor bundle is the same shape. The difference is that
+  Mozilla ships a browser-ready build and CodeMirror does not, so it would be a committed
+  artifact someone regenerates offline rather than a step in `cargo tauri build`.
+
+  **What would decide it is a number, not an argument.** This layer builds one row per
+  logical line for the **whole** buffer: 1,880 rows over `tests/fixtures/long.md`, whose
+  layout costs ~34 ms — moved off the keystroke into a frame by Phase 23's amendment, and
+  still paid there — while `Lines` mode costs a 35 ms synchronous sweep, which is OQ-16. A
+  viewport-only editor is flat where this is linear, and would close OQ-15 and OQ-16 both.
+  `@lezer/markdown` is incremental and extensible by design, which is Phase 24's problem
+  with a grammar under it.
+
+  **What it costs is why this is not obvious.** The `<textarea>` is load-bearing in six
+  shipped places — the reload path's `value`, `caretPage`'s `selectionStart`, the disabled
+  state, `#divider`'s `getBoundingClientRect`, `invoke('edit')`, and both rigs, which read
+  that element across twenty-six harness clauses and five driver ones — and a migration
+  deletes `#mirror`, `remirror`, `regutter`, `rows`, `placeInk` and the drag suppression,
+  which is most of Phase 23.
+
+  **Decided at the window: Phase 24 ships first and the experiment runs on a branch after**,
+  so the pane that is built, gated and shipped stays the one on `main` while the question is
+  answered. **Not opened further until that branch has a figure beside the 34 ms.**
+
 ## 4. Implementation phases
 
 Strictly sequential; each is one plan-mode pass. Phases 1 to 3 build a

@@ -913,6 +913,22 @@
       #mirror .include {
         color: var(--mark);
       }
+      /* `mpdf-003` Phase 24: the three the dialect's own bracket family needs. A
+         cross-reference, a citation's key and a footnote's label are each a
+         payload the author chose, so each takes `--mark` — and **none of them is
+         judged**, the bibliography's keys and the `{#…}` names living in files
+         the pane is not holding. `{#fig:x}` reuses `.name` above rather than
+         taking a fourth: that class already means a payload that is not a
+         heading. */
+      #mirror .ref {
+        color: var(--mark);
+      }
+      #mirror .cite {
+        color: var(--mark);
+      }
+      #mirror .note {
+        color: var(--mark);
+      }
       #mirror .missing {
         color: var(--alarm);
       }
@@ -4966,6 +4982,46 @@
           : 'include'
       }
 
+      /** Where a bracket run closes, or `-1`. **Not `indexOf`**: a citation may
+       *  carry a `]` in no key this dialect writes, but a link's text may, and
+       *  the shipped scan stopped at the first one. One depth counter, so
+       *  `[a [b] c](x)` closes where it should.
+       *  @param {string} line @param {number} opens @returns {number} */
+      function closingBracket(line, opens) {
+        let depth = 0
+        for (let i = opens; i < line.length; i++) {
+          if (line[i] === '[') depth++
+          else if (line[i] === ']' && --depth === 0) return i
+        }
+        return -1
+      }
+
+      /**
+       * The keys inside a citation's brackets, or `null` where the text is not
+       * one. **The brackets are what make it**, which the dialect states: an
+       * unbracketed `@` is load-bearing in ordinary text, so `a@b.com` and
+       * `@thing` never reach here at all.
+       *
+       * Three forms — `[@key]`, `[+@key]` and `[@a; @b]` — and one shape covers
+       * them: `;`-separated parts, each an optional `+`, an `@`, and a key of at
+       * least one character. **Offsets are relative to the text given**, so the
+       * caller adds its own opening bracket back.
+       *
+       * @param {string} inside @returns {{ from: number, to: number }[] | null}
+       */
+      function citationKeys(inside) {
+        if (inside.indexOf('@') < 0) return null
+        const found = []
+        let at = 0
+        for (const part of inside.split(';')) {
+          const key = /^(\s*\+?@)([^\s;\]]+)$/.exec(part)
+          if (key === null) return null
+          found.push({ from: at + key[1].length, to: at + key[0].length })
+          at += part.length + 1
+        }
+        return found.length > 0 ? found : null
+      }
+
       /**
        * The inline constructs, left to right, from `at`. Flat and never nested:
        * a run is one element, and a colour inside a colour is not something the
@@ -4998,26 +5054,93 @@
             continue
           }
 
+          /*
+            The bracket family, decided in one order and first match winning.
+            **Five shapes come out of what was one**, and the one that was drawn
+            wrongly is why: `[](#fig:pipeline)` took the inline link's branch and
+            its destination the ink a URL gets, where the dialect records that
+            *it is the empty brackets that make a reference* — so `[](…)` is a
+            section include when the destination ends `.md` and a cross-reference
+            when it is an anchor. **A construct drawn as a different construct is
+            worse than one drawn as prose.**
+
+            **The include marker is not decided here**, and that is deliberate:
+            it is a whole-line construct settled in `markdownRuns` by `includeIn`,
+            which gates on `/\.md$/i` — so an anchor can never match it and
+            always falls to the cross-reference below.
+          */
           if (c === '[' || (c === '!' && line[i + 1] === '[')) {
             const opens = c === '!' ? i + 1 : i
-            const shuts = line.indexOf(']', opens + 1)
-            const dest = shuts < 0 ? -1 : line.indexOf(')', shuts + 2)
-            if (
-              shuts < 0 ||
-              line[shuts + 1] !== '(' ||
-              dest < 0 ||
-              /[\s"]/.test(line.slice(shuts + 2, dest))
-            ) {
-              // A citation `[@panel]`, a reference link, a bare bracket: left as
-              // body text rather than guessed at.
-              i = opens + 1
+            const shuts = closingBracket(line, opens)
+
+            // A footnote, `[^label]`, before anything that reads a `]` as the end
+            // of link text — otherwise `[^a][b]` reads as a reference link.
+            if (shuts > 0 && line[opens + 1] === '^' && shuts > opens + 2) {
+              found.push(...run(i, opens + 2, 'quiet'))
+              found.push(...run(opens + 2, shuts, 'note'))
+              found.push(...run(shuts, shuts + 1, 'quiet'))
+              i = shuts + 1
               continue
             }
-            found.push(...run(i, opens + 1, 'quiet'))
-            found.push(...run(shuts, shuts + 2, 'quiet'))
-            found.push(...run(shuts + 2, dest, 'link'))
-            found.push(...run(dest, dest + 1, 'quiet'))
-            i = dest + 1
+
+            // A citation, `[@key]` or `[+@key]` or `[@a; @b]`. **The brackets are
+            // required**: the dialect records that an unbracketed `@` is
+            // load-bearing in ordinary text, so `a@b.com` and `@thing` are prose
+            // and are never reached from here.
+            const keys = shuts > 0 ? citationKeys(line.slice(opens + 1, shuts)) : null
+            if (keys !== null) {
+              // The offsets are into the bracketed text, so the base is fixed and
+              // only the cursor moves: advancing the base by each key runs the
+              // second one off the end of the line.
+              const base = opens + 1
+              let at = base
+              found.push(...run(i, base, 'quiet'))
+              for (const key of keys) {
+                found.push(...run(at, base + key.from, 'quiet'))
+                found.push(...run(base + key.from, base + key.to, 'cite'))
+                at = base + key.to
+              }
+              found.push(...run(at, shuts + 1, 'quiet'))
+              i = shuts + 1
+              continue
+            }
+
+            const dest = shuts < 0 ? -1 : line.indexOf(')', shuts + 2)
+            const inline =
+              shuts > 0 &&
+              line[shuts + 1] === '(' &&
+              dest > 0 &&
+              !/[\s"]/.test(line.slice(shuts + 2, dest))
+
+            if (inline) {
+              // **A cross-reference is the empty brackets and nothing else.** A
+              // *texted* anchor link — `[this one](#fig:pipeline)` — is an
+              // ordinary link in this dialect, which is why the emptiness is the
+              // term and the `#` is not.
+              const empty = shuts === opens + 1
+              const target = line.slice(shuts + 2, dest)
+              const cls = empty && target[0] === '#' ? 'ref' : 'link'
+              found.push(...run(i, opens + 1, 'quiet'))
+              found.push(...run(shuts, shuts + 2, 'quiet'))
+              found.push(...run(shuts + 2, dest, cls))
+              found.push(...run(dest, dest + 1, 'quiet'))
+              i = dest + 1
+              continue
+            }
+
+            // A reference link, `[text][ref]`, whose label is the destination.
+            const ref = shuts > 0 && line[shuts + 1] === '[' ? line.indexOf(']', shuts + 2) : -1
+            if (ref > 0) {
+              found.push(...run(i, opens + 1, 'quiet'))
+              found.push(...run(shuts, shuts + 2, 'quiet'))
+              found.push(...run(shuts + 2, ref, 'link'))
+              found.push(...run(ref, ref + 1, 'quiet'))
+              i = ref + 1
+              continue
+            }
+
+            // A bare bracket, left as body text rather than guessed at.
+            i = opens + 1
             continue
           }
 
@@ -5101,6 +5224,29 @@
               ...run(0, marker.from, 'quiet'),
               ...run(marker.from, marker.to, includeClass(marker.dest)),
               ...run(marker.to, line.trimEnd().length, 'quiet')
+            ])
+            continue
+          }
+
+          /* A footnote definition and a link definition, **both before the
+             caption case** the next commit adds: each carries a `: ` that a
+             caption predicate would otherwise claim, and the label is what a
+             reader is looking for on those lines. */
+          const defines = /^(\[)(\^?)([^\]]+)(\]:)/.exec(line)
+          if (defines !== null) {
+            const label = 1 + defines[2].length
+            const body = defines[0].length
+            out.push([
+              ...run(0, label, 'quiet'),
+              // The label is the payload either way — `note` for a footnote's,
+              // and `name` for a link's, which is the class that already means a
+              // payload that is not a heading.
+              ...run(label, label + defines[3].length, defines[2] === '^' ? 'note' : 'name'),
+              ...run(label + defines[3].length, body, 'quiet'),
+              // **A footnote's body is prose and a link definition's rest is a
+              // destination**, which is why one takes the scan and the other the
+              // ink every destination takes.
+              ...(defines[2] === '^' ? inlineRuns(line, body) : run(body, line.length, 'quiet'))
             ])
             continue
           }
