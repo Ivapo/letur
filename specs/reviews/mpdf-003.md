@@ -2,6 +2,119 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 35 — Phase 23 only — 2026-09-04 — both reviewers, resumed — **READY (converged)**
+
+Zero blocking from both lenses, at the third and last round of this episode. Both traced
+the deletion rather than trusting the changelog: one resolved every `above`/`below` in the
+phase against the post-deletion file and found no dangling cross-reference, the other
+confirmed the only surviving mention of the rejected `rows` assignment is the historical
+clause the reversal argument needs to overturn it.
+
+**Clause 19 at `WIDTHS[2]` re-derived rather than accepted.** 500 px viewport, `#text` at
+`flex: 0 0 40%` less its 28 px of padding leaves ~170 px, about 23 characters at the
+measured 0.6021 em advance, against `book.md`'s ~75-character lines — so the fixture wraps
+three to four rows deep and the blank lines give the clause its shortest row. Both halves
+hold on correct code, and `ink-bigger-headings` fails the equality half without rescuing
+the wrap half, so the clause fails on the assertion it was written for rather than by
+accident. **And the narrowing keeps the suppression flag out of it**: `opened()` creates
+the page at that width, so there is no post-load resize and `mirroredWidth` is null on the
+observer's first delivery.
+
+Two editorial refinements folded after the verdict: the weakened guard paragraph said
+"keeps its `rows === null` guard" twice in three sentences, and the decomposition table's
+"Chromium / WebKit, and not the driver" label sits two paragraphs from the amended table
+that uses the same pair convention — the first corrected, the second left, being cosmetic
+at the cap.
+
+### Round 34 — Phase 23 only — 2026-09-04 — both reviewers, resumed — **NOT READY**
+
+**One blocker, found independently by both lenses, and it was the §7.3 pattern again: the
+author's own round-33 fix introduced it.** The three keystroke-path changes were folded
+into the Scope as a numbered list — and the *earlier* copy of the same list, 350 lines
+down in the exit gate, was left standing. That copy still specified the shape round 33 had
+just documented as broken (*"It stays `remirror`'s and stays null in the default state"*),
+still named only one of the two cached readers, and still attributed the scroll cost to
+the write alone. The gate section is where the budget and the `cut` path live, so an
+implementer planning from it would have rebuilt exactly the defect the round removed.
+Resolved by **deleting** the three bullets rather than revising them, leaving one
+normative list and a pointer that names the failure mode.
+
+**And a changelog reported a change the document did not carry.** Clause 19's width and
+wrap assertion were in an edit batch that aborted on a later assertion and never wrote,
+and the author did not re-check. Caught because the reviewer verified against the files —
+which is the rule that exists for it. Landed this round.
+
+Two more: clause 19 credited `remirror` with assigning each gutter row's height when it is
+`regutter` — the one sentence in the phase that reasons about which function owns the
+measurement, so the wrong name there costs more than a stale pointer — and *"its
+`lines.hidden` guard is true exactly when `regutter` has returned early"* was a false
+biconditional, `regutter` returning early on two conditions and a memo hit happening with
+the gutter drawing. Weakened to the true statement, with `markLine`'s own `rows === null`
+guard explicitly kept so no later reader takes the biconditional for licence to drop it.
+
+**The four-mutation isolation was re-traced against the amended design** rather than
+re-derived by the author: `ink-lines-gated` still fails clause 20's *"hidden and
+**empty**"* half alone, `ink-band-tiles` still fails 22 without touching the re-keyed 15,
+`ink-bigger-headings` fails 19 alone because row counts and not heights are what 15's
+`relined` and 20 read, and `ink-include-anywhere` fails 21 alone now that it relaxes both
+terms of the predicate.
+
+### Round 33 — Phase 23 only — 2026-09-04 — a panel of two, fresh — **NOT READY**
+
+The round the round-32 amendment owed. Round 0 is not re-asked: the episode is Phase 23
+and round 28 answered it.
+
+**Three blockers, and the panel found the one the author had already spotted plus two he
+had not.**
+
+**`rows` gated on `shown` empties the gutter on `⌘L`**, and both lenses reached it
+independently. `#text` is `flex: 0 0` and `#lines` is `flex: none`, so showing the gutter
+takes its width from `#preview` and the gesture moves neither the buffer nor the width —
+`showLines`' `relines()` memo-hits in `remirror`, `rows` stays null, and `regutter` empties
+the column it was asked to fill. It fails shipped clause 15's `relined`, this phase's
+clause 20, and `ink-lines-gated`'s isolation besides. **Resolved at the root**: the sweep
+and `rows` both move into `regutter`, which reverses what round 29 assigned — that
+assignment was right while `remirror` swept unconditionally, and the moment the sweep
+became conditional the assignment had to move with it. The broken shape is written down
+rather than left to be rediscovered.
+
+**The width cache missed `remirror`'s second reader.** The memo compares a *content* width
+while `mirror.style.width` is assigned `text.clientWidth`, a *padding-box* one; caching the
+first and leaving the second still pays the 16.5 ms reflow, and the amendment would have
+missed its own number.
+
+**The scrollbar case hid the ink with no way back.** `#text` gaining a classic scrollbar
+narrows its content box without moving its border box, so the `column` observer fires and
+`placeInk` hides — but `#preview` and `#pages` never resize and no press bracketed it, so
+no `settle` is ever armed and the pane goes plain and stays plain. `placeInk` now arms the
+timer where it hides, which makes every route one route.
+
+**Two of the author's own numbers were wrong.** The contrast ratios read 11.6 / 6.3 / 4.3
+where the tokens give **11.8 / 6.4 / 4.4** — the built page's own comment had it right and
+the spec did not — and the measurement was labelled *"in the driver"* over a table of
+Chromium / WebKit pairs the driver cannot produce, being one engine by construction. The
+budget stays in the driver, where a claim about the shipped engine belongs; the
+decomposition is labelled as `app/harness/`'s.
+
+**The exit gate never required the driver to be run**, though every prior phase touching
+that rig states it as an item — so the phase could have passed with clause 5 written and
+never executed, and with nothing checking that a fifth clause left the three existing
+mutations isolated.
+
+Also folded: `unmark()` as the one clear across both columns, which turns an
+"invisible in practice" asymmetry into something clause 22 can assert; `Status.main` named
+as the include resolution's base; `--mark`'s values and figures moved into the spec;
+`window.__pane.mirrorMs` named as the surface, with the honest note that it stops before
+the deferred frame; the default state defined; the failure path stated as cut-by-default
+and amendment-by-a-person; `README.md:209`'s fourth "sixteen"; and the by-eye `refs.yml`
+stated as removed rather than committed.
+
+**One rejection, recorded.** A reviewer wanted the "master in a subfolder" include
+resolution exercised by a fixture. Declined — a second project tree for one line of
+arithmetic — and the phase instead admits that clause 21 runs the resolution as a no-op and
+points at `mpdf-010`'s own `project_root` tests. The reviewer accepted the admission on
+re-review.
+
 ### Round 32 — Phase 23 only — 2026-09-04 — the author, from the build — **AMENDED, RE-REVIEW OPEN**
 
 **A round opened by an implementation and not by a reviewer**, which §7 does not provide

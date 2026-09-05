@@ -6241,23 +6241,48 @@ be *bigger*, and that is the one thing the author cannot have.
 
   - **`remirror()`** — unconditional. Builds `#mirror` from the buffer at the pane's
     content width and tokenises it, memoised on its own `mirroredText`/`mirroredWidth`.
-  - **`regutter()`** — `if (!shown) return`. Reads the heights `remirror` just laid out
-    and writes `#lines`, memoised on **its own** pair — its own *variables*, and the
-    values `remirror` wrote rather than a second `getComputedStyle` of its own. Two
-    readings of one width in one pass is a second thing that can disagree, and it settles
-    a case by construction: the gutter can only rebuild on a pass where the mirror did, so
-    a fresh gutter never meets a mirror row still wearing the caret's mark.
+  - **`regutter()`** — `if (!shown) return`. **Sweeps** the heights `remirror` just laid
+    out, produces `rows` from them and writes `#lines`, memoised on **its own** pair — its
+    own *variables*, and the values `remirror` wrote rather than a second
+    `getComputedStyle` of its own. Two readings of one width in one pass is a second thing
+    that can disagree.
   - **`relines()`** stays as `remirror()` then `regutter()`, so every existing caller is
     unchanged.
 
   **The two seams inside today's function are assigned rather than left to fall out.**
   `relines`' `text.value === ''` branch splits with the function: `remirror` empties the
-  mirror, nulls `rows` and calls `markLine`; `regutter` empties `#lines`. **`rows` stays
-  `remirror`'s**, produced there — though only where `shown`, per the keystroke-path
-  paragraph below, so it is null in the default state and `markLine`'s own guard is what
-  already answers for that — and read by `regutter` and `markLine` — the band no
-  longer needs its prefix sums, but `markLine`'s `rows === null` guard and its row index
-  both still do.
+  mirror and calls `markLine`; `regutter` empties `#lines` and nulls `rows`.
+
+  **`rows` is `regutter`'s, and that reverses what round 29 assigned.** It said `rows`
+  stays `remirror`'s, and it was right while `remirror` swept the heights unconditionally;
+  the keystroke-path paragraph below takes that sweep off every keystroke, and the moment
+  it is conditional the assignment has to move with it. **Leaving `rows` in `remirror` and
+  gating it on `shown` is the shape that does not work, and it was built and traced before
+  it was rejected**: `#text` is `flex: 0 0` and `#lines` is `flex: none`, so showing the
+  gutter takes its width from `#preview` and **`⌘L` moves neither the buffer nor the
+  width** — `showLines`' `relines()` memo-hits in `remirror`, `rows` stays null, and
+  `regutter` empties the column it was asked to fill. That fails shipped clause 15's
+  `relined` and this phase's own clause 20, and it costs `ink-lines-gated` its
+  falsification besides.
+
+  So the sweep and the value it produces live together, in the one function that runs only
+  when the gutter draws. **`markLine` is the only other reader and it never outruns it**:
+  a null `rows` is unreachable from a drawing gutter. **Not a biconditional, and the
+  weaker statement is the true one** — `regutter` returns early on two conditions, `!shown`
+  and its own memo hit, and a memo hit happens with `lines.hidden` false. What carries the
+  safety is that a memo hit implies a completed earlier pass at the same text and width,
+  so the only states left holding a null `rows` are empty-buffer ones — which
+  **`markLine` keeps its own `rows === null` and `text.value === ''` terms for**, and a
+  reader who took the biconditional for licence would have dropped the first of them. The band no longer needs the prefix sums,
+  but `markLine`'s `rows === null` guard and its row index both still do.
+
+  **`unmark()` is the one clear, and it is named because three callers share it.**
+  `markLine`'s guard branch, `remirror` after a rebuild and `regutter` after one all take
+  `.here` off `lines.children[marked]` **and** `mirror.children[marked]` and reset `marked`
+  to `-1`. Removing a class from a row that was just created is a no-op; removing it from
+  the *other* column, which this pass did not rebuild, is the whole point — without it a
+  rebuild of one column strands a mark on the other, which is clause 22's "clears both"
+  failing on a path `#lines[hidden] { display: none }` happens to hide.
 
   **Two memos and not one, because one is the bug.** With a single `linedText`/
   `linedWidth`, building the mirror while the gutter is hidden leaves the memo current,
@@ -6321,16 +6346,35 @@ line stays and is invisible.
   rebuild's own follow has none. The exit gate carries the numbers.
 
   **Three readings come off the keystroke path, and all three are this file's own rules
-  applied to a reading rather than to a placement.** The gate below measured
-  `remirror` at 36.2 ms in Chromium and 26 in WebKit over `tests/fixtures/long.md` against
-  a budget of 8, found the tokenise costing 0.1, and found the whole of it to be one
-  forced layout of a 300 KB document. So: the follow above; **the content width cached and
-  refreshed by the `column` `ResizeObserver`**, which is the rule `placeViewer` was
-  rewritten under and an observer that already fires for a scrollbar appearing; and
-  **`rows` measured only when the gutter draws**, which is Phase 8's *"the mode that pays
-  for the measurement is the mode that gets the band"* applied to the measurement rather
-  than to the band. **None of the three reaches the ink**, which is built unconditionally
+  applied to a reading rather than to a placement.** The gate below measured `remirror` at
+  36.2 ms in Chromium and 26 in WebKit over `tests/fixtures/long.md` against a budget of 8,
+  found the tokenise costing 0.1, and found the whole of it to be one forced layout of a
+  300 KB document. **None of the three reaches the ink**, which is built unconditionally
   either way, and clause 20 is what holds that apart.
+
+  1. **`#text`'s box is read by the observer that watches it, and never on a keystroke.**
+     *"What the page watches is the pane, not the events that resize it"* is the rule
+     `placeViewer` was rewritten under, and a reading `remirror` takes per keystroke is the
+     same claim in the other direction. **Both of `remirror`'s readers are cached, and that
+     is stated because caching one is the trap**: the memo compares a **content** width,
+     and `mirror.style.width` is assigned `text.clientWidth`, a **padding-box** one — cache
+     only the first and the second still pays the 16.5 ms reflow the table below prices.
+     So one function reads `clientWidth` and the padding once and holds both numbers, and
+     `placeInk` calls it. It also **seeds itself on first use**, because a
+     `ResizeObserver`'s initial delivery is asynchronous and `refresh` can reach `relines`
+     before it.
+  2. **The heights are swept only where the gutter draws**, which is Phase 8's *"the mode
+     that pays for the measurement is the mode that gets the band"* applied to the
+     measurement rather than to the band — the sweep and `rows` move into `regutter`
+     together, per the seam above.
+  3. **The rebuild's scroll follow is deferred to a `requestAnimationFrame`.** **The whole
+     statement, the read included** — `text.scrollTop` is as much a forced-layout read as
+     the write is, so deferring the write alone would defer nothing. It reads live inside
+     the frame rather than capturing at schedule time, which makes two pending frames
+     idempotent and stops a stale capture undoing a `scroll` event that landed between the
+     two. **`regutter`'s own `lines.scrollTop` is not deferred and neither is the `scroll`
+     listener**: the listener has a reader dragging a scrollbar and cannot wait a frame,
+     and `regutter` runs only in the mode OQ-16 already holds the cost of.
 
   **`#text` sits above the ink and below the figure** — ink `1`, textarea `2`, `#viewer`
   `3`. `#text` is a flex item at `position: static`, on which a non-`auto` `z-index`
@@ -6367,6 +6411,17 @@ line stays and is invisible.
   press would otherwise fire mid-drag and restore the ink detached. **The pane goes plain
   while you drag and colours a settle later.**
 
+  **`placeInk` arms `settle()` where it hides, and that is what closes the last route.**
+  `settle` is otherwise armed only by the `pages` observer and by the divider's `up()`, and
+  **a scrollbar appearing inside `#text` reaches neither**: it narrows that element's
+  content box without moving its border box, so `#preview` and `#pages` never resize and no
+  press bracketed it. The observer fires, `placeInk` hides — and nothing restores. Arming
+  here makes every route one route: **a content width the mirror was not built at hides the
+  ink and arms the timer; the timer rebuilds at the new width and restores.** The re-arm is
+  cheap where a settle was coming anyway — `rerender` returns at its own
+  `derived() === fitted` — and it is the only thing that makes the sentence below true of
+  the case the cache is praised for.
+
   **The hide is keyed to a stale mirror and not to the divider, because the window's own
   edge is the same defect by the other route.** A window resize reaches `settle` through
   the very `pages` `ResizeObserver` named above, with no press to bracket it — and the
@@ -6390,18 +6445,35 @@ line stays and is invisible.
 
   **Four inks, and the vocabulary is derived rather than asserted.** Against
   `--ground` (`#f4f4f2`) the existing palette offers exactly three legible foregrounds —
-  `--ink` ≈ 11.6:1, `--alarm` ≈ 6.3:1, `--quiet` ≈ 4.3:1; `--chrome`, `--edge`, `--band`
-  and `--paper` sit at 1.1–1.3:1 and cannot be text. So **one new token, `--mark`**, is
-  declared in each of the four theme blocks. That is a departure from
-  `rules/desktop-panes.md`'s recorded *"`--edge` and not a new token"*, and the departure
-  is that the precedent reuses a **surface** token for a surface; there is no unused
-  foreground to reuse, and a fourth ink invented out of `--edge` would be unreadable.
+  `--ink` **11.8:1**, `--alarm` **6.4:1**, `--quiet` **4.4:1**, WCAG 2.x from the token
+  values; `--chrome`, `--edge`, `--band` and `--paper` sit at 1.1–1.3:1 and cannot be text.
+  So **one new token, `--mark`**: `#1d5f57` light and `#5fbdad` dark, **6.7:1** and
+  **7.4:1** on their grounds and **6.1:1** over the caret's own `--band`, declared beside
+  `--band` in **the three blocks that declare palette tokens** —
+  `:root[data-theme='light']` is a fourth `:root` rule and deliberately declares none,
+  which is that block's own argument and not an omission here.
+
+  **Teal, and the hue is chosen against the three it sits beside**: `--ink` is a
+  desaturated navy and `--alarm` a rust red, so blue and red are the neighbourhoods
+  already spoken for. That is a departure from `rules/desktop-panes.md`'s recorded
+  *"`--edge` and not a new token"*, and the departure is that the precedent reuses a
+  **surface** token for a surface; there is no unused foreground to reuse, and a fourth ink
+  invented out of `--edge` would be unreadable. **A known that goes in the rule rather than
+  being fixed here**: `--quiet` reads 4.0:1 over `--band` against 4.4 over `--ground`,
+  under the line either way, which is `--quiet`'s to answer and not this phase's.
 
   | | `--ink` | `--mark` | `--quiet` | `--alarm` |
   |---|---|---|---|---|
-  | markdown | body text | heading text (**bold**), include marker | syntax punctuation, fence bodies, frontmatter delimiters | an include naming a file `Status.entries` marks `missing` |
+  | markdown | body text, a link's own text | heading text (**bold**), an emphasis run and a strong one (**bold**), include marker | syntax punctuation, fence and code-span bodies, frontmatter delimiters, **an inline link's destination** | an include naming a file `Status.entries` marks `missing` |
   | BibTeX | field values | `@type` and field names (**bold** on `@type`) | braces, commas, `=`, comments | — |
   | YAML | scalar values | keys (**bold**), `-` item markers | `#` comments, `---`, quotes | — |
+
+  **Emphasis and an inline link's destination are in that row deliberately, and clause 21
+  is why.** The destination is `--quiet` like the punctuation around it and **carries a
+  class of its own**, because the three the clause reads apart — an include marker, an
+  inline link, a marker naming a missing file — are three classes and only two colours.
+  And emphasis is where *"emphasis takes colour and weight, never slant"* below lands: it
+  is `--mark`, which is the only reading of that sentence introducing no fifth ink.
 
   **No italic anywhere in the shipped ink**, and the rule is stated as a prohibition
   rather than a condition. "Allowed on runs the table clears" is not implementable:
@@ -6419,9 +6491,14 @@ line stays and is invisible.
   still — it wants a top-level *paragraph* and declines a marker inside a list or a block
   quote — and where the two disagree the compiler is right; see the invariant below.
   **A marker's target is resolved against the master's own directory, not the root**,
-  before it is compared to `Entry.path`: `Entry.path` is root-relative while a section
-  path is relative to the master, and a master in a subfolder is where matching the raw
-  text would mark every include red.
+  before it is compared to `Entry.path`. The base is **`Status.main`'s** directory and not
+  `Status.edited`'s and not the root, and naming which of the three matters: `Entry.path`
+  is root-relative while a section path is relative to the master, and a master in a
+  subfolder is where matching the raw text would mark every include red. **The fixture
+  cannot exercise that case and clause 21 does not claim to**: `book.md` is the panel's
+  master and sits at its root, so the resolution runs there as a no-op. A fixture with a
+  master one level down is a second project tree for one line of arithmetic, and
+  `mpdf-010`'s own `project_root` climb is where that shape is already tested.
 
   **The highlight is a hint and never a claim.** It gates nothing, refuses nothing,
   writes nothing, and reaches no Rust; where this lexer and `md2pdf-core` disagree, the
@@ -6461,6 +6538,12 @@ line stays and is invisible.
   `bun app/typecheck.mjs` passes. `bun app/harness/checks.mjs` passes **in both engines**,
   per Phase 12's gate, and `--falsify` passes, **which is what catches an isolation error
   in the four pairings below rather than a reader's confidence in them**.
+  **`bun app/driver/drive.mjs` prints five clauses, five passed**, and `--falsify` prints
+  three mutations, three isolated — stated as an item because every prior phase that
+  touched that rig stated it as one, and because a phase that adds a clause there and does
+  not run it can pass with the clause written and never executed. The three existing
+  mutations own clauses 1, 2 and 4, and a fifth clause is exactly the kind of thing that
+  costs one of them its isolation.
 
   **The fixture gains three things**, and only three: `tests/fixtures/panel/book.md`
   already opens with a frontmatter block and a `# The book` heading and already carries
@@ -6487,13 +6570,16 @@ line stays and is invisible.
       fixture wraps, `#mirror.scrollHeight` equals `#text.scrollHeight` within a pixel —
       **no padding term**, the two boxes carrying the same padding over the same content
       width by the geometry above; subtracting one side's would assert a 24 px difference
-      and fail correct code. **Narrowed by `opened(browser, url, width)`**, not by clause
-      14's synthetic divider drag, which now trips the suppression flag. **The one-pixel
+      and fail correct code. **Narrowed by `opened(browser, url, width)` at `WIDTHS[2]`**,
+      not by clause 14's synthetic divider drag, which now trips the suppression flag —
+      and **the wrap is asserted, not assumed**, off a mirror row taller than the shortest
+      one, since the height equality holds at any width and a clause that only read it
+      could pass without testing the agreement it is named for. **The one-pixel
       tolerance is measured, not assumed**: a textarea and a `pre-wrap` div carrying the
       same font, padding and border-box width over 40 rows of blank lines and soft-wrapped
       paragraphs both report `scrollHeight` 1789 — **Δ 0** — in Chromium and WebKit alike,
       so the historic form-control divergence does not bite at this geometry. **The gutter comparison is deliberately not this
-      clause**: `remirror` *assigns* each gutter row's height from the mirror's own
+      clause**: `regutter` *assigns* each gutter row's height from the mirror's own
       `offsetHeight`, so a mirror-versus-gutter check holds by construction and proves
       nothing about the textarea. Mutation **`ink-bigger-headings`**.
   20. **The ink draws with `Lines` off, and the gutter does not.** In the default state
@@ -6510,12 +6596,20 @@ line stays and is invisible.
       clause 15's `relined`, `linesMoved` and `linesMarked` all still true.
   21. **An include marker is not an inline link, and a missing target is neither.** The
       fixture's own marker, its inline link and a typed marker naming a file the panel
-      lists `missing` carry three distinct classes. Mutation **`ink-include-anywhere`**.
+      lists `missing` carry three distinct classes, read off the span whose text is the
+      destination so the clause encodes no class name. Mutation
+      **`ink-include-anywhere`**, which relaxes **both** terms of the predicate — the
+      whole-line anchoring *and* the empty link text — because the fixture's inline link
+      carries text and is refused on that count too, so a mutation dropping only the
+      anchors would change nothing and report NOT ISOLATED for failing no clause at all.
   22. **The band is on the caret's row and on one row.** In `Lines` mode `markLine` marks
       exactly one mirror row and one gutter row, and clears both; with `Lines` off it
       marks neither, the band being the gutter's affordance and not the ink's.
       Mutation **`ink-band-tiles`**, the element form of the `no-repeat` bug Phase 8
-      records costing a build.
+      records costing a build. **It tiles the add and leaves the clear alone**, and the
+      whole isolation rests on that: `unmark()` takes `.here` off the caret's own row on
+      the hide, which is the row the amended clause 15 reads, so 15 survives while 22
+      fails. A mutation that broke the clear as well would fail both.
 
   **One shipped clause is amended, and leaving it would let it pass for the wrong
   reason.** Clause 15's `unbanded = afterHide.band === ''` reads
@@ -6527,7 +6621,11 @@ line stays and is invisible.
   fail under `ink-band-tiles` and cost that mutation its isolation. It is an absence
   assertion again only because the band stayed a `Lines` affordance; had the ink carried
   it in both modes there would have been no reproducible target, and `ink-band-tiles`
-  would have failed 15 and 22 together.
+  would have failed 15 and 22 together. **The row is indexed the way `markLine` indexes
+  it**, off `selectionStart` — `opened()` never focuses the pane, so that is row 0 here,
+  and a literal `0` would be the same assertion by accident rather than by construction.
+  It goes vacuous under any mutation that stops a row ever being marked, which is what an
+  absence assertion is and why clause 22 is the one that asserts the presence.
 
   **There is no second amendment, and the earlier draft's "clause 6" was two mistakes.**
   *"The pane is Phase 4's textarea again"* is Phase 8's **by-eye** item, `§4` above, which
@@ -6540,22 +6638,49 @@ line stays and is invisible.
   that *"a claim about how the engine that ships renders is the driver's"*, and
   `checks.mjs` records that at narrow widths WebKit agrees with Chromium and not with the
   window. "The ink wraps where the textarea wraps" is exactly such a claim, so clause 19's
-  height comparison is taken once in the shipped binary.
+  height comparison is taken once in the shipped binary. It **opens a second document** —
+  `DOCUMENT` is `book.md` and stays it, so the clause takes a `LONG` constant of its own —
+  and it **runs last**, after clause 4, because it opens that document and types into it
+  and the four before it were not written against either. **No mutation of its own**:
+  clause 3 is the precedent.
 
   **And one measurement, because `remirror` is on the keystroke path.** Phase 22's whole
   subject was what a keystroke waits on, and this adds a tokenise to a rebuild that is
-  already whole-buffer. Measured in the driver on `tests/fixtures/long.md` (300,527 bytes,
-  1,879 lines, pure ASCII), `performance.now()` around `remirror`, median of 20
-  keystrokes appended at the end of the buffer, **in the default state**: under **8 ms**,
-  half a 16.7 ms frame and beside the 23.9 ms `render_project` OQ-14 measured over 267 KB.
+  already whole-buffer. **It rides clause 5 rather than being a clause of its own**, the
+  document being open there already. On `tests/fixtures/long.md` (300,527 bytes, 1,879
+  lines, pure ASCII), median of 20 keystrokes appended at the end of the buffer, **in the
+  default state** — a fresh window, `Lines` never pressed, at the driver's own `WIDTH`,
+  though the amended body takes no layout reading and so no width can move it: under
+  **8 ms**, half a 16.7 ms frame and beside the 23.9 ms `render_project` OQ-14 measured
+  over 267 KB.
+
+  **What it is read off is `window.__pane.mirrorMs`, and it has to be said.** `remirror`
+  is module-local and the driver's `execute/sync` is a classic script in the global
+  context, so *"`performance.now()` around `remirror`"* is only reachable through the
+  surface `rules/desktop-geometry.md` already calls *"the surface the pane publishes for
+  its own gate"* — one field beside `sizingMs`, `deliveryMs` and `renderMs`, written
+  through the existing `since()`, which rounds to 0.1 ms. **A scalar overwritten per
+  pass**, so it is sampled after each of the twenty keystrokes and not once at the end, and
+  **written only where the pass rebuilt**, so a memo hit leaves the last real figure
+  standing. **It stops before the deferred frame**, and that is stated rather than hidden:
+  the scroll follow's layout is work this phase **moved** and did not remove, and what the
+  budget bounds is what a keystroke waits on synchronously. The frame's own cost is the
+  ink layer's layout, which the browser was going to spend to paint it.
+
   **If it does not, this phase is `cut` and re-specced** — the windowed alternative is
   OQ-15 and not a branch of this gate, because a gate whose failure path is an undesigned
-  second design checks nothing.
+  second design checks nothing. **The cut is the default and an amendment is a person's
+  call**, which is what happened once already: round 32 records the budget failing, the
+  human choosing the amendment over the cut, and the ground for it, which was that the
+  measurement found the gate bounding a quantity that turned out to be free.
 
   **The first draft of this gate bounded the wrong quantity, and the correction is the
   measurement rather than a second opinion.** It said *"the tokenise-and-build pass"*,
-  which is the thing a new lexer was expected to cost. Built and measured (Chromium /
-  WebKit, the document above, the method above):
+  which is the thing a new lexer was expected to cost. Built and measured — **in
+  `app/harness/`'s two engines and not in the driver, which is one engine by
+  construction**, over a page it served with the buffer set to that document, the two rigs
+  being explicitly not interchangeable and this being a decomposition rather than the
+  gate — Chromium / WebKit, the method above:
 
   | | ms |
   |---|---|
@@ -6579,28 +6704,12 @@ line stays and is invisible.
   not a paper's — which is exactly why a gate keyed to `long.md` is the one that catches
   it.
 
-  **Three changes take it off the keystroke path, and none of them is a second design.**
-  All three are this file's own rules applied to a reading rather than to a placement, and
-  the amended figures below are measured, not projected:
-
-  - **The content width is cached and refreshed by the `column` `ResizeObserver`.**
-    *"What the page watches is the pane, not the events that resize it"* is the rule
-    `placeViewer` was rewritten under, and the reading `remirror` takes per keystroke is
-    the same claim in the other direction. That observer is over `#files`, `#lines` and
-    `#text` on their **content** boxes, so it fires for the divider, the window, the fold,
-    the gutter and — the case a naive cache gets wrong — a scrollbar appearing.
-  - **`rows` is measured only when the gutter draws.** With `Lines` off nothing reads it:
-    `regutter` returns at `!shown` and `markLine` guards on `lines.hidden`. It stays
-    `remirror`'s and stays null in the default state, which `markLine` already guards on.
-    This is Phase 8's *"the mode that pays for the measurement is the mode that gets the
-    band"*, applied to the measurement itself rather than to the band — **and it does not
-    reach the ink**, which is built unconditionally either way. Clause 20 is what holds
-    that apart.
-  - **The scroll follow is deferred to a frame.** Writing `mirror.scrollTop` is what
-    forces the ink layer's layout; in a `requestAnimationFrame` the browser does the same
-    layout in the frame it was going to spend anyway. **The `scroll` listener is not
-    deferred** and must not be: a reader dragging the pane's scrollbar would see the ink
-    trail its glyphs, where a rebuild's own follow has no such reader.
+  **Three readings come off the keystroke path, and the Scope above is the one place they
+  are specified.** They are not restated here: an earlier draft of this paragraph carried
+  its own copy of the list, the two drifted apart across a round, and the copy went on
+  naming an assignment of `rows` the Scope had already documented as broken. **A phase
+  that specifies the same three changes twice specifies neither.** What belongs here is
+  what they are worth, and it is measured rather than projected:
 
   | | ms |
   |---|---|
@@ -6615,7 +6724,8 @@ line stays and is invisible.
   By eye, against `tests/fixtures/samples/showcase/showcase.md` — **the full path, the
   short one in Phase 8's gate resolving nowhere** — with `refs.bib` beside it and a
   `refs.yml` added to that folder for the third grammar, noting that dropping one there
-  adds it to the walked project:
+  adds it to the walked project — **and that it is removed after the reading and not
+  committed**, the showcase being a frozen fixture and this being a file no document names:
 
   1. The caret sits on its glyph at the end of a long wrapped line, and a selection is
      legible across a token boundary.
@@ -6632,8 +6742,10 @@ line stays and is invisible.
   being true, the `--mark` token and the four-ink table are new, and **the in-place counts
   move — "the nineteen clauses" and "the sixteen broken pages" at lines 42–43 and 618–619
   become twenty-three and twenty**, named here rather than left for the linter — and so
-  does a third at line 645, *"four clauses and three mutations"* for the driver, which
-  clause 5 makes five. **Its *"Off, the pane is the plain textarea"* is the sentence the
+  does a third at line 649, *"four clauses and three mutations"* for the driver, which
+  clause 5 makes five — **649 and not 645**, which is the *"a claim about how the engine
+  that ships renders is the driver's"* sentence this phase quotes separately, two
+  paragraphs earlier in the same rule. **Its *"Off, the pane is the plain textarea"* is the sentence the
   earlier draft mis-filed as a shipped harness clause**, and it is corrected here, where
   a rule is corrected against its own sources. Its `max_lines` goes **625 → 700**: the body is at 618, and an ink layer, a token table,
   three grammars, four clauses and an amendment do not fit in seven lines.
@@ -6649,7 +6761,11 @@ line stays and is invisible.
 
   **`README.md`** gains a sentence where `Lines` is described: the pane colours what it is
   holding, in all three kinds, and headings do not grow. §6's hook is not satisfied by a
-  spec.
+  spec. **And a fourth in-place count, which is the rule's own by another route**: line
+  209's *"breaks the page **sixteen** ways"* is `--falsify`'s number in user-facing
+  documentation of a command a reader runs, and becomes twenty. The two other "sixteen"s
+  in `rules/desktop-panes.md`, at 137 and 146, are the showcase's own links and do not
+  move.
 
   **`rules/INDEX.md` is regenerated** — `spec-lint --write-index` in the same pass.
   **`specs/INDEX.md` needs nothing**: the rollup is already `partial`, Phase 7 being
@@ -6664,8 +6780,16 @@ line stays and is invisible.
   the number; then clauses 19–22 with their mutations, the amendment, the driver item, the
   fixture, and the rule, README and regenerated index.
 
-  **The drafted spec lands first, on its own**, as Phases 21 and 22 did — six commits in
-  the push, five of them the plan's.
+  **The drafted spec lands first, on its own**, as Phases 21 and 22 did.
+
+  **Three of those are already on `main`, and a fresh context has to be told so** — §3
+  asks an implementer to plan from this document alone, and this document is the only
+  place that fact lives. `6aa2e8b` is the split, `336625e` the ink layer, `bb8b6d8` the
+  grammars; `e7e7751` is the amendment above, a fourth docs commit the plan did not
+  foresee because the measurement that asked for it had not been taken. **What is left is
+  the fourth commit and the fifth**, plus the corrections this round folded into the three
+  that shipped — the sweep moving into `regutter`, `unmark()`, and `placeInk` arming the
+  timer, all of which land with the fourth.
 
 <!--
 The review record is a sibling file, not a section: it lives at
