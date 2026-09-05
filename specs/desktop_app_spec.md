@@ -120,7 +120,7 @@ phases:
     by: null
   - name: "Phase 23 — the text pane shows its syntax"
     reviewed: 2026-09-04
-    shipped: null
+    shipped: 2026-09-04
     cut: null
     by: null
 
@@ -6638,11 +6638,26 @@ line stays and is invisible.
   that *"a claim about how the engine that ships renders is the driver's"*, and
   `checks.mjs` records that at narrow widths WebKit agrees with Chromium and not with the
   window. "The ink wraps where the textarea wraps" is exactly such a claim, so clause 19's
-  height comparison is taken once in the shipped binary. It **opens a second document** —
-  `DOCUMENT` is `book.md` and stays it, so the clause takes a `LONG` constant of its own —
-  and it **runs last**, after clause 4, because it opens that document and types into it
-  and the four before it were not written against either. **No mutation of its own**:
-  clause 3 is the precedent.
+  height comparison is taken once in the shipped binary. It **runs last**, after clause 4,
+  because it replaces the buffer and types into it and the four before it were not written
+  against either. **No mutation of its own**: clause 3 is the precedent.
+
+  **It fills the pane rather than opening `long.md`, and that was discovered by building
+  it.** An earlier draft of this clause opened the file. `tests/fixtures/` holds several
+  masters, so `open_document` on that path climbs to that root, discovers one of them and
+  puts *that* in the pane — the first run measured 27 rows and reported 0 ms with the
+  footer naming `multi_file.md`, and the wait was vacuous because the document already
+  open satisfied "the rows equal the lines" on its first poll. That is the app working:
+  the window finds the document a file belongs to. **It also makes `long.md` unreachable
+  as a document from the driver, exactly as it is unreachable from `checks.mjs`, for a
+  different reason** — and both are recorded rather than worked around.
+
+  Nothing is lost by filling. What the budget is about is what a 300 KB **buffer** costs
+  the pane on a keystroke, and `remirror` reads `text.value` and knows nothing about which
+  file it came from; the bytes reach Rust's buffer through `edit` the way typing does, and
+  `export` and `save` are the two writers on no path here. The wait is against **the line
+  count that buffer really has**, read off the disk, which is what stops it being vacuous
+  a second time.
 
   **And one measurement, because `remirror` is on the keystroke path.** Phase 22's whole
   subject was what a keystroke waits on, and this adds a tokenise to a rebuild that is
@@ -6747,8 +6762,16 @@ line stays and is invisible.
   that ships renders is the driver's"* sentence this phase quotes separately, two
   paragraphs earlier in the same rule. **Its *"Off, the pane is the plain textarea"* is the sentence the
   earlier draft mis-filed as a shipped harness clause**, and it is corrected here, where
-  a rule is corrected against its own sources. Its `max_lines` goes **625 → 700**: the body is at 618, and an ink layer, a token table,
-  three grammars, four clauses and an amendment do not fit in seven lines.
+  a rule is corrected against its own sources. Its `max_lines` goes **625 → 720**: the body is at 618, and an ink layer, a token table,
+  three grammars, four clauses and an amendment do not fit in seven lines. **700 was the
+  estimate and 717 is the measurement** — the section came in eleven lines over, and the
+  rule's own duplicated mirror prose was condensed into `## The ink` rather than trimming
+  arguments to hit a number that was a guess before the section existed.
+
+  **The four-ink table and the include predicate land there rather than being summarised
+  away**, and so do the two figures a later reader would otherwise re-measure: the
+  keystroke-path before and after, and `--quiet`'s 4.0:1 over `--band`, which is recorded
+  as a known that is `--quiet`'s to answer.
 
   **`rules/desktop-panel.md`** (233/235) and **`rules/desktop-geometry.md`** (346/370)
   both declare `app/dist/index.html` in `sources`; the panel rule's `covers` names *"the

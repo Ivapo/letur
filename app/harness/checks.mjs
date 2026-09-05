@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all sixteen. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all twenty. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -72,7 +72,11 @@ const OWNS = {
   'views-deaf': 15,
   'trash-unnamed': 16,
   'folds-one-level': 17,
-  'bib-opens-nothing': 18
+  'bib-opens-nothing': 18,
+  'ink-bigger-headings': 19,
+  'ink-lines-gated': 20,
+  'ink-include-anywhere': 21,
+  'ink-band-tiles': 22
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -130,6 +134,17 @@ const opened = async (browser, url, width = WIDTHS[0], colorScheme = 'light') =>
   })
   await settle(page)
   return page
+}
+
+/** Work the gutter, **through the bar's own control and not through the menu
+    event**. The two are one code path in the page and either would show the
+    gutter — but `views-deaf` drops the two `listen` registrations and owns
+    clause 15, so a check that drove the event would fail under that mutation
+    too and cost it its isolation. The chord is clause 15's subject; the button
+    is every other clause's way in. */
+const pressLines = async (page) => {
+  await page.evaluate(() => document.getElementById('views-lines').click())
+  await settle(page)
 }
 
 /** What a page's error listener saw. Read before the page is closed, because the
@@ -1116,6 +1131,14 @@ const dividerLeavesThePaneAlone = async (browser, url) => {
        on correct code. Both are properties, not metric literals, and neither
        costs `views-deaf` its isolation: no mutation touches either function.
 
+       **`unbanded` was amended by `mpdf-003` Phase 23 and is still an absence
+       assertion.** It read `text.style.backgroundImage`, which that phase makes
+       `''` unconditionally by moving the band onto a class; it now reads the
+       caret's own mirror row. It stayed an absence assertion only because the
+       band stayed a `Lines` affordance — had the ink carried it in both modes
+       there would have been no reproducible target after the hide, and
+       `ink-band-tiles` would have failed 15 and 22 together.
+
        **The decline is asserted, because it is the one place the chord and the
        button differ.** With nothing open there is no panel, so `offerFold`
        hides the button and the still-enabled item's event must be declined by
@@ -1137,7 +1160,22 @@ const viewsTakeTheirMenuEvents = async (browser, url) => {
         gutter: !document.getElementById('lines').hidden,
         rows: document.getElementById('lines').children.length,
         wanted: text.value.split('\n').length,
-        band: text.style.backgroundImage
+        /* **The caret's own mirror row, and not any marked row.** Since
+           `mpdf-003` Phase 23 the band is a class on that row rather than a
+           gradient on the textarea, whose `backgroundImage` this used to read
+           and which is now `''` unconditionally — so the old reading went
+           vacuously true and stopped testing that `markLine` ran on the hide.
+
+           **The caret's row and not a walk over marked rows**: `markLine`'s
+           clear is the one-element `marked` bookkeeping the page chose over a
+           walk, so an assertion reading *any* marked row would also fail under
+           `ink-band-tiles` and cost that mutation its isolation. Indexed the way
+           `markLine` indexes it, off `selectionStart`, so the two are one
+           answer to one question rather than a literal that is right by
+           accident. */
+        band: document.getElementById('mirror').children[
+          text.value.slice(0, text.selectionStart).split('\n').length - 1
+        ]?.className ?? ''
       }
     })
 
@@ -1203,7 +1241,8 @@ const viewsTakeTheirMenuEvents = async (browser, url) => {
   note(
     `view-lines: the gutter ${gutter.map((r) => r.gutter).join(' → ')}, ` +
       `the mark ${gutter.map((r) => r.linesMark).join(' → ')}, ` +
-      `${afterShow.rows} rows for ${afterShow.wanted} lines, the band ${JSON.stringify(afterHide.band)} after the hide`
+      `${afterShow.rows} rows for ${afterShow.wanted} lines, ` +
+      `the caret's own ink row ${JSON.stringify(afterHide.band)} after the hide`
   )
   note(
     `with nothing open: #files hidden ${wasEmpty.absent} → ${stillEmpty.absent}, ` +
@@ -1221,7 +1260,9 @@ const viewsTakeTheirMenuEvents = async (browser, url) => {
       linesMoved ? null : `view-lines did not show the gutter and hide it again: ${gutter.map((r) => r.gutter).join(' → ')}`,
       linesMarked ? null : `the Lines mark disagreed with the gutter: ${JSON.stringify(gutter)}`,
       relined ? null : `the show left ${afterShow.rows} rows for ${afterShow.wanted} lines — relines() did not run`,
-      unbanded ? null : `the hide left the band at ${JSON.stringify(afterHide.band)} — markLine() did not run`,
+      unbanded
+        ? null
+        : `the hide left the caret's own ink row at ${JSON.stringify(afterHide.band)} — markLine() did not run`,
       declined
         ? null
         : `with nothing open the event was taken: #files hidden ${wasEmpty.absent} → ${stillEmpty.absent}, ` +
@@ -1586,6 +1627,279 @@ const theBibliographyRowOpens = async (browser, url) => {
 
 /* ----------------------------------------------------------------- the run */
 
+/* 19. **The ink lays out to the textarea's own height.** `mpdf-003` Phase 23 put
+       one element where a hidden ruler was: `#mirror` is the layout the gutter is
+       measured from *and* the glyphs the reader sees, over `#text`'s own box,
+       under a textarea gone transparent. What has to be true of that arrangement
+       is that the two boxes wrap in the same places, and a height is what says so
+       for every wrap at once.
+
+       **No padding term**, and subtracting one would fail correct code by 24px:
+       the two carry the same `padding: 12px 14px` over the same content width by
+       the geometry that phase states, so the two `scrollHeight`s are directly
+       comparable. **The one-pixel tolerance is measured, not hoped past** — a
+       textarea and a `pre-wrap` div at the same font, padding and border-box
+       width over 40 rows both report 1789 in Chromium and WebKit alike.
+
+       **Narrowed by `opened`'s own width and not by clause 14's drag**, which now
+       trips the ink's suppression flag; at `WIDTHS[2]` the pane holds about 23
+       columns against the fixture's ~75-character lines, so it wraps three or
+       four rows deep. **And the wrap is asserted rather than assumed**: the
+       equality holds at any width, so a clause that only read it could pass
+       without testing the agreement it is named for. A row taller than the
+       shortest row is a logical line that took more than one.
+
+       **The gutter is deliberately not the comparison here**: `regutter` assigns
+       each gutter row its height from the mirror's own `offsetHeight`, so a
+       mirror-versus-gutter reading holds by construction and says nothing about
+       the textarea. */
+const theInkLaysOutToThePane = async (browser, url) => {
+  const page = await opened(browser, url, WIDTHS[2])
+
+  const read = await page.evaluate(() => {
+    const text = /** @type {HTMLTextAreaElement} */ (document.getElementById('text'))
+    const mirror = document.getElementById('mirror')
+    const heights = Array.from(mirror.children, (row) => /** @type {HTMLElement} */ (row).offsetHeight)
+    return {
+      ink: mirror.scrollHeight,
+      pane: text.scrollHeight,
+      rows: mirror.children.length,
+      wanted: text.value.split('\n').length,
+      spans: mirror.querySelectorAll('span').length,
+      wrapped: heights.some((h) => h > Math.min(...heights))
+    }
+  })
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const laid = Math.abs(read.ink - read.pane) <= 1
+  const whole = read.rows === read.wanted && read.spans > 0
+
+  note(`the ink ${read.ink} against the pane's ${read.pane}, ${read.rows} rows for ${read.wanted} lines`)
+  note(`${read.spans} token spans, and the fixture ${read.wrapped ? 'wraps' : 'DOES NOT WRAP'} at this width`)
+
+  ok(
+    19,
+    'the ink lays out to the height the textarea lays out to',
+    laid && whole && read.wrapped,
+    [
+      laid ? null : `the ink stands ${read.ink} against the pane's ${read.pane}`,
+      whole ? null : `${read.rows} rows for ${read.wanted} lines, ${read.spans} spans`,
+      read.wrapped ? null : 'no row is taller than the shortest, so nothing wrapped and the reading is vacuous'
+    ]
+      .filter(Boolean)
+      .join('; ') || `both ${read.ink} over ${read.rows} wrapped rows`
+  )
+  return errors
+}
+
+/* 20. **The ink draws with `Lines` off, and the gutter does not.** The feature is
+       the pane the author's hands are in, not a mode: `#lines` ships `hidden` and
+       `shown` is `false`, so a highlighting layer gated the way the gutter is
+       would colour nothing until `⌘L` and would not be the feature.
+
+       **Both halves, and each is one of the two things the split bought.** In the
+       default state the ink is whole and carries tokens while the gutter is
+       hidden *and empty*; `⌘L` then fills the gutter without touching the ink.
+
+       **Read as `textContent`, a row count and a span count, never `innerHTML`**:
+       the show marks the caret's row on the mirror, so an `innerHTML` comparison
+       would fail on correct code. And the span count is compared **across the
+       toggle** rather than to a number — a literal would be the metric this file
+       forbids, and it would also cost `ink-include-anywhere` its isolation, that
+       mutation changing which class a span wears and, with it, how many there
+       are. */
+const theInkDrawsWithLinesOff = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  const read = () =>
+    page.evaluate(() => {
+      const text = /** @type {HTMLTextAreaElement} */ (document.getElementById('text'))
+      const mirror = document.getElementById('mirror')
+      const lines = document.getElementById('lines')
+      return {
+        rows: mirror.children.length,
+        wanted: text.value.split('\n').length,
+        spans: mirror.querySelectorAll('span').length,
+        ink: mirror.textContent,
+        hidden: lines.hidden,
+        gutter: lines.children.length
+      }
+    })
+
+  const before = await read()
+  await pressLines(page)
+  const after = await read()
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const drawn = before.rows === before.wanted && before.wanted > 1 && before.spans > 0
+  const gated = before.hidden && before.gutter === 0
+  const filled = !after.hidden && after.gutter === after.wanted
+  const untouched = after.rows === before.rows && after.spans === before.spans && after.ink === before.ink
+
+  note(`off: ${before.rows} ink rows for ${before.wanted} lines, ${before.spans} spans; #lines hidden ${before.hidden} with ${before.gutter} rows`)
+  note(`on:  ${after.rows} ink rows, ${after.spans} spans; #lines hidden ${after.hidden} with ${after.gutter} rows`)
+
+  ok(
+    20,
+    'the ink draws with the gutter off, and the gutter fills without touching it',
+    drawn && gated && filled && untouched,
+    [
+      drawn ? null : `the ink drew ${before.rows} rows and ${before.spans} spans for ${before.wanted} lines`,
+      gated ? null : `#lines was hidden ${before.hidden} with ${before.gutter} rows before the toggle`,
+      filled ? null : `the toggle left #lines hidden ${after.hidden} with ${after.gutter} rows for ${after.wanted} lines`,
+      untouched ? null : `the toggle moved the ink: ${before.rows}→${after.rows} rows, ${before.spans}→${after.spans} spans`
+    ]
+      .filter(Boolean)
+      .join('; ') ||
+      `${before.spans} spans over ${before.rows} rows either way, and #lines went 0 → ${after.gutter}`
+  )
+  return errors
+}
+
+/* 21. **An include marker is not an inline link, and a missing target is
+       neither.** `[](sections/three.md)` on its own line is what the compiler
+       reads a section in by; the same thing inside a sentence is an inert link.
+       The pane draws the difference, and a marker naming a file the panel lists
+       `missing` gets the alarm.
+
+       **The class is read off the span whose text is the destination**, so this
+       clause encodes no class name — it asserts that the three are distinct,
+       which is the property, and would go on holding if the names changed.
+
+       **It types the third case in, and it is the only clause here that writes
+       into `#text`.** `sections/missing.md` cannot join the fixture: the engine
+       raises `Error::MissingSection` and `serve.mjs` would `die` before a clause
+       ran, which is why `book.md` deliberately does not name it. So one `fill`,
+       the class read, the buffer restored — and the panel already lists that path
+       `missing`, `PANEL_ENTRIES` carrying the row no walk can produce. */
+const anIncludeIsNotAnInlineLink = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  const classOf = (destination) =>
+    page.evaluate((want) => {
+      for (const span of document.querySelectorAll('#mirror span')) {
+        if (span.textContent === want) return span.className
+      }
+      return null
+    }, destination)
+
+  const marker = await classOf('sections/text.md')
+  const link = await classOf('other.md')
+
+  const held = await page.evaluate(() => document.getElementById('text').value)
+  await page.fill('#text', `${held}\n[](sections/missing.md)\n`)
+  await settle(page)
+  const absent = await classOf('sections/missing.md')
+  await page.fill('#text', held)
+  await settle(page)
+  const restored = await page.evaluate(() => document.getElementById('text').value)
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const found = marker !== null && link !== null && absent !== null
+  const apart = found && new Set([marker, link, absent]).size === 3
+
+  note(`the marker "${marker}", the inline link "${link}", the missing target "${absent}"`)
+  note(`the buffer was ${restored === held ? 'restored' : 'NOT RESTORED'} after the fill`)
+
+  ok(
+    21,
+    'an include marker, an inline link and a missing target are three different inks',
+    apart && restored === held,
+    [
+      found ? null : `one of them drew no span at all: marker ${marker}, link ${link}, missing ${absent}`,
+      !found || apart ? null : `they are not three: ${JSON.stringify([marker, link, absent])}`,
+      restored === held ? null : 'the fill left the buffer changed'
+    ]
+      .filter(Boolean)
+      .join('; ') || `${JSON.stringify([marker, link, absent])}`
+  )
+  return errors
+}
+
+/* 22. **The band is on the caret's row, and on one row.** Phase 8 painted it as
+       the textarea's own `background-image`, and records that the missing
+       `no-repeat` cost a build: a gradient sized to one measured row tiles down
+       the whole pane by default and every line wears one. Phase 23 made the band
+       a class on a row, which is the element form of the same construct — and so
+       the same bug is available again, in a form no `background-repeat` protects
+       against.
+
+       **Both columns, because the band is now two marks through one index.** The
+       gutter's row and the mirror's are marked and cleared together by `unmark()`
+       and the one `marked`, and a clause reading only one of them would not see a
+       rebuild of the other strand a mark.
+
+       **And with `Lines` off it marks neither**, which is the affordance staying
+       where Phase 8 put it: the mode that pays for the measurement is the mode
+       that gets the band, and `README.md` describes it as what `⌘L` adds. */
+const theBandIsOnTheCaretsRow = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  const marks = () =>
+    page.evaluate(() => {
+      const text = /** @type {HTMLTextAreaElement} */ (document.getElementById('text'))
+      const at = (box) =>
+        Array.from(box.children).flatMap((row, i) => (row.classList.contains('here') ? [i] : []))
+      return {
+        ink: at(document.getElementById('mirror')),
+        gutter: at(document.getElementById('lines')),
+        caret: text.value.slice(0, text.selectionStart).split('\n').length - 1
+      }
+    })
+
+  /* The caret is put on a line by its own index rather than by a character
+     offset, so the reading below compares two answers to the same question. */
+  const putCaret = async (line) => {
+    await page.evaluate((n) => {
+      const text = /** @type {HTMLTextAreaElement} */ (document.getElementById('text'))
+      text.focus()
+      const at = text.value.split('\n').slice(0, n).join('\n').length
+      text.setSelectionRange(at, at)
+    }, line)
+    await settle(page)
+    return marks()
+  }
+
+  const off = await marks()
+  await pressLines(page)
+  const first = await putCaret(3)
+  const moved = await putCaret(7)
+  await pressLines(page)
+  const back = await marks()
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const one = (r) => r.ink.length === 1 && r.gutter.length === 1 && r.ink[0] === r.caret && r.gutter[0] === r.caret
+  const none = (r) => r.ink.length === 0 && r.gutter.length === 0
+
+  note(`with Lines off: ink [${off.ink}], gutter [${off.gutter}]`)
+  note(`caret on row ${first.caret}: ink [${first.ink}], gutter [${first.gutter}]`)
+  note(`caret on row ${moved.caret}: ink [${moved.ink}], gutter [${moved.gutter}]`)
+  note(`after the hide: ink [${back.ink}], gutter [${back.gutter}]`)
+
+  ok(
+    22,
+    "the band is on the caret's row in both columns, on one row, and on neither with Lines off",
+    none(off) && one(first) && one(moved) && none(back),
+    [
+      none(off) ? null : `with Lines off it marked ink [${off.ink}] and gutter [${off.gutter}]`,
+      one(first) ? null : `on row ${first.caret} it marked ink [${first.ink}] and gutter [${first.gutter}]`,
+      one(moved) ? null : `moving to row ${moved.caret} left ink [${moved.ink}] and gutter [${moved.gutter}]`,
+      none(back) ? null : `the hide left ink [${back.ink}] and gutter [${back.gutter}]`
+    ]
+      .filter(Boolean)
+      .join('; ') || `one row each on ${first.caret} then ${moved.caret}, and neither column marked outside Lines mode`
+  )
+  return errors
+}
+
+
 const run = async ({ engine, headed, rev, doc, mutate }) => {
   passed = 0
   failed = 0
@@ -1623,7 +1937,11 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       viewsTakeTheirMenuEvents,
       theDeleteIsADrawnMark,
       theFolderRowFolds,
-      theBibliographyRowOpens
+      theBibliographyRowOpens,
+      theInkLaysOutToThePane,
+      theInkDrawsWithLinesOff,
+      anIncludeIsNotAnInlineLink,
+      theBandIsOnTheCaretsRow
     ]) {
       gather(await check(browser, held.url))
     }
@@ -1638,7 +1956,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    19,
+    23,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +

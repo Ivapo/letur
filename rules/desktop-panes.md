@@ -33,18 +33,27 @@ covers: >
   auto margin that moved and the reading that can tell it moved, the panel that
   is a rule file of its own and the two places it still touches this one, the text the reader can
   select and the stream it is read off, the link filter and the destination a click resolves, the scaffolding the
-  bundle does not carry and the app supplies, the gutter whose rows are as tall
+  bundle does not carry and the app supplies, the one element that is both the ink
+  a reader sees and the ruler the gutter is measured from, the textarea gone
+  transparent above it and the caret it keeps, the split that stopped the layer
+  being gated on the gutter and the two memo pairs a single one would break, the
+  readings that came off the keystroke path and what they were worth, the ink
+  suppressed for a drag and for any width the mirror was not built at, the three
+  grammars chosen off one extension and the one of them written once and used
+  twice, the four inks and the properties the layer may not carry, the marker that
+  is the whole of its own line and the compiler that is right where it disagrees,
+  the gutter whose rows are as tall
   as their lines render, the follow
   that keeps the numbers against their lines, the caret's two marks, the third
   the pane does not draw, and the pane that loses both when it empties, the check that reads this file and the
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
-  because the DOM cannot show one, the nineteen clauses it
-  asserts as properties and the sixteen broken pages that falsify them, the rule
+  because the DOM cannot show one, the twenty-three clauses it
+  asserts as properties and the twenty broken pages that falsify them, the rule
   that decides what a clause may read as well as what it may assert, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
-max_lines: 625
+max_lines: 720
 generated: 2026-09-03
 ---
 
@@ -60,8 +69,13 @@ bundle; this file has the two panes those things feed.
 
 Two panes: a `<textarea>` at 40% of the width, a divider the reader drags, and
 `#pages`, a scroll container holding one `div.page` per page of the document.
-**The text pane is plain** — no highlighting, no autocomplete, no formatting commands — and every
-change goes straight to Rust, which holds the buffer.
+**The text pane draws no glyphs of its own** — it is transparent, and what a reader
+sees is `#mirror` underneath it, one element carrying both the ink and the layout
+the gutter is measured from. It stays the editor: the buffer, the caret, the
+selection, the disabled state and the divider's geometry are all still the
+textarea's, and every change goes straight to Rust, which holds the buffer. **No
+autocomplete and no formatting commands**, which were the other two halves of the
+sentence this replaces.
 
 **The divider's press cancels its own default action, and the capture is not what
 does that.** `setPointerCapture` routes the gesture — the `pointermove`s and the
@@ -499,8 +513,10 @@ foot, whose count includes every clause that reads a panel row.
 ## The gutter
 
 **`Lines` is a view and changes not one byte of the buffer.** Off, the pane is
-the plain textarea. On, it gains numbered rows and marks the caret's line
-**twice** — the row's number in the gutter, and a band behind the line itself.
+coloured but unnumbered — the ink is ungated and the gutter is what `⌘L` adds.
+On, it gains numbered rows and marks the caret's line **twice**, the row's number
+in the gutter and a band behind the line itself, and both marks are classes on a
+row that one index puts on and takes off.
 
 **`#text` draws no focus ring, and those two marks are why.** The engine's default
 is `outline-style: auto`, 3px in the shipping family, painted whenever the textarea
@@ -523,35 +539,38 @@ buffer sent to `edit`, the reload that replaces `value`, `caretPage`, the
 disabled state, the divider — is forked.
 
 **A row is as tall as its line renders, not one line-height.** A textarea
-soft-wraps and will not say where, so the heights are measured off a hidden
-mirror: the same text, the same font, laid out at the same content width, one
-element per logical line. What the browser did to the mirror is what it did to
-the textarea. **An empty logical line is mirrored as a zero-width space** — an
-empty line still occupies one and an empty element does not, and markdown is
-mostly blank lines. The failure without it **accumulates** rather than costing
-one row its height: the offsets are a running sum over the measured heights, so
-every blank line above a row shifts it by one line more. The rebuild happens
-when the text or the width changed and is skipped when neither did, and the
-width-change half rides `settle`'s 200 ms timer rather than a `pointermove` or
-the `pointerup`, because the measurement is a layout.
+soft-wraps and will not say where, so the heights are swept off `#mirror` — the
+same text, the same font, the same content width, one element per logical line,
+and no longer hidden, `## The ink` above being what it became. What the browser
+did to it is what it did to the textarea. **An empty logical line is mirrored as
+a zero-width space**, an empty line still occupying one where an empty element
+does not, and the failure without it **accumulates**: the offsets are a running
+sum, so every blank line above a row shifts it by one line more. The rebuild
+happens when the text or the width changed and is skipped when neither did, and
+the width-change half rides `settle`'s 200 ms timer rather than a `pointermove`,
+because the measurement is a layout.
 
-**The gutter does not scroll; it follows.** Its box does not scroll itself and
-its `scrollTop` is driven from the textarea's, on the textarea's own `scroll`
-event and again whenever the rows are rebuilt. Without it the numbers part
-company with their lines the moment a document is taller than the pane, which is
-every document.
+**The gutter does not scroll; it follows** — its `scrollTop` driven from the
+textarea's, on that element's own `scroll` event and again whenever the rows are
+rebuilt. Without it the numbers part company with their lines the moment a
+document is taller than the pane, which is every document.
 
 **The caret's line is counted the way `caretPage` counts it**, off
 `selectionStart` — a second way of finding it would be a second thing that can
-disagree with the page the pane opens on. The band behind that line is the
-textarea's **own background**, one colour sized and placed from the measured
-row, with `background-attachment: local`, which is what scrolls it with the text
-rather than pinning it to the border box — the other half of the contrast above,
-and why the two are built differently — and `background-repeat: no-repeat`,
-without which the one-row gradient tiles down the whole pane. Drawing it as an
-element would mean wrapping the textarea and layering over it, and the divider's
-geometry reads the textarea's own box. Only the two rows that change are touched
-per caret move.
+disagree with the page the pane opens on. **The band behind that line is a class
+on the mirror's own row**, `#lines div.here`'s twin and only a background, the
+row's own ink being whatever its tokens made it. It was the textarea's own
+`background-image` until the ink layer could carry it: one colour sized and
+placed in pixels from the measured row, with `background-attachment: local` to
+scroll it with the text and `background-repeat: no-repeat` without which the
+one-row gradient tiled down the whole pane and cost a build. The argument against
+an element was that it would mean wrapping the textarea and layering over it —
+two of which are now the arrangement, the third avoided by absolute positioning,
+so the reason is spent and the gradient is gone. **`unmark()` is the one clear**,
+called by `markLine`'s guard and by each rebuild, taking the class off **both**
+columns at the one index and forgetting it: removing it from a row a pass just
+created is a no-op, and removing it from the column that pass did not rebuild is
+what stops a mark being stranded.
 
 **An emptied pane loses its band with its rows.** `clear` empties the buffer and
 calls `relines`, which returns early there — and the two other things that move
@@ -559,6 +578,89 @@ the mark both need a focused, enabled textarea, which a cleared pane is not. So
 that early return clears the mark on its way out; without it the previous
 document's band stayed painted across an empty, disabled pane until something
 opened.
+
+## The ink
+
+**`#mirror` is one element and it is two things**, which is the decision the
+layer rests on: the layout the gutter's heights are measured from, and the glyphs
+the reader sees. A second element would be two layouts that must agree on every
+wrap, that nothing forces to agree, and whose disagreement is invisible until a
+paragraph is long enough. It sits on `#text`'s own box — same `padding: 12px
+14px`, `left` from `placeInk`, `width` from `remirror` as `text.clientWidth`,
+`top` and `bottom` against a `main` the textarea also stretches to — at
+`z-index: 1` under a textarea at 2 and the figure surface at 3; it takes neither
+the selection nor the pointer, both the textarea's; and it does not scroll, it
+follows, on `#lines`' arrangement.
+
+**`relines` is `remirror()` then `regutter()`**, and the split is the founding
+fact rather than tidiness: `relines` used to open `if (lines.hidden) return`, so
+in the default state the mirror was never built and ink drawn from it would have
+coloured nothing until `⌘L`. The mirror is unconditional; the gutter keeps the
+gate, and **the heights sweep and `rows` are the gutter's**, so the mode that
+pays for the measurement is still the mode that gets it. **Two memo pairs and not
+one**, a single pair being marked current by a mirror built while the gutter was
+hidden, after which `showLines()`'s rebuild never runs.
+
+**Nothing in `remirror` reads layout**, and that is measured rather than tidy:
+`#text`'s box is read by the `ResizeObserver` that watches it, in **two** numbers
+— a content width for the memo and a padding-box one for the assignment, caching
+only the first leaving the second paying the reflow the first was moved to avoid
+— and the rebuild's scroll follow rides a `requestAnimationFrame`, the whole
+statement in it, a `text.scrollTop` read being as forced as the write. On a
+300,527-byte document, median of twenty appended keystrokes: **36.2 ms in
+Chromium and 26 in WebKit before, 1.2 and 2 after**, against a budget of 8. The
+`scroll` listener is **not** deferred, having a reader dragging a scrollbar; and
+`Lines` mode still costs a whole-document sweep, which is Phase 8's and is OQ-16.
+
+**The ink is suppressed for a drag and for any stale width.** `placeInk` hides
+`#mirror` and arms `settle()` whenever the content width is one the mirror was
+not built at — the arming being what covers the route with no press and no
+`#pages` resize behind it, a scrollbar appearing inside `#text` narrowing its
+content box without moving its border box. `dragging` is the second condition on
+the restore, so a settle armed by the `pages` observer just before a press cannot
+put the ink back detached. `visibility: hidden` and never `display: none`, or a
+`scrollHeight` read near a drag answers 0; and `#text` takes its own colour back
+for the drag, so the pane goes plain rather than empty.
+
+**Three grammars, one pass, chosen off the extension of the file in the pane**,
+folded to lower case as `app/src/document.rs:kind_of` folds it — so `.yml` and
+`.yaml` are bibliographies and the YAML lexer is written once and used twice, for
+those and for a markdown frontmatter block. The markdown pass carries block state
+and cannot be per-line: a fence opened on line 40 makes line 41 code. A line with
+no runs gets one text node and no element, which is what holds the budget on a
+document that is mostly prose. **Four inks and no fifth**, `--mark` the one token
+this added — `#1d5f57` light and `#5fbdad` dark, teal because `--ink` is a navy
+and `--alarm` a rust red and those neighbourhoods are spoken for.
+
+| | `--ink` | `--mark` | `--quiet` | `--alarm` |
+|---|---|---|---|---|
+| markdown | body text, a link's own text | heading text (**bold**), emphasis, strong (**bold**), include marker | punctuation, fence and code-span bodies, frontmatter delimiters, an inline link's destination | an include naming a file the listing marks `missing` |
+| BibTeX | field values | `@type` (**bold**) and field names | braces, commas, `=`, comments | — |
+| YAML | scalar values | keys (**bold**), `-` item markers | `#` comments, `---`, quotes | — |
+
+**What may not appear in that layer is the point of it.** `font-size`,
+`letter-spacing`, `font-family` and `font-variant` all move a glyph's advance and
+the textarea does not move with them, so the ink would slide off the words and
+the numbers off the lines. Bold is free — a monospace family holds its advance
+across weights, 0.000px in both engines. **Italic is forbidden outright** rather
+than allowed on runs a table clears: whether a glyph resolves inside the stack or
+falls out to a proportional face carrying a real oblique depends on the machine's
+installed faces and is not answerable from JS. **A heading may be bold and
+coloured and may not be bigger.**
+
+**An include marker is the whole of its own line at zero indentation**, empty
+brackets, no title, `.md` case-insensitively; inline it is an inert link, and the
+two draw differently. Its target resolves against **`Status.main`'s own
+directory** before being compared to `Entry.path`, which is root-relative where a
+section path is relative to the master. `core/src/emit.rs:lone_markdown_link`
+is stricter still — it wants a top-level paragraph — and **where the two disagree
+the compiler is right and the colour is wrong**. A target the listing has never
+heard of draws as an ordinary marker rather than reddened: the panel moves at a
+compile and not at a keystroke, and reddening would flash every path an author is
+halfway through typing. **The highlight is a hint and never a claim**: it gates
+nothing, refuses nothing, writes nothing and reaches no Rust. A known rather than
+a fix: `--quiet` reads 4.0:1 over the caret's `--band` against 4.4 over
+`--ground`, under the line either way, which is `--quiet`'s to answer.
 
 ## What checks it, and what that does not reach
 
@@ -615,8 +717,8 @@ sentence — found by a mutation that falsified nothing, not by reading.
 `core:default`'s own words — the half a stub that merely omits it never tests. It also keeps
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
-asserts nineteen clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against sixteen broken copies
+asserts twenty-three clauses in Playwright's Chromium and WebKit, **both of which must pass, every
+clause a property and none a metric literal**, and is falsified first against twenty broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
 without either being redundant**, and clause 3 is where that now stands: `flex-min` reaches
 the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`
@@ -646,8 +748,14 @@ driver's; and **a claim about how the engine that ships *renders*** is the drive
 not because it is about the window but because only the driver reaches that engine. The
 two drawn marks are that third kind: it reads them at the size their own `svg` attributes
 declare, in their two inks, with the footer still the height its own rule declares —
-**four clauses and three mutations**, the third `marks-unlit` in this rig's terms, an own
-`setAttribute` swallowing the state attribute the ink rule selects on. It opens
+**five clauses and three mutations**, the third `marks-unlit` in this rig's terms, an own
+`setAttribute` swallowing the state attribute the ink rule selects on. **The fifth is the
+ink's**, and it is the only place the two boxes are compared in the engine that ships:
+`#mirror` and `#text` report `scrollHeight` **236612 and 236612** over 1,880 rows, exactly
+and not within the tolerance, with `remirror`'s median at **2 ms**. **It fills the pane
+rather than opening the document it measures** — `tests/fixtures/` holds several masters,
+so an open there climbs to that root and puts one of *them* in the pane, which makes that
+document unreachable from this rig as it is from the other, for a different reason. It opens
 `tests/fixtures/panel/book.md` in place and writing nothing to do it, a control over a
 pane needing the pane. Neither rig reaches more of the seven below than the other.
 

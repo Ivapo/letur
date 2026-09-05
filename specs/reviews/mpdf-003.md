@@ -2,6 +2,39 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 36 — Phase 23 only — 2026-09-04 — the author, from the build — **AMENDED, no re-review**
+
+Two facts the gate found that no reviewer could have, and one of them was a clause passing
+for the wrong reason.
+
+**Driver clause 5 cannot open `tests/fixtures/long.md`, and passed anyway.** That directory
+holds several masters, so `open_document` climbs to it, discovers one and puts *that* in
+the pane: the first run reported **27 rows and 0 ms** with the footer naming
+`multi_file.md`. The wait was vacuous — it compared the ink's rows against the pane's lines,
+which the document already open satisfies on the first poll. Both halves are fixed: the
+clause now **fills** the pane with those bytes through the page's own `input` path, and the
+wait is against the line count read off the disk. The budget is about what a 300 KB buffer
+costs a keystroke, and `remirror` knows nothing about which file it came from. **`long.md`
+is now recorded as unreachable as a document from both rigs**, for two different reasons.
+
+**And a `\n` inside a template literal reached WebKit as a real newline**, which is a
+syntax error inside a string: `SyntaxError: Unexpected EOF`. `String.raw` on the two script
+constants.
+
+**Measured in the shipped WKWebView, which is what clause 5 exists for**: `#mirror` and
+`#text` report `scrollHeight` **236612 and 236612** over 1,880 rows — exact, not within the
+one-pixel tolerance — and `remirror`'s median over twenty appended keystrokes is **2 ms**
+against the budget of 8. `bun app/driver/drive.mjs --falsify` prints three mutations, three
+isolated, with the fifth clause present.
+
+**One deviation from the close-out, recorded rather than waved**: `rules/desktop-panes.md`'s
+`max_lines` goes to **715** and not the 700 the close-out estimated. The section came in
+eleven lines over; the rule's own duplicated mirror prose was condensed into `## The ink`
+rather than trimming arguments to hit a number guessed before the section existed.
+
+**No re-review.** These are gate findings about the implementation, not changes to what the
+phase decides: the clause's subject, its budget and its failure path are all unchanged.
+
 ### Round 35 — Phase 23 only — 2026-09-04 — both reviewers, resumed — **READY (converged)**
 
 Zero blocking from both lenses, at the third and last round of this episode. Both traced

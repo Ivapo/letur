@@ -70,6 +70,15 @@ that, and there is no way back short of clearing the app's own settings. Drag th
 numbers the pane and marks the line your cursor is on**, so an error that names a line names
 somewhere you can see.
 
+**The pane colours what it is holding**, and it does so whether the numbers are on or not:
+markdown, a `.bib` and a `.yml` or `.yaml` each get their own reading, so a heading, a key,
+a fenced block and the marker that reads a section in are all told apart at a glance — and
+an include marker naming a file the project does not have wears the same red the errors do.
+**Headings do not grow**: they are bolder and a different colour, and never a larger size,
+because the letters have to stay exactly where the text is or the colour slides off the
+words. The colour is a hint and never a verdict — the page beside it is what says whether
+your document compiles.
+
 **Save the file in another program and the page redraws too** — with one exception. The
 window watches the whole project, so editing a section, a figure or the bibliography
 elsewhere redraws it as well, and adding or removing a file shows up in the list. If the
@@ -206,7 +215,7 @@ $ bun harness/checks.mjs
 
 `app/harness/serve.mjs` serves a copy of the front end with a stub in its head, so the
 real page can be driven outside a window; `bun harness/checks.mjs --falsify` breaks the
-page sixteen ways and checks that each break fails the one clause that owns it.
+page twenty ways and checks that each break fails the one clause that owns it.
 
 ## Licence
 

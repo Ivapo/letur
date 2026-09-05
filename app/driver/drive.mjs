@@ -106,6 +106,28 @@ const WIDTH = 600
    `.gitignore` to cover. */
 const DOCUMENT = join(REPO, 'tests', 'fixtures', 'panel', 'book.md')
 
+/* The buffer clause 5 measures. **300,527 bytes, 1,879 lines, pure ASCII** — the
+   size `mpdf-003` Phase 23's budget is about, and the one document in this
+   repository that is that size.
+
+   **It is put in the pane and not opened, because it cannot be opened.**
+   `tests/fixtures/` holds several masters, so `open_document` on this path
+   climbs to that root, discovers one of them and puts *that* in the pane — a
+   first run of this clause measured 27 rows and reported 0 ms with the footer
+   naming `multi_file.md`. That is the app working: the window finds the document
+   a file belongs to. It also makes this document unreachable as a document from
+   here, exactly as `app/harness/checks.mjs` records it being unreachable there,
+   for a different reason.
+
+   **And nothing is lost by filling instead.** What the budget is about is what a
+   300 KB *buffer* costs the pane on a keystroke; `remirror` reads `text.value`
+   and knows nothing about which file it came from. The bytes reach Rust's buffer
+   through `edit` the way typing does and no disk is written — `export` and `save`
+   are the two writers and neither is on this path. */
+const LONG = join(REPO, 'tests', 'fixtures', 'long.md')
+const LONG_TEXT = readFileSync(LONG, 'utf8')
+const LONG_LINES = LONG_TEXT.split('\n').length
+
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /* The IPC round trip and a paint, which is what `set_appearance` costs: it
@@ -456,6 +478,77 @@ const PRESS = `
   return true
 `
 
+/* Put a buffer in the pane the way typing puts one there: `edit` reaches Rust and
+   the page's own `input` listener runs `relines`, so what follows is measured on
+   the path a keystroke takes rather than on a function called out of context. */
+const INK_FILL = String.raw`
+  const text = document.getElementById('text')
+  text.value = arguments[0]
+  text.dispatchEvent(new Event('input', { bubbles: true }))
+  return true
+`
+
+/* Whether the ink has caught up with the buffer. **A row count against a line
+   count and not "more than none"**: the pass still showing the last document has
+   rows too, and a wait that took them would measure the wrong file. */
+const INK_ROWS = String.raw`
+  const text = document.getElementById('text')
+  return {
+    rows: document.getElementById('mirror').children.length,
+    lines: text.value.split('\n').length,
+    foot: (document.getElementById('edited').textContent || '').trim(),
+    status: (document.getElementById('status').textContent || '').trim()
+  }
+`
+
+/* Clause 19's reading, taken once in the engine that ships. **Every field copied
+   out by name**, this file's rule: a `DOMRect` returned whole serializes empty,
+   and the same caution is cheap here.
+
+   **No padding term**, and subtracting one would fail correct code by 24px:
+   `#mirror` carries `#text`'s own `padding: 12px 14px` over the same content
+   width, so the two `scrollHeight`s are directly comparable. **The wrap is
+   read rather than assumed** — the equality holds at any width, so a row taller
+   than the shortest is what says the fixture wrapped and the reading means
+   something. */
+const INK_HEIGHT = String.raw`
+  const text = document.getElementById('text')
+  const mirror = document.getElementById('mirror')
+  const heights = Array.prototype.map.call(mirror.children, function (row) { return row.offsetHeight })
+  return {
+    ink: mirror.scrollHeight,
+    pane: text.scrollHeight,
+    rows: mirror.children.length,
+    lines: text.value.split('\n').length,
+    width: Math.round(text.clientWidth),
+    wrapped: Math.max.apply(null, heights) > Math.min.apply(null, heights)
+  }
+`
+
+/* Twenty keystrokes at the end of the buffer, and what each cost `remirror`.
+
+   **A real `input` event and not a call**: `setRangeText` moves the value the way
+   typing does and the page's own listener is what runs `relines`, so what is
+   measured is the path a keystroke takes rather than a function called out of
+   context. One synchronous script, so nothing preempts a write and its read.
+
+   **`window.__pane.mirrorMs` is a scalar overwritten per pass**, which is why it
+   is read inside the loop and not once after it, and why the page writes it only
+   where the pass rebuilt — a memo hit would otherwise report a stale figure as a
+   fresh one. */
+const INK_COST = String.raw`
+  const text = document.getElementById('text')
+  text.focus()
+  const seen = []
+  for (let i = 0; i < 20; i++) {
+    const at = text.value.length
+    text.setRangeText('x', at, at, 'end')
+    text.dispatchEvent(new Event('input', { bubbles: true }))
+    seen.push(window.__pane.mirrorMs)
+  }
+  return seen
+`
+
 /** Ask Rust for an appearance, wait for Rust to say it has it, let the page
     place it, and read the bar. The wait is on `status` rather than on the DOM
     deliberately: the DOM is what the clauses judge, so waiting on it would be
@@ -722,6 +815,86 @@ const marksInTheEngineThatShips = async (held) => {
   )
 }
 
+/* 5. **The ink wraps where the textarea wraps, in the engine that ships, and a
+      keystroke rebuilds it inside a frame.** `mpdf-003` Phase 23 laid the ink
+      over `#text`'s own box in one element, and `rules/desktop-panes.md` records
+      that **a claim about how the shipping engine *renders* is this rig's** —
+      `app/harness/checks.mjs` says in its own header that at narrow widths its
+      WebKit agrees with its Chromium and not with the window, which is exactly
+      the disagreement a wrap could hide. Clause 19 makes the same comparison
+      there; this makes it once here.
+
+      **And the budget rides it rather than being a clause of its own**, the
+      document being open by then. Phase 22's whole subject was what a keystroke
+      waits on, and Phase 23 put a whole-buffer rebuild on that path — measured at
+      36.2 ms in Chromium and 26 in WebKit before three readings came off it, and
+      gated at 8.
+
+      **`window.__pane.mirrorMs` is how a classic script reaches a module-local
+      function.** `execute/sync` evaluates in the global context, so the page
+      publishes the figure on the surface `rules/desktop-geometry.md` already
+      calls the one the pane publishes for its own gate. It is a scalar
+      overwritten per pass, so it is read after each keystroke rather than once at
+      the end, and it is written only where the pass rebuilt.
+
+      **It runs last, and opens a document of its own.** `long.md` is 300,527
+      bytes — the one document in this repository at the size the budget is about
+      — and it is neither `DOCUMENT` nor a document clauses 1 to 4 were written
+      against. It types twenty characters into a buffer Rust holds and no disk
+      sees: `edit` sets that buffer and nothing else, `export` and `save` are the
+      two writers and neither is on this path, and the run kills the app. */
+const theInkWrapsWhereTheTextareaDoes = async (held) => {
+  await held.sync(INK_FILL, [LONG_TEXT])
+
+  /* Waited on the ink rather than on a timer, and **against the line count that
+     buffer really has**: the document clause 4 left open satisfies "the rows
+     equal the lines" on the first poll, which is how the first run of this clause
+     measured the wrong file. */
+  const caught = (r) => r.lines === LONG_LINES && r.rows === r.lines
+  let built = { rows: 0, lines: -1 }
+  for (let i = 0; i < 40 && !caught(built); i++) {
+    built = await held.sync(INK_ROWS)
+    if (!caught(built)) await wait(250)
+  }
+  if (!caught(built)) {
+    throw new Error(
+      `the pane was given ${LONG_LINES} lines and holds ${built.lines}, ` +
+        `the ink ${built.rows} rows; the foot names ${JSON.stringify(built.foot)} ` +
+        `and the status says ${JSON.stringify(built.status)}`
+    )
+  }
+  note(`the pane holds ${LONG.replace(`${REPO}/`, '')}'s ${built.lines} lines, and the ink ${built.rows} rows`)
+
+  /* The height first, because the timing appends to the buffer. */
+  const laid = await held.sync(INK_HEIGHT)
+  const cost = await held.sync(INK_COST)
+
+  const sorted = [...cost].sort((a, b) => a - b)
+  const median = (sorted[9] + sorted[10]) / 2
+
+  const agrees = Math.abs(laid.ink - laid.pane) <= 1
+  const whole = laid.rows === laid.lines
+  const inside = median < 8
+
+  note(`the ink ${laid.ink} against the pane's ${laid.pane}, ${laid.rows} rows for ${laid.lines} lines`)
+  note(`the fixture ${laid.wrapped ? 'wraps' : 'DOES NOT WRAP'} at ${laid.width}px of pane`)
+  note(`remirror over twenty keystrokes: ${sorted[0]} min, ${median} median, ${sorted[19]} max`)
+
+  ok(
+    5,
+    'the ink lays out to the pane in the engine that ships, and a keystroke rebuilds it inside a frame',
+    agrees && whole && laid.wrapped && inside,
+    [
+      agrees ? null : `the ink stands ${laid.ink} against the pane's ${laid.pane}`,
+      whole ? null : `${laid.rows} rows for ${laid.lines} lines`,
+      laid.wrapped ? null : 'no row is taller than the shortest, so nothing wrapped and the reading is vacuous',
+      inside ? null : `remirror's median is ${median} ms against the 8 ms this phase is gated at — see OQ-15`
+    ]
+      .filter(Boolean)
+      .join('; ') || `both ${laid.ink} over ${laid.rows} wrapped rows, and remirror at ${median} ms`
+  )
+}
+
 /* ----------------------------------------------------------------- the run */
 
 const run = async ({ mutate }) => {
@@ -754,6 +927,9 @@ const run = async ({ mutate }) => {
     await marksAtAWidthTheDriverSet(held)
     await theInstrumentSeesALoop(held)
     await marksInTheEngineThatShips(held)
+    /* Last, and its own comment says why: it opens a second document and types
+       into it, and the four above were written against neither. */
+    await theInkWrapsWhereTheTextareaDoes(held)
 
     if (mutate) fired = (await held.sync('return window.__mutation')).count
   } catch (problem) {

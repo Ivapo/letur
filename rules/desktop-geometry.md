@@ -19,8 +19,8 @@ covers: >
   a raster's freshness turns on, the one drawing pass and the rest it re-checks
   before every page, the release that zeroes a canvas and the two sweeps that
   catch one, the reading a box height is taken by, the engine its literals belong
-  to and which of them is history, and the surface the pane publishes for its own
-  gate
+  to and which of them is history, the surface the pane publishes for its own
+  gate, and the fourth cost on it that a second rig reads
 max_lines: 370
 generated: null
 ---
@@ -283,6 +283,15 @@ explicit width while the panel and the gutter each took width out of the column
 beside it. The divider now measures from the text pane's own left edge, taken
 once at the grab. **The rule outlived the renderer it was found in.**
 
+**`window.__pane` carries a fourth cost since `mpdf-003` Phase 23, and a second
+reader.** `mirrorMs` is what one rebuild of the text pane's ink layer cost, beside
+`sizingMs`, `deliveryMs` and `renderMs` and written through the same `since()`. It
+ships for the reason those three do — the function is module-local and reachable
+from nowhere else — and it is read by `app/driver/drive.mjs`, which evaluates a
+classic script in the global context and cannot see a module-local name either. A
+scalar overwritten per pass, written only where the pass rebuilt, so a memo hit
+leaves the last real figure standing.
+
 ## What the pane holds
 
 **A canvas costs 5.8 MiB at the default pane and nothing bounded that**: 71 pages
@@ -297,7 +306,9 @@ near and lets the rest go.
 **It is evaluated at the three passes that can move it — an open, a width rest
 and a fit change — and never once per document.** A pass after a scroll
 re-evaluates nothing, correctly: scrolling moves neither width nor fit. Five
-shipped causes move the *width* term: the divider, a window resize, the panel
+shipped causes move the *width* term — six, counting a classic scrollbar
+appearing inside `#text`, which moves that element's content box without moving
+its border box and so reaches this observer and not `#pages`': the divider, a window resize, the panel
 folding, the gutter, and an open itself, the panel being shown for any document
 naming sections.
 

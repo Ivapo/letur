@@ -394,6 +394,75 @@ const MUTATIONS = {
       "          (entry.kind === 'markdown' || entry.kind === 'bibliography') && !entry.missing && !holding\n"
     if (page.split(term).length !== 2) die('the mutation bib-opens-nothing found no single opens term')
     return page.replace(term, "        const opens = entry.kind === 'markdown' && !entry.missing && !holding\n")
+  },
+
+  /* Headings a size the textarea's own glyphs are not. **The one thing the pane
+     cannot offer a heading**, and it is measured rather than assumed:
+     `font-weight: 700` drifts 0.000px in both engines over a 64-character
+     monospace sample, where `font-size: 14px` drifts 77.063 in Chromium and
+     79.125 in WebKit. The ink then wraps where the textarea does not and stands
+     taller than it.
+
+     **A declaration added rather than a value changed**, so the rule keeps its
+     colour and its weight and only the forbidden property is what differs. */
+  'ink-bigger-headings': (page) => {
+    const rule = '      #mirror .head {\n'
+    if (page.split(rule).length !== 2) die('the mutation ink-bigger-headings found no single heading ink rule')
+    return page.replace(rule, `${rule}        font-size: 15px;\n`)
+  },
+
+  /* The gutter fills while it is still hidden — `regutter`'s own gate dropped,
+     which is the one seam the two memo pairs exist to keep apart.
+
+     **It falsifies from the gutter's side, and both other shapes were tried and
+     fail.** Restoring the single memo fails shipped clause 15's `relined`;
+     giving `remirror` the pre-phase `if (lines.hidden) return` empties `#mirror`
+     in the default state, which is where clause 19 reads it, so it fails 19 as
+     well. This one leaves `#mirror` alone and fails only clause 20's "`#lines`
+     is `hidden` and **empty**" half — `#lines[hidden] { display: none }` means a
+     filled-but-hidden gutter still takes no width, so no geometry clause moves. */
+  'ink-lines-gated': (page) => {
+    const gate = '      function regutter() {\n        if (!shown) return\n'
+    if (page.split(gate).length !== 2) die('the mutation ink-lines-gated found no single gutter gate')
+    return page.replace(gate, '      function regutter() {\n')
+  },
+
+  /* A marker anywhere on a line rather than the whole of its own.
+
+     **It relaxes both terms of the predicate, and that is not belt-and-braces**:
+     the fixture's inline `[another file](other.md)` is refused by the anchors
+     *and* by the empty-text requirement, so a mutation dropping only the anchors
+     would change nothing and report NOT ISOLATED for failing no clause at all.
+
+     `includeIn` derives the destination's offset from where the pattern matched
+     rather than writing it down, which is what lets an unanchored pattern answer
+     correctly here instead of throwing. */
+  'ink-include-anywhere': (page) => {
+    const anchored = String.raw`const INCLUDE = /^\[\]\(([^()\s"]+)\)$/`
+    if (page.split(anchored).length !== 2) die('the mutation ink-include-anywhere found no single include pattern')
+    return page.replace(anchored, String.raw`const INCLUDE = /\[[^\]]*\]\(([^()\s"]+)\)/`)
+  },
+
+  /* Every row wears the band. **The element form of the `no-repeat` bug Phase 8
+     records costing a build**: that gradient was sized to one measured row and a
+     background repeats by default, so without `no-repeat` the band tiled down
+     the pane and every line wore one.
+
+     **It tiles the add and leaves `unmark()` alone**, and the whole isolation
+     rests on that. The clear is still one element — the caret's own row, which
+     is the row the re-keyed clause 15 reads after the hide — so 15 goes on
+     passing while clause 22's "on one row" fails. A mutation that broke the
+     clear as well would fail both and tell the two apart from neither. */
+  'ink-band-tiles': (page) => {
+    const pair =
+      "          lines.children[i]?.classList.add('here')\n" +
+      "          mirror.children[i]?.classList.add('here')\n"
+    if (page.split(pair).length !== 2) die('the mutation ink-band-tiles found no single pair of band marks')
+    return page.replace(
+      pair,
+      "          for (const row of lines.children) row.classList.add('here')\n" +
+        "          for (const row of mirror.children) row.classList.add('here')\n"
+    )
   }
 }
 

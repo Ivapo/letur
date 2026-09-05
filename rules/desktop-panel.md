@@ -18,10 +18,12 @@ covers: >
   surfaces, the two kinds a row's body puts in the pane and the second kind test
   that has to move with the first, the panel's own gesture that is on no row and
   the two things the page holds, the surface over the text pane and the three boxes that place it,
+  the ink layer placed off the same reading, the box measurement it holds for a
+  keystroke that must not take one and the timer it arms where it hides,
   the sentence it shows where a figure cannot be drawn, the sequence its read
   carries and the three ways back, and the disk half that is walked twice beside
   the missing half that follows the text
-max_lines: 235
+max_lines: 250
 generated: 2026-09-03
 ---
 
@@ -201,6 +203,19 @@ which is what makes its top padding free — flexbox distributes free space over
 items' **outer** sizes, so a figure's `max-height: 100%` resolves against a
 content box that already excludes it. `box-sizing` is not what does that, and two
 drafts of `mpdf-010` Phase 5 said it was.
+
+**`placeInk` is that observer's second writer, and a separate function for two
+reasons.** `placeViewer` early-returns on a hidden figure, which is nearly always,
+where the ink is placed for every document; and where the figure takes a `left`
+and a `width`, the ink takes **`left` only**, its width having exactly one writer
+in `remirror` at the reading the wraps were measured at. It also **holds `#text`'s
+box for that function** — both numbers, a content width and a padding-box one —
+because `remirror` runs on the keystroke path and a layout read there costs a
+reflow of the whole document. And it **hides the ink and arms `settle()`**
+whenever that width is one the mirror was not built at, which is the only thing
+that restores the ink after a scrollbar appears inside `#text`: that narrows its
+content box without moving its border box, so nothing `#pages` observes resizes
+and no press brackets it. `rules/desktop-panes.md` carries the layer itself.
 
 **The surface is placed off the three boxes that decide its column, not off a
 list of gestures.** `placeViewer` mirrors `#text`'s `offsetLeft` and
