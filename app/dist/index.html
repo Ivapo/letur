@@ -4912,22 +4912,37 @@
 
       /* --------------------------------------------------------- markdown */
 
-      /** Whether a markdown line can hold an inline construct at all. Four
-       *  `indexOf` scans over what is nearly always plain ASCII prose, and this
+      /** Whether a markdown line can hold an inline construct at all. **Six
+       *  `indexOf` scans** over what is nearly always plain ASCII prose, and this
        *  is the whole of the budget argument: the pass is on the keystroke path,
        *  and a line that answers true here allocates nothing — no array, no
        *  object, no element. `String.prototype.indexOf` and not one character
        *  class, the first being the engines' own byte scan and the second not.
+       *
+       *  **`$` and `{` joined it in `mpdf-003` Phase 24**, being the two
+       *  constructs that fire mid-line. Measured over `tests/fixtures/long.md`:
+       *  the allocation-free path goes 1,585 lines to 1,581 of 1,880. **A hard
+       *  break's `\` and an autolink's `<` are deliberately absent, and that is
+       *  why neither is drawn** — two more whole-line scans on every line of
+       *  every document, for two constructs that are ordinary markdown rather
+       *  than this dialect.
        *  @param {string} line */
       const inert = (line) =>
         line.indexOf('`') < 0 &&
         line.indexOf('[') < 0 &&
         line.indexOf('*') < 0 &&
-        line.indexOf('~') < 0
+        line.indexOf('~') < 0 &&
+        line.indexOf('$') < 0 &&
+        line.indexOf('{') < 0
 
       /** The characters a block construct can open with, plus the indent one may
-       *  carry. A line beginning with anything else is a paragraph. */
-      const OPENS = '#`~-*+>[0123456789 \t'
+       *  carry. A line beginning with anything else is a paragraph. `$`, `:` and
+       *  `|` are Phase 24's, all three of them column-0 constructs. */
+      const OPENS = '#`~-*+>[$:|0123456789 \t'
+
+      /** A display fence, opening or closing. The showcase's own closing fence
+       *  carries a trailing space, so the tail is not anchored tight. */
+      const MATH = /^\s{0,3}\$\$\s*$/
 
       /**
        * An include marker: `[](sections/three.md)`, **the whole of its own
@@ -5033,11 +5048,53 @@
        *
        * @param {string} line @param {number} at @returns {Run[]}
        */
-      function inlineRuns(line, at) {
+      function inlineRuns(line, at, pipes = false) {
         const found = []
         let i = at
         while (i < line.length) {
           const c = line[i]
+
+          // A table's structural pipes, and **only where the caller says the
+          // line is a row**: a `|` in prose is a `|`. They are scanned here
+          // rather than emitted by the block case because a row's pipes are
+          // scattered through cells that keep every construct they already draw
+          // — one scanner, one ascending array, no merge.
+          if (c === '|' && pipes) {
+            found.push(...run(i, i + 1, 'quiet'))
+            i++
+            continue
+          }
+
+          // A name, `{#fig:pipeline}`. It lives here and not in the block chain
+          // because a caption carries one *after* its own prose, and every case
+          // in that chain ends by taking the whole line.
+          if (c === '{' && line[i + 1] === '#') {
+            const shuts = line.indexOf('}', i + 2)
+            if (shuts < 0) {
+              i++
+              continue
+            }
+            found.push(...run(i, i + 2, 'quiet'))
+            found.push(...run(i + 2, shuts, 'name'))
+            found.push(...run(shuts, shuts + 1, 'quiet'))
+            i = shuts + 1
+            continue
+          }
+
+          // Inline math, a code span's twin: delimiters and body one run, and
+          // nothing inside parsed. **A lone `$` opening nothing stays prose**,
+          // which is what `$5` needs. Two on one line pair up, so `$5 and $7`
+          // draws as math — the twin's own limit, recorded rather than fixed.
+          if (c === '$') {
+            const shuts = line.indexOf('$', i + 1)
+            if (shuts < 0) {
+              i++
+              continue
+            }
+            found.push(...run(i, shuts + 1, 'quiet'))
+            i = shuts + 1
+            continue
+          }
 
           if (c === '`') {
             let n = 1
@@ -5173,6 +5230,7 @@
         /** The fence the walk is inside: its character, and how many of them. */
         let fence = null
         let front = source[0] === '---'
+        let math = false
 
         for (let n = 0; n < source.length; n++) {
           const line = source[n]
@@ -5187,6 +5245,18 @@
           if (fence !== null) {
             const shut = new RegExp(`^\\s{0,3}\\${fence.char}{${fence.length},}\\s*$`)
             if (shut.test(line)) fence = null
+            out.push(whole(line, 'quiet'))
+            continue
+          }
+
+          /* A display block, and **it is block state and sits before the fast
+             path for a reason**: a body like `a^2 + b^2 = c^2` holds no trigger
+             character at all, so a `$$` checked after that path would let it
+             fall through to prose. What is between the fences is another
+             language and is not read as markdown, which is the code fence's own
+             rule applied to the other thing this dialect embeds. */
+          if (math) {
+            if (MATH.test(line)) math = false
             out.push(whole(line, 'quiet'))
             continue
           }
@@ -5215,6 +5285,49 @@
 
           if (/^\s{0,3}#{1,6}\s*$/.test(line) || /^\s{0,3}([-*_])[ \t]*(\1[ \t]*){2,}$/.test(line)) {
             out.push(whole(line, 'quiet'))
+            continue
+          }
+
+          /* A display fence. **Trailing space allowed** — the showcase's own
+             closing fence carries one, and a `line === '$$'` reading would turn
+             the rest of that file into mathematics. */
+          if (MATH.test(line)) {
+            math = true
+            out.push(whole(line, 'quiet'))
+            continue
+          }
+
+          /* A group. **The dialect gives this its positional term and this is an
+             approximation of it**: it records that *everywhere but the start of a
+             paragraph, `:::` is ordinary text*, and a per-line lexer holds no
+             paragraph state — so column 0 with a blank line above it, and the
+             case it gets wrong is a `:::` on a paragraph's later line. `mpdf-003`
+             Phase 23's *the highlight is a hint and never a claim* is what that
+             sits under. The word after an opener is the one thing the author
+             chose; a bare closing line takes the colons alone. */
+          if (line.startsWith(':::') && (n === 0 || source[n - 1].trim() === '')) {
+            const kind = /^(:::\s*)(\S+)/.exec(line)
+            out.push(
+              kind === null
+                ? whole(line, 'quiet')
+                : [
+                    ...run(0, kind[1].length, 'quiet'),
+                    ...run(kind[1].length, kind[0].length, 'name')
+                  ]
+            )
+            continue
+          }
+
+          /* A table row. **A scan mode rather than a prefix**, which is the one
+             case that is: a row's pipes are scattered through its cells, and
+             `| a *table* | yes |` has its emphasis drawn — emitting the pipes and
+             stopping would take that away. An alignment row is the exception and
+             has no cells to keep. */
+          const cells = line.trim()
+          if (cells.length > 1 && cells[0] === '|' && cells[cells.length - 1] === '|') {
+            out.push(
+              /^\|[\s:|-]+\|$/.test(cells) ? whole(line, 'quiet') : inlineRuns(line, 0, true)
+            )
             continue
           }
 
@@ -5248,6 +5361,17 @@
               // ink every destination takes.
               ...(defines[2] === '^' ? inlineRuns(line, body) : run(body, line.length, 'quiet'))
             ])
+            continue
+          }
+
+          /* A caption, a paragraph opening `: `. **Its body goes through the
+             inline scan and that is not a detail**: the showcase's own caption
+             carries an emphasis run and a name after its marker, so the marker,
+             the emphasis and the name are one flat ascending array. It sits after
+             the two definitions above, each of which carries a `: ` this would
+             otherwise claim. */
+          if (line.startsWith(': ')) {
+            out.push([...run(0, 2, 'quiet'), ...inlineRuns(line, 2)])
             continue
           }
 
