@@ -2837,25 +2837,36 @@
         early-returns when it is hidden, which is nearly always, where the ink is
         placed for every document; and the figure takes a `left` *and* a `width`
         where this writes **`left` only**. `#mirror`'s width has exactly one
-        writer, `remirror`, at the reading the wraps were measured at —
+        writer, `remirror`, at the reading `readPane` took here —
         `placeViewer`'s `offsetWidth` is a border-box cover and differs from that
         by a classic scrollbar's track, and the wrong one of the two silently
-        moves where the ink wraps.
+        moves where the ink wraps. **Both of `#text`'s numbers are taken here and
+        neither on a keystroke**, which is what `readPane`'s own comment argues.
 
         **It also hides a mirror the column has outgrown**, and that is the
         second half of the suppression rather than an extra. A width this box was
         not built at means the textarea has rewrapped and this has not: under a
         divider drag, and under the window's own edge, which arms the same 200 ms
         timer with no press to bracket it. Stale hides the ink and a settle at a
-        matching width brings it back — `settle` and `hideInk` are with the
-        mirror, hundreds of lines down, reached from inside a function the way
-        the observe below reaches `#lines` by id.
+        matching width brings it back — **and the arming is this function's too**,
+        because a scrollbar appearing inside `#text` narrows its content box
+        without moving its border box, so `#preview` and `#pages` never resize
+        and no press bracketed it: the observer fires, this hides, and nothing
+        else would ever put the ink back. `rerender` returns at its own
+        `derived() === fitted`, so the re-arm is cheap where a settle was coming
+        anyway. `readPane`, `settle` and `hideInk` are all with the mirror,
+        hundreds of lines down, reached from inside a function the way the
+        observe below reaches `#lines` by id.
       */
       function placeInk() {
+        readPane()
         mirror.style.left = `${text.offsetLeft}px`
-        // `null` is a mirror that has never been built, which is this
-        // observer's own first delivery: there is nothing laid out to be stale.
-        if (mirroredWidth !== null && paneWidth() !== mirroredWidth) hideInk()
+        // `null` is a mirror that has never been built, which is this observer's
+        // own first delivery: there is nothing laid out to be stale.
+        if (mirroredWidth !== null && paneInk !== mirroredWidth) {
+          hideInk()
+          settle()
+        }
       }
 
       const column = new ResizeObserver(() => {
@@ -4648,7 +4659,10 @@
         neither has. **The width-change rebuild rides `settle`'s 200 ms timer**,
         not a `pointermove` and not the `pointerup` itself: the measurement is a
         layout, and a layout per frame for a column of numbers nobody is reading
-        mid-drag is waste.
+        mid-drag is waste. **The sweep that takes it is `regutter`'s and runs
+        only where the gutter draws** — Phase 8's own *the mode that pays for the
+        measurement is the mode that gets the band*, applied to the measurement
+        itself. The ink above it is built either way.
       */
       const lines = document.getElementById('lines')
       const mirror = document.getElementById('mirror')
@@ -4696,23 +4710,44 @@
       // element rather than a walk.
       let marked = -1
 
-      /**
-       * The pane's own content width, which both rebuilds are measured at and
-       * memoised on.
-       *
-       * **`clientWidth` and not `offsetWidth`**: on a machine set to show
-       * classic scrollbars the two differ by the track, and a mirror laid out at
-       * the wrong one of them wraps where the textarea does not.
-       *
-       * @returns {number}
-       */
-      function paneWidth() {
+      /*
+        What `#text`'s box last measured, and **the one place in this file it is
+        read**. `remirror` runs on the keystroke path and a layout read there
+        costs a reflow of the whole document — 16.5 ms in Chromium and 8 in
+        WebKit over a 300 KB one, measured — so the reading is taken by the
+        observer that watches the box instead. That is this file's own rule,
+        *what the page watches is the pane and not the events that resize it*,
+        applied to a reading rather than to a placement.
+
+        **Two numbers and not one, and one is the trap.** The memo below compares
+        a **content** width; `mirror.style.width` is assigned a **padding-box**
+        one. Caching only the first leaves the second paying exactly the reflow
+        the first was moved to avoid, which is a fix that measures no better than
+        no fix at all.
+
+        **`clientWidth` and not `offsetWidth`**: on a machine set to show classic
+        scrollbars the two differ by the track, and a mirror laid out at the wrong
+        one of them wraps where the textarea does not.
+      */
+      let paneBox = null
+      let paneInk = null
+      function readPane() {
         const style = getComputedStyle(text)
-        return (
-          text.clientWidth -
-          parseFloat(style.paddingLeft) -
-          parseFloat(style.paddingRight)
-        )
+        paneBox = text.clientWidth
+        paneInk = paneBox - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+      }
+
+      /* Take the caret's mark off both columns and forget which row wore it.
+         **Three callers and one index**, which is what makes it worth a name:
+         `markLine`'s guard clears on the way out of Lines mode, and each rebuild
+         clears before it forgets. Removing a class from a row this pass just
+         created is a no-op; removing it from the *other* column, which this pass
+         did not rebuild, is the whole point — without it a rebuild of one strands
+         a mark on the other. */
+      function unmark() {
+        lines.children[marked]?.classList.remove('here')
+        mirror.children[marked]?.classList.remove('here')
+        marked = -1
       }
 
       /*
@@ -5149,53 +5184,54 @@
       */
       function remirror() {
         const started = performance.now()
-        const width = paneWidth()
-        if (text.value === mirroredText && width === mirroredWidth) return
+        // A cache the observer keeps, seeded here because a `ResizeObserver`'s
+        // first delivery is asynchronous and `refresh` can reach this before it.
+        if (paneBox === null) readPane()
+
+        if (text.value === mirroredText && paneInk === mirroredWidth) return
         mirroredText = text.value
-        mirroredWidth = width
+        mirroredWidth = paneInk
 
         if (text.value === '') {
           mirror.replaceChildren()
-          rows = null
-          // And the band with them. `clear()` reaches here, and this is the
-          // only path to it: the two other callers of `markLine` need a
-          // focused, enabled textarea, which a cleared pane is not. Without
-          // this the previous document's band stays painted across an empty
-          // one until something opens.
+          // And the band with it. `clear()` reaches here, and this is the only
+          // path to it: the two other callers of `markLine` need a focused,
+          // enabled textarea, which a cleared pane is not. Without this the
+          // previous document's band stays drawn across an empty one until
+          // something opens. `rows` is `regutter`'s and is nulled there.
           markLine()
           return
         }
 
-        /* **The border box and not the content width**, the padding having
-           moved onto this element: `clientWidth` is what `paneWidth` subtracts
-           from, so assigning it back here lays the glyphs out over exactly the
-           column the textarea lays its own over. */
-        mirror.style.width = `${text.clientWidth}px`
+        /* **The border box and not the content width**, the padding having moved
+           onto this element: `paneBox` is what `readPane` subtracts from, so
+           assigning it back here lays the glyphs out over exactly the column the
+           textarea lays its own over. */
+        mirror.style.width = `${paneBox}px`
         const source = text.value.split('\n')
         const runs = tokenise(source, grammarOf(editedPath))
         mirror.replaceChildren(...source.map((line, at) => paintRow(line, runs[at])))
+        unmark() // the rows above are new elements; none of them wears it
 
-        // One layout, read twice: `regutter` is given these heights rather than
-        // measuring a second time, and `markLine` counts them to clamp the
-        // caret's row. **The running sum is no longer read** — it placed the
-        // band while the band was a background sized and offset in pixels, and
-        // a class on a row needs neither. `rows` keeps its shape because it is
-        // the one value both readers hold, and a second shape for the same
-        // measurement is what the mirror exists to avoid.
-        const heights = Array.from(
-          /** @type {HTMLCollectionOf<HTMLElement>} */ (mirror.children),
-          (row) => row.offsetHeight
-        )
-        rows = /** @type {Rows} */ (heights.reduce(
-          (at, height) => (at.push(at[at.length - 1] + height), at),
-          [0]
-        ))
-        rows.heights = heights
-        marked = -1 // the rows above are new elements; none of them wears it
+        /*
+          The layer follows; it does not scroll — `#lines`' arrangement, second
+          instance. **In a frame, and the whole statement is in it.** Writing
+          `scrollTop` lays out the ink layer `replaceChildren` has just dirtied,
+          and reading `text.scrollTop` is as much a forced read as the write is,
+          so deferring the write alone would defer nothing. Measured at 34.2 ms
+          in Chromium and 22 in WebKit over a 300 KB document, which was the
+          whole of what a keystroke cost; in a frame the browser does the same
+          layout in the frame it was going to spend to paint the layer anyway.
 
-        // The layer follows; it does not scroll. `#lines`' arrangement, second
-        // instance — here, and again on the textarea's own `scroll`.
-        mirror.scrollTop = text.scrollTop
+          **It reads live rather than capturing at schedule time.** Two pending
+          frames are then idempotent, and a `scroll` event landing between the
+          schedule and the frame is not undone by a stale capture — which is the
+          same reason the `scroll` listener below is *not* deferred: it has a
+          reader dragging a scrollbar and cannot wait a frame.
+        */
+        requestAnimationFrame(() => {
+          mirror.scrollTop = text.scrollTop
+        })
         pane.mirrorMs = since(started)
       }
 
@@ -5223,20 +5259,31 @@
         gutteredText = mirroredText
         gutteredWidth = mirroredWidth
 
-        if (rows === null) {
+        if (text.value === '') {
           lines.replaceChildren()
+          rows = null
           return
         }
 
+        // One read of the whole mirror, then one write of the whole gutter.
+        const heights = Array.from(
+          /** @type {HTMLCollectionOf<HTMLElement>} */ (mirror.children),
+          (row) => row.offsetHeight
+        )
         lines.replaceChildren(
-          ...rows.heights.map((height, i) => {
+          ...heights.map((height, i) => {
             const row = document.createElement('div')
             row.style.height = `${height}px`
             row.textContent = String(i + 1)
             return row
           })
         )
-        marked = -1 // the rows above are new elements; none of them wears it
+        rows = /** @type {Rows} */ (heights.reduce(
+          (at, height) => (at.push(at[at.length - 1] + height), at),
+          [0]
+        ))
+        rows.heights = heights
+        unmark() // the rows above are new elements; none of them wears it
 
         lines.scrollTop = text.scrollTop
         markLine()
@@ -5274,13 +5321,10 @@
       function markLine() {
         if (lines.hidden || rows === null || text.value === '') {
           /* **The clear is the whole of this branch now**, where it used to
-             blank a background. Both columns and the index that names them:
-             without it a `⌘L` off leaves the band on a mirror row the reader can
-             still see, which `#lines[hidden] { display: none }` used to hide for
-             free. */
-          lines.children[marked]?.classList.remove('here')
-          mirror.children[marked]?.classList.remove('here')
-          marked = -1
+             blank a background: without it a `⌘L` off leaves the band on a
+             mirror row the reader can still see, which
+             `#lines[hidden] { display: none }` used to hide for free. */
+          unmark()
           return
         }
 
@@ -5290,8 +5334,7 @@
         // Only the rows that change. Walking either column to clear it would be
         // a pass over every line in the document on every arrow key.
         if (marked !== i) {
-          lines.children[marked]?.classList.remove('here')
-          mirror.children[marked]?.classList.remove('here')
+          unmark()
           lines.children[i]?.classList.add('here')
           mirror.children[i]?.classList.add('here')
           marked = i
