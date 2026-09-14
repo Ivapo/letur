@@ -3170,11 +3170,12 @@
       }
 
       document.getElementById('close-viewer').addEventListener('click', hideAsset)
-      // The reader arrives at a figure by three routes, so there are three ways
-      // back: this key, the surface's own control, and asking for a markdown
-      // row — which already means *put that file in the pane* and must not
-      // leave a picture over it. `clear()` closes it too, an open being a new
-      // project.
+      // The reader arrives at a figure by three routes, so there are four ways
+      // back: this key, the surface's own control, asking for a markdown row —
+      // which already means *put that file in the pane* and must not leave a
+      // picture over it — and clicking the row the pane is already holding,
+      // which is `fileRow`'s own and means the same thing with the pane left
+      // where it is. `clear()` closes it too, an open being a new project.
       addEventListener('keydown', (e) => {
         /*
           **Unconditional, and the condition it replaces was the defect.**
@@ -3303,13 +3304,16 @@
                 ? entry.path
                 : `${entry.path} — not edited here`
 
-        const label = document.createElement(opens || shows ? 'button' : 'span')
+        const label = document.createElement(opens || shows || holding ? 'button' : 'span')
         label.className = 'name'
         label.textContent = entry.path.split('/').pop() ?? entry.path
         if (label instanceof HTMLButtonElement) {
           label.type = 'button'
+          /* The three are exclusive by construction: `opens` excludes `holding`
+             by its own term, and an image is never `edited`, so `shows` and
+             `holding` cannot both be true. The last branch is the held row. */
           label.addEventListener('click', () =>
-            opens ? openInPane(entry.path) : showAsset(entry.path)
+            opens ? openInPane(entry.path) : shows ? showAsset(entry.path) : hideAsset()
           )
         }
         li.append(label)
