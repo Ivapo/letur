@@ -334,7 +334,19 @@
         padding: 56px 12px 12px;
         overflow: auto;
       }
-      #viewer img {
+      /*
+        **A canvas is in this rule because a PDF figure is drawn onto one**, and
+        a selector of `img` alone gave it none of this: `.sheet` adds no child
+        rule, so a canvas laid out at whatever size it carried. It is given a CSS
+        size of its own — the page at `scale: 1`, where its backing store is that
+        times `devicePixelRatio` — so **both dimensions are written and the two
+        maxima clamp independently**, where an `<img>` at `height: auto` keeps
+        its aspect through one of them. `object-fit` is what absorbs the
+        difference: the box may lose the page's proportions, the drawing inside
+        it never does. `mpdf-010` Phase 9.
+      */
+      #viewer img,
+      #viewer canvas {
         max-width: 100%;
         max-height: 100%;
         object-fit: contain;
@@ -2895,6 +2907,38 @@
       for (const box of ['files', 'lines', 'text']) column.observe(document.getElementById(box))
 
       /**
+       * The figure surface's own PDF, held for one reason: so it can be given
+       * back. It is the loading task and not the document, which is
+       * `openPdf`'s own idiom one pane over — `destroy()` on the task is what
+       * releases the worker behind it.
+       * @type {PDFDocumentLoadingTask | null}
+       */
+      let shownPdf = null
+
+      /**
+       * Give back whatever the surface is holding: a blob URL, a PDF, or
+       * neither.
+       *
+       * **There are three places that let go of a figure, not two**, and the
+       * third is the one a PDF reaches. `hideAsset` and `saySoInstead` are the
+       * two ways out that a reader can see; the third is `showAsset`'s own,
+       * immediately before it mints the next URL — so looking at a PDF and then
+       * clicking an image goes through *that* site and no other. Before this was
+       * one function, that path dropped a worker on the floor every time.
+       *
+       * **It is idempotent and says nothing**, which is what lets the exits call
+       * it unconditionally: the empty state has no URL to revoke and no document
+       * to destroy, and `Escape` in an empty window already depends on exactly
+       * that.
+       */
+      function releaseFigure() {
+        if (viewing !== null) URL.revokeObjectURL(viewing)
+        viewing = null
+        shownPdf?.destroy()
+        shownPdf = null
+      }
+
+      /**
        * Put a sentence in the sheet where the figure would have gone.
        *
        * **Three things reach here and only one of them composes its own
@@ -2912,8 +2956,7 @@
        * @param {string} sentence @param {string} path
        */
       function saySoInstead(sentence, path) {
-        if (viewing !== null) URL.revokeObjectURL(viewing)
-        viewing = null
+        releaseFigure()
         const said = document.createElement('p')
         said.className = 'said'
         said.textContent = sentence
@@ -2932,38 +2975,72 @@
         viewSeq++
         viewer.hidden = true
         viewerSheet.replaceChildren()
-        if (viewing !== null) URL.revokeObjectURL(viewing)
-        viewing = null
+        releaseFigure()
         figureInPane = null
         namePaneFile()
       }
 
       /**
+       * Put a drawn figure up over the text, whatever drew it.
+       *
+       * **The tail of both drawing paths, and one function because it is one
+       * act.** An `<img>` and a `<canvas>` differ in how they are made and in
+       * nothing after: the same label, the same sheet, the same page state, the
+       * same placement. Two copies of this also cost more than a duplicate —
+       * `app/harness/serve.mjs`'s `figure-unnamed` mutation takes this block and
+       * requires it to appear exactly once, so a second copy stops that mutation
+       * applying at all and the clause it falsifies quietly stops being
+       * falsified.
+       *
+       * **The label is written here and not before the read**, or the bar names
+       * the last row clicked while the sheet holds the last one to arrive.
+       *
+       * @param {Element} node @param {string} path
+       */
+      function raiseFigure(node, path) {
+        viewerPath.textContent = path
+        viewerSheet.replaceChildren(node)
+        figureInPane = path
+        namePaneFile()
+
+        viewer.hidden = false
+        placeViewer()
+      }
+
+      /**
        * Show one of the project's figures over the text pane.
        *
-       * **The extension is read before anything is asked for**, because a PDF
-       * is a legal figure in this dialect — `pdf` is in
+       * **Two kinds reach the sheet and they are drawn by different elements.**
+       * A PDF is a legal figure in this dialect — `pdf` is in
        * `md2pdf_core::IMAGE_EXTENSIONS` and the panel lists one — and `<img>`
-       * will not draw it. That row gets a sentence and the command is never
-       * called for it at all. **The sentence is the page's own**, which is a
-       * deliberate exception to the rule that the window composes no text: the
-       * two Rust routes are both wrong here, `fail` marking the compiled page
-       * stale for a click that compiled nothing and `divergence` drawing a
-       * `Discard` button beside it, and a field on `Status` is what this
-       * phase's own invariant refuses. It is a label for a file kind, not a
-       * status about the document — the distinction that rule was always about,
-       * and the one under which `Back to the text` is the page's too.
+       * will not draw one, so `mpdf-010` Phase 9 draws it with the `pdf.js` this
+       * page already imports for the pane. **The first page and only the first**:
+       * the engine writes its `image()` call with no `page:` argument, so the
+       * first is the one the compiled document embeds, and a surface offering a
+       * second would be offering something the document does not draw.
+       *
+       * **The page pane's machinery is not reachable from here and that is
+       * deliberate.** `openPdf` and `paint` hold one retained document between
+       * them, with a generation counter, a raster budget and two release sweeps
+       * keyed to it; a second document inside that gives every one of them a
+       * second meaning. This is its own `getDocument`, its own canvas, and its
+       * own line in `releaseFigure`.
+       *
+       * **The sentence survives for the file that will not parse**, and it is
+       * the page's own — a deliberate exception to the rule that the window
+       * composes no text, because the two Rust routes are both wrong here:
+       * `fail` marks the compiled page stale for a click that compiled nothing,
+       * `divergence` draws a `Discard` button beside its sentence, and a field
+       * on `Status` is what `mpdf-010` Phase 5's own invariant refuses. It is a
+       * label for a file kind, not a status about the document — the distinction
+       * that rule was always about, and the one under which `Back to the text`
+       * is the page's too.
        *
        * @param {string} path
        */
       async function showAsset(path) {
         const seq = ++viewSeq
         const extension = (path.split('.').pop() ?? '').toLowerCase()
-
-        if (extension === 'pdf') {
-          saySoInstead('A PDF figure is not drawn here.', path)
-          return
-        }
 
         let bytes
         try {
@@ -2977,6 +3054,11 @@
         }
 
         if (seq !== viewSeq) return
+
+        if (extension === 'pdf') {
+          await drawPdf(bytes, path, seq)
+          return
+        }
 
         /*
           **`.svgz` is gzip and an `<img>` will not unwrap one.** It is in
@@ -3000,7 +3082,7 @@
           if (seq !== viewSeq) return
         }
 
-        if (viewing !== null) URL.revokeObjectURL(viewing)
+        releaseFigure()
         const type =
           extension === 'svg' || extension === 'svgz'
             ? 'image/svg+xml'
@@ -3021,16 +3103,70 @@
         }
         picture.src = viewing
         picture.alt = path
-        // **The label is written here and not before the read**, or the bar
-        // names the last row clicked while the sheet holds the last one to
-        // arrive, which is the third of the three gestures this guard fixes.
-        viewerPath.textContent = path
-        viewerSheet.replaceChildren(picture)
-        figureInPane = path
-        namePaneFile()
+        raiseFigure(picture, path)
+      }
 
-        viewer.hidden = false
-        placeViewer()
+      /**
+       * Draw a PDF figure's first page onto a canvas in the sheet.
+       *
+       * **The canvas carries two sizes and they are not the same number.** The
+       * CSS size is the page at `scale: 1` and the backing store is that times
+       * the pixel ratio, which is `paint`'s split one pane over and for the
+       * reason written at `#pages canvas`: a canvas with no CSS size lays out at
+       * its backing store, and at a ratio of 2 that is a figure twice the size
+       * the sheet was asked for. With both written, the rule's two maxima do the
+       * fit — so the surface reflows on a divider drag, a resize, `#toggle` and
+       * `#numbers` exactly as an `<img>` does, and **no occasion re-renders**.
+       * A figure the sheet enlarges past its natural size is a scaled raster,
+       * which is what an `<img>` of a PNG is too.
+       *
+       * **`seq` is checked after every await and the reasoning is `showAsset`'s
+       * own**: a parse or a raster landing after the reader has left is the same
+       * event as bytes landing after they have left, one function further on.
+       *
+       * @param {ArrayBuffer} bytes @param {string} path @param {number} seq
+       */
+      async function drawPdf(bytes, path, seq) {
+        let opened
+        try {
+          const task = pdfjs.getDocument({ data: new Uint8Array(bytes) })
+          const got = await task.promise
+          if (seq !== viewSeq) {
+            task.destroy()
+            return
+          }
+          // The previous figure goes back here and not before the parse: a file
+          // that will not open must not take the one on screen down with it.
+          releaseFigure()
+          shownPdf = task
+          opened = got
+        } catch {
+          if (seq === viewSeq) saySoInstead('This figure could not be drawn.', path)
+          return
+        }
+
+        const ratio = window.devicePixelRatio
+        const canvas = document.createElement('canvas')
+        try {
+          const page = await opened.getPage(1)
+          if (seq !== viewSeq) return
+          const viewport = page.getViewport({ scale: 1 })
+          canvas.width = Math.floor(viewport.width * ratio)
+          canvas.height = Math.floor(viewport.height * ratio)
+          canvas.style.width = `${viewport.width}px`
+          canvas.style.height = `${viewport.height}px`
+          await page.render({
+            canvas,
+            viewport,
+            transform: [ratio, 0, 0, ratio, 0, 0]
+          }).promise
+        } catch {
+          if (seq === viewSeq) saySoInstead('This figure could not be drawn.', path)
+          return
+        }
+        if (seq !== viewSeq) return
+
+        raiseFigure(canvas, path)
       }
 
       document.getElementById('close-viewer').addEventListener('click', hideAsset)
@@ -3100,21 +3236,33 @@
        * text is the last segment and the path is what Rust is handed. Only a
        * markdown file gets one: nothing else can be the file that compiles.
        *
-       * **The name is a button when the row opens or shows, and a span when it
-       * does neither.** A markdown file *or a bibliography* the pane is not
-       * already holding goes in the pane, which is where `mpdf-010` OQ-2
-       * landed: the compile is `main`'s, so a `.bib` in the pane feeds its
-       * unsaved bytes to the citation pass while the page goes on drawing the
-       * whole document. An image is shown over the pane, the pane keeping its
-       * own file, which is where OQ-1 landed. A marked-missing row is the one
-       * that opens nothing and says so in its title, naming a file the disk
-       * does not hold. The row the pane already holds is inert for the reason
-       * the `main` row has no `main` button: the gesture would ask for what is
-       * already true. **That is the one gesture a reader might expect and not
-       * get** — clicking the row you are on while a figure is up does nothing
-       * — and it is accepted rather than fixed, the alternative being a row
-       * whose drawing depends on page state where holding no selection is what
-       * lets the panel be rebuilt whole on every status.
+       * **The name is a button when the row opens, shows, or is the one the
+       * pane holds, and a span only for a row that is none of the three.** A
+       * markdown file *or a bibliography* the pane is not already holding goes
+       * in the pane, which is where `mpdf-010` OQ-2 landed: the compile is
+       * `main`'s, so a `.bib` in the pane feeds its unsaved bytes to the
+       * citation pass while the page goes on drawing the whole document. An
+       * image is shown over the pane, the pane keeping its own file, which is
+       * where OQ-1 landed. A marked-missing row is the one that opens nothing
+       * and says so in its title, naming a file the disk does not hold.
+       *
+       * **The row the pane already holds is the fourth way back**, and
+       * `mpdf-010` Phase 9 is where it stopped being inert. Its handler is
+       * `hideAsset` and **not `openInPane`**: `set_edited` refuses a switch
+       * while the pane is dirty, and that refusal draws the divergence bar — so
+       * the open would answer a reader who clicked the row they are *already on*
+       * with a request to discard their own unsaved work. The gesture means *the
+       * text pane, as it stands*, and `hideAsset` is the whole of that.
+       *
+       * **Nothing here reads page state**, which is what the inert row was
+       * protecting: `holding` is a parameter already, it already decided the
+       * element, and whether a figure is up reaches neither — the row is a
+       * button in both cases and `hideAsset` is idempotent in the empty one, the
+       * same property the global `Escape` depends on. So the rows still hold no
+       * selection and the panel is still rebuilt whole on every status. **The
+       * cost is a button that usually does nothing**, and it is accepted where
+       * the alternative is drawing the row differently depending on what is on
+       * screen.
        *
        * **The title is a second chain with its own kind test, and it moves
        * with `opens`'.** Widening one without the other would put `— not
@@ -3124,6 +3272,11 @@
        * not missing always `shows`, and a missing row takes the first branch.
        * It is left standing rather than deleted, an unreachable branch putting
        * no sentence in the window.
+       *
+       * **The held row's title stays the bare path** though its name is now a
+       * button. What that button means depends on whether a figure is up, and a
+       * title naming either state would be false in the other — where the
+       * drawing, which is what the chain above is for, depends on neither.
        *
        * @param {Entry} entry @param {number} depth @param {boolean} here
        * @param {boolean} holding
