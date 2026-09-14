@@ -32,15 +32,21 @@ subsystem, read `rules/INDEX.md`.** Both are generated from frontmatter by
 
 **A phase is not cleared to build until its own review round has converged** — that is
 `reviewed` on the phase, not `status` on the document. Run `/review-spec <spec> --phase N`.
+**Convergence hands the phase to plan mode; it does not start the build.** That round
+reviewed the *spec*, which is a different artifact from the plan for building it, and the
+plan is what gets approved before a file is edited. **The step is easiest to skip when the
+spec is good**: the two standing steps below are already written into the phase, so the
+plan reads as made when it has not been made.
 
 **When a conversation settles on a feature, work §6.1's ordered test (in
 `spec-authoring.md` above) before assuming a new document.** Step 0 asks whether a
 decision changed at all; step 2 — append a phase to the spec that owns the subject — is
 the commonest real answer, and the one a fresh context is least likely to reach for.
 
-**"Implement Phase N of `specs/X`" carries two standing plan steps and a close-out**
-(§3 of `spec-authoring.md`). The plan states a **commit plan** — a phase is one plan,
-one push, and as many commits as the work wants — and a **reconciliation step** naming
+**"Implement Phase N of `specs/X`" enters plan mode, and carries two standing plan
+steps and a close-out** (§3 of `spec-authoring.md`). The plan states a **commit
+plan** — a phase is one plan, one push, and as many commits as the work wants — and
+a **reconciliation step** naming
 which `rules/` files, which user-facing documentation and which stanza the phase
 changes, or "none needed" with a reason. When the exit gate passes, **write that
 phase's `shipped` date** into `phases[]`: `/review-spec` owns `reviewed`, and nothing
