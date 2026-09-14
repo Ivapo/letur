@@ -828,9 +828,13 @@ const viewsWorkTheirPanes = async (browser, url) => {
        `edited`.** Clicking an image row opens a surface over the text and never
        moves `Status::edited` — it cannot, `edited` being the file being typed
        in — so before this the bar named a markdown file that had not been on
-       screen since the click. Both surfaces are asserted: the drawn figure and
-       the sentence a `.pdf` row gets, which is still a surface the pane is
-       holding.
+       screen since the click. **Both kinds of figure are asserted**: the `<img>`
+       an image row draws and the `<canvas>` a `.pdf` row draws since `mpdf-010`
+       Phase 9 — which is what the second half of this clause is now pointed at.
+       It used to be pointed at the sentence a `.pdf` row got instead, and the
+       assertion below is on the footer cell, which names the file either way —
+       so the clause went on passing while its own prose described a behaviour
+       the app no longer had. Naming the element is what stops that.
 
        **And the way back is half the clause.** A cell that took the figure's
        name and kept it would read correctly in exactly the reading a one-ended
@@ -861,6 +865,12 @@ const cellNamesTheFigure = async (browser, url) => {
   )
   await clickRow('plan.pdf')
   const said = await cell()
+  /* The same reading for the other kind, and the element is the whole of it:
+     a PDF that will not parse reaches `saySoInstead`, which names this same
+     file over an empty sheet. */
+  const rastered = await page.evaluate(
+    () => !document.getElementById('viewer').hidden && !!document.querySelector('#viewer .sheet canvas')
+  )
   await page.keyboard.press('Escape')
   await settle(page)
   const back = await cell()
@@ -868,14 +878,14 @@ const cellNamesTheFigure = async (browser, url) => {
   const errors = await drainErrors(page)
   await page.close()
 
-  note(`the cell: ${before} → mark.svg gives ${figure} → plan.pdf gives ${said} → Escape gives ${back}`)
+  note(`the cell: ${before} → mark.svg gives ${figure} (img ${drawn}) → plan.pdf gives ${said} (canvas ${rastered}) → Escape gives ${back}`)
 
   ok(
     11,
     'the cell names the figure the pane is holding, and the edited file again when it is left',
-    figure === 'mark.svg' && drawn && said === 'plan.pdf' && back === before && before !== '',
+    figure === 'mark.svg' && drawn && said === 'plan.pdf' && rastered && back === before && before !== '',
     `opened on ${JSON.stringify(before)}; the figure gave ${JSON.stringify(figure)} with a picture drawn ${drawn}; ` +
-      `the pdf's sentence gave ${JSON.stringify(said)}; Escape gave ${JSON.stringify(back)}`
+      `the pdf gave ${JSON.stringify(said)} with a canvas drawn ${rastered}; Escape gave ${JSON.stringify(back)}`
   )
   return errors
 }

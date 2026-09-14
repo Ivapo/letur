@@ -2,6 +2,83 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 2 — Phase 9 only — 2026-09-14 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. Both blockers verified resolved **against the files rather than the
+changelog**, which is what this step is for: the re-review re-opened `app/dist/index.html`
+to confirm the quoted `#viewer img` declaration and the `#pages canvas` comment are
+verbatim, re-confirmed all six fixture sites and the loud/silent split, and checked every
+string the close-out quotes from `rules/desktop-panel.md` and `rules/desktop-panes.md` is
+exact. It also confirmed **no remaining gate clause is unsatisfiable** after the fixture
+refusal: all nine run on `plan.pdf` and `cover.jpg`, both committed and real.
+
+Three new non-blocking observations, two folded in and one recorded as priced:
+
+- **Both CSS dimensions written means `max-width` and `max-height` clamp independently**,
+  so the canvas *box* can lose the page's aspect where an `<img>` at `height: auto` would
+  not — the `object-fit: contain` already in the widened declaration absorbs it and the
+  drawing never distorts. Folded into clause 1, because it is the kind of thing a later
+  pass finds at the keyboard and mistakes for a defect.
+- **`releaseFigure()` is a fifth function the "four functions" line does not count.**
+  Folded in: the four are the ones modified, the fifth is the one they leave behind.
+- **Gate clause 9 lost most of its bite with `broken.pdf`** — on a valid PDF neither error
+  path runs, so it now only fails if the happy path reaches `fail`. Recorded rather than
+  fixed: it is the priced consequence of the fixture refusal, which the phase argues in
+  place.
+
+### Round 1 — Phase 9 only — 2026-09-14 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0** (asked once for this episode): *does this phase produce the observable, and if
+not, is that argued?* It does not, and it is argued in the phase header — Phase 5's own
+argument extended to the one kind Phase 5 left out: nothing reaches the pipeline, `Status`
+gains no field, and the page pane's renderer is not touched. It is the right thing to
+build because it is not a new idea: **OQ-3 and OQ-8 are both standing questions this
+document already asked**, OQ-3 deferred explicitly *by evidence* — "needs the panel in use
+for a week" — and OQ-8 waiting on OQ-3 and naming this phase's shape as one of its three.
+The week happened and the row was reported as noise, which is the evidence OQ-3 was held
+open for.
+
+**Two blocking findings, both confirmed by the author against the code before folding.**
+
+1. **A `<canvas>` would get none of the fit the phase called "already built", and no CSS
+   was in scope.** Phase 5's fit is one declaration whose selector is `img`, and
+   `#viewer .sheet` adds no child rule — so the gate's "no wider than the sheet" was not
+   satisfiable as scoped, and an implementer had to guess between widening the selector
+   and computing a render scale, which differ in behaviour on the four occasions
+   `placeViewer` re-runs. The same file **already records the failure mode** one
+   declaration away at `#pages canvas`: *"a canvas with no CSS size lays out at its backing
+   store, which at a pixel ratio of 2 is a page twice the pane's width."* Resolved by
+   choosing the mechanism in the spec: the selector widens to `#viewer img, #viewer
+   canvas`, the CSS size comes from `getViewport({ scale: 1 })` and the backing store is
+   that times `devicePixelRatio`, which reflows exactly as the `<img>` does and needs no
+   re-render. The scaled-raster cost and the rejected alternative are both recorded.
+
+2. **"The fixture gains one file, and it costs two edits" was wrong: it costs six, and
+   four fail silently.** `tests/fixtures/panel-manifest.txt` and the listing test fail
+   loudly; `app/harness/serve.mjs:PANEL_ENTRIES`, `app/src/document.rs`'s *"keeps its
+   eleven rows"*, `app/harness/checks.mjs`'s *"the fixture's eleven entries"* and
+   `tests/gates/mpdf-010-phase4.js`'s fresh-copy literal do not — and the sentence as
+   written ("so the failure is expected rather than investigated") actively steered an
+   implementer past the silent four. The claim "exactly as Phase 5's did" was stale rather
+   than wrong-at-the-time: `serve.mjs` postdates Phase 5 by a day. **`specs/desktop_app_spec.md`
+   had already priced this and refused a fixture over it**, so the phase takes that answer:
+   no `broken.pdf`, the parse branch argued as one `catch` calling `saySoInstead`, and gate
+   clause 1 named as the cover for the blank-sheet failure.
+
+**Seven non-blocking findings, all accepted, none rejected.** The sharpest: **the object
+URL is revoked in three places, not two** — `hideAsset`, `saySoInstead` and `showAsset`'s
+own pre-mint revoke — and the third is exactly the one a PDF-then-image click reaches, so
+that path would have leaked a worker. Clause 3 became a refactor to a single
+`releaseFigure()` rather than an addition, with a gate clause for the reachable half. Also:
+*"the rows hold no selection"* is in `rules/desktop-panel.md`, not `desktop-panes.md`
+(a misattribution inherited from Phase 5, corrected in this phase's own text rather than in
+Phase 5's); the close-out under-counted what the phase falsifies in the file with the tight
+246/250 cap, and now enumerates three `covers:` clauses and four body sentences; **Phase 5
+clause 5 needed its own dated `CORRECTED` note** and got one, its *"the command is never
+called for a `.pdf` at all"* being as false after this phase as clause 4's inert row; and
+`app/harness/checks.mjs` clause 11 would have gone on **passing while documenting a
+behaviour the app no longer has**, so it is re-pointed in this phase's commit.
+
 ### Round 2 — Phase 8 only — 2026-09-03 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking. The blocker resolved, and the re-review went past the changelog in the way

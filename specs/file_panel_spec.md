@@ -7,7 +7,7 @@ note: >
   file is set as the main the app compiles, and clicking another edits it while
   the main still draws the page.
 status: accepted
-last_updated: 2026-09-03
+last_updated: 2026-09-14
 
 phases:
   - name: "Phase 1 — the project's files, and the main among them"
@@ -48,6 +48,11 @@ phases:
   - name: "Phase 8 — a bibliography opens in the pane"
     reviewed: 2026-09-03
     shipped: 2026-09-03
+    cut: null
+    by: null
+  - name: "Phase 9 — a PDF row draws its first page, and the row you are on is the way back"
+    reviewed: 2026-09-14
+    shipped: 2026-09-14
     cut: null
     by: null
 
@@ -581,13 +586,26 @@ window or put state on a row that `app/dist/index.html:parts` rebuilds.
   bibliography as `.bib`, `.yml` or `.yaml`, which `Status`'s `bibliography`
   kind already folds together.
 
-- **OQ-3 — does the panel show the document's own exported PDF?** *(deferred by
+- **OQ-3 — does the panel show the document's own exported PDF?** ~~*(deferred by
   evidence)* It does, per §2, because a PDF is a legal figure and the list is the
   pipeline's own. Whether that reads as correct or as noise needs the panel in
   use for a week; the alternative is to hide the path
   `app/src/document.rs:default_output` names, which is a special case that would
   be wrong the moment an author names their figure the same thing. **Blocks
-  nothing.**
+  nothing.**~~
+
+  **RESOLVED 2026-09-14 — it does, and it stays.** The week of use this entry
+  asked for happened, and the row was reported as noise. **The finding
+  underneath the report was sharper than the question**: the row read as noise
+  because it was a *dead end*, not because it was output — a PDF was the one
+  kind the panel listed and the viewer refused to draw, so the only row a reader
+  meets by accident was also the only row that answered nothing. Phase 9 draws
+  it, and the export row becomes a way to see what you last exported beside the
+  page you are writing. **The hide stays refused** for the reason recorded
+  above, which use did not weaken. A *mark* on the row — output distinguished
+  rather than hidden — was raised and **deferred to use again**, on the ground
+  that what the row costs a reader has just changed and the question is worth
+  asking of the new one rather than the old.
 
 - **OQ-4 — rename and move.** *(design call)* §1.2 makes both non-goals for now.
   Rename is the one with a real argument behind it: renaming a section the master
@@ -642,7 +660,7 @@ window or put state on a row that `app/dist/index.html:parts` rebuilds.
   behaviour in its own gate, and §1.2 makes the deeper layout a non-goal until
   this is answered.
 
-- **OQ-8 — what does a PDF row show?** *(design call, opened by OQ-1)* `pdf` is
+- **OQ-8 — what does a PDF row show?** ~~*(design call, opened by OQ-1)* `pdf` is
   in `core/src/emit.rs:IMAGE_EXTENSIONS`, so a PDF is a legal figure, the panel
   lists one, and Phase 5's viewer can be asked for one — which `<img>` cannot
   draw. Three shapes: **the sentence Phase 5 ships**, which says so and draws
@@ -652,7 +670,17 @@ window or put state on a row that `app/dist/index.html:parts` rebuilds.
   OQ-3 records that a document's own exported PDF sits in the panel beside its
   markdown, so a reader meets a PDF row by accident rather than by intent — and
   if OQ-3 is answered by hiding the export, most PDF rows go with it, which is
-  why this waits on that one. **Blocks nothing.**
+  why this waits on that one. **Blocks nothing.**~~
+
+  **RESOLVED 2026-09-14 — the first page, through the `pdf.js` this app already
+  vendors**, which is the second of the three shapes above. It waited on OQ-3
+  and OQ-3 kept the export row, so most PDF rows stay — and the shape that draws
+  nothing leaves the panel listing a kind it cannot show, which is the state
+  that produced OQ-3's report in the first place. The third shape, a row that
+  does not open, is refused with it: a row that lists a legal figure and then
+  declines to be looked at is the same dead end with the sentence taken away.
+  Phase 9 ships it, and **the sentence this entry called "the sentence Phase 5
+  ships" survives as the parse failure's**, per that phase's clause 4.
 
 - **OQ-9 — should a collapsed folder say it holds `main` or `edited`?** *(design
   call, opened by Phase 7)* A fold may hide the row that carries `◀ main` or the
@@ -677,6 +705,10 @@ another — Phases 3, 4 and 5 could each be cut without touching what Phases 1 a
 appended after Phase 2 shipped**, out of the prototype that resolved OQ-1; it
 depends on Phase 2 and on neither of the two between them, so it may ship out of
 order, which §3 of the methodology allows and this sentence is the record of.
+
+*(The count above is Phase 5-era and is left as it was written. Phases 6, 7, 8
+and 9 were appended after it under §6.1; of those, Phase 9 is a fourth that
+produces no observable and argues so in its own header.)*
 
 ### Phase 1 — the project's files, and the main among them
 *Produces the observable: **yes** — open `samples/showcase/sections/text.md` from
@@ -1490,6 +1522,15 @@ meets most often.*
      surface's own control and `Escape` both cover that reader, so nobody is
      stuck.
 
+     **CORRECTED 2026-09-14:** Phase 9 fixes it, and this clause stays as it
+     shipped because it is the record of what Phase 5 decided. What changed is
+     that the fix is not the one this clause was reasoning about: the row's name
+     becomes a `<button>` whose handler is `hideAsset` — a fourth way back —
+     where this clause weighed an `openInPane` that would also have moved the
+     pane. Nothing about its *drawing* comes to depend on page state, so the
+     sentence about the rows holding no selection is unaffected. See Phase 9
+     clause 5.
+
   5. **A PDF row says so and draws nothing**, per OQ-8, **and that sentence is
      the page's own** — which is a deliberate exception to the rule that the
      window composes no text, and the reason is that neither route for a Rust
@@ -1502,6 +1543,14 @@ meets most often.*
      the way it writes `Back to the text` — this is a label for a file kind and
      not a status about the document, which is the distinction that rule was
      always about. The command is never called for a `.pdf` at all.
+
+     **CORRECTED 2026-09-14:** Phase 9 draws the first page instead, so *"says
+     so and draws nothing"* and *"the command is never called for a `.pdf` at
+     all"* are both false as of that phase — `asset_bytes` is called for a `.pdf`
+     exactly as it is for every other kind. The rest of this clause stands: the
+     sentence survives for a PDF that will not parse, and the reasoning about
+     `fail`, `divergence` and `Status` is why it is still the page's own. This
+     clause stays as it shipped, per §6.1.
 
 - **Exit gate:** In the Rust suite, over `tests/fixtures/panel/`, which Phase 1
   created:
@@ -2221,6 +2270,259 @@ when Phase 2 separated `edited` from `main`, and nobody went back to look.
   **Commit plan.** One push, four commits: the fixture's key and citation; the
   page's two terms with its clause and its mutation; the two Rust tests and the
   window gate script; then the rules and the README.
+
+### Phase 9 — a PDF row draws its first page, and the row you are on is the way back
+*Produces the observable: **no**, and the argument is Phase 5's own extended to the
+one kind Phase 5 left out. Nothing here reaches the pipeline: the same markdown
+compiles to the same bytes, `app/src/preview.rs:Status` gains no field, no command
+is added, no capability is asked for, and the page pane's renderer is not touched.
+What changes is that **the panel stops listing a kind it cannot show**, and that a
+reader who went to look at a figure stops needing one particular control to get
+back to their own text.*
+
+- **Scope:** four functions and one CSS rule in `app/dist/index.html` —
+  `showAsset`, `hideAsset`, `saySoInstead`, `fileRow` and the `#viewer img`
+  declaration — plus the `releaseFigure()` clause 3 collapses three of them
+  into, clause 11 of `app/harness/checks.mjs`, and one gate script. The four
+  are the ones modified; the fifth is the one they leave behind.
+  **No Rust**: the bytes already cross for every other kind, and
+  `app/src/main.rs:asset_bytes` does not know what it is reading. **No new
+  fixture**, per the refusal below. **No new dependency**: `pdfjs` is imported at
+  the top of this same file for the page pane, which is the whole of why OQ-8
+  named this shape rather than an `<embed>`, a second renderer, or handing the
+  file to Preview.
+
+1. **A PDF row draws its first page, through the `pdf.js` this app already
+   vendors.** `showAsset`'s `.pdf` short-circuit goes: the bytes are asked for
+   with `asset_bytes` like every other kind, `pdfjs.getDocument` parses them,
+   and page 1 renders onto a `<canvas>` the sheet holds. The surface, the column
+   and the upper third are Phase 5's and are not touched.
+
+   **The fit is not, and this is the one place the phase spends more than a
+   swap.** Phase 5's fit is a single declaration — `#viewer img { max-width:
+   100%; max-height: 100%; object-fit: contain; background: var(--paper) }` —
+   whose selector is `img`, which a canvas does not match, and `#viewer .sheet`
+   adds no child rule. So the selector becomes `#viewer img, #viewer canvas`,
+   **and the canvas is given a CSS size that is not its backing store**: the CSS
+   `width` and `height` are the page's own size at `getViewport({ scale: 1 })`
+   and the backing store is that times `devicePixelRatio`. Without the CSS size
+   it lays out at the backing store, which this file already records one
+   declaration away at `#pages canvas` — *"a canvas with no CSS size lays out at
+   its backing store, which at a pixel ratio of 2 is a page twice the pane's
+   width"*.
+
+   **Both dimensions are written, so `max-width` and `max-height` clamp
+   independently** and the canvas *box* can lose the page's aspect where an
+   `<img>` left to `height: auto` would not. The `object-fit: contain` already
+   in the declaration being widened is what absorbs it — the drawing letterboxes
+   inside the clamped box and is never distorted — and it is written down here
+   because it is the kind of thing a later pass finds at the keyboard and
+   mistakes for a defect.
+
+   **It reflows and it does not re-render**, which is the whole reason the fit
+   is spelled this way. An intrinsic CSS size under `max-width`/`max-height`
+   clamping behaves exactly as Phase 5's `<img>` on all four occasions
+   `app/dist/index.html:placeViewer` re-runs — a window resize, the divider's
+   drag end, `#toggle` and `#numbers` — so none of them needs a second render
+   and none of them needs a second in-flight guard. **The cost is that a figure
+   the sheet enlarges past its natural size is a scaled raster**, and it is
+   accepted: this surface is a look rather than a reading, and an `<img>` of a
+   PNG is no sharper. The alternative — take the scale from the sheet's content
+   box and re-render on `placeViewer` — is named here rather than left for a
+   later pass to re-derive, and it is what a reader who wants a *readable* page
+   would be asking for, which is a different feature from the one OQ-8 named.
+
+   **The first page and not a chooser**, because the first page is the one the
+   document itself embeds: `core/src/emit.rs:image_call` writes the call with no
+   `page:` argument, so the figure in the compiled page is Typst's own default. A
+   viewer offering a second page would be offering something the document does
+   not draw, and this surface is a view of the material the document is made
+   from rather than a PDF reader that happens to be nearby.
+
+2. **The page pane's machinery stays the page pane's.**
+   `app/dist/index.html:openPdf` and `app/dist/index.html:paint` and the retained
+   document they share are a multi-page, scroll-driven, cost-budgeted renderer
+   holding exactly one document, and a second document inside it would give every
+   one of those a second meaning — the memo pairs, the release sweeps and the
+   near-page observer included. The surface gets its own `getDocument` and its
+   own canvas, which is a dozen lines, where the reuse is a rewrite of the pane.
+
+3. **Disposal gains a second kind, a single call site, and `viewSeq` gains
+   nothing.** A PDF adds a document proxy and its loading task, which hold a
+   worker, beside the object URL an image leaves. **The URL is revoked in three
+   places, not two** — `hideAsset`, `saySoInstead`, and `showAsset`'s own
+   pre-mint `if (viewing !== null)` — and the third is the one a PDF reaches:
+   look at a PDF, then click an image, and the release never runs unless that
+   site has it. So the three become one `releaseFigure()` and the proxy joins the
+   URL inside it, which is why this clause is a refactor and not an addition.
+   The in-flight guard is already right and is not touched: `viewSeq` was written
+   for bytes landing after the reader has left, and a *parse* landing after the
+   reader has left is that same event one function further on.
+
+4. **The sentence survives and loses one of its three callers.** `saySoInstead`
+   goes on placing `asset_bytes`'s refusal and the undecodable figure, and it
+   takes the PDF that will not parse as a third. Phase 5 clause 5's exception —
+   the page composing words of its own — is **narrowed, not revoked**, and its
+   reasoning is untouched: a click that compiled nothing must not reach
+   `app/dist/index.html:fail` and mark the compiled page stale.
+
+5. **The row the pane holds becomes the fourth way back, and this revises Phase 5
+   clause 4.** Its name is a `<button>` again and its handler is `hideAsset` —
+   **not `openInPane`**. `app/src/main.rs:set_edited` refuses a switch while the
+   pane is dirty and that refusal lands in the divergence bar
+   (`app/src/preview.rs:Session::refused_while_dirty`), so routing this row
+   through the open would answer a reader who clicked the row they are *already
+   on* with a request to discard their own unsaved work. The gesture means **the
+   text pane, as it stands**, and `hideAsset` is the whole of that.
+
+   **The reason Phase 5 gave does not reach this shape.** It refused *"a row
+   whose drawing depends on page state"*, and nothing here draws on page state:
+   `holding` is already a `fileRow` parameter and already decides the element
+   type, and whether a figure is up reaches neither. The row is a button in both
+   states. **`rules/desktop-panel.md`'s "the rows hold no selection"** is
+   untouched and the panel is still rebuilt whole on every status. (That sentence
+   is in the *panel* rule file, not the panes one; Phase 5 clause 4 attributes it
+   to `rules/desktop-panes.md`, which is where this phase stops repeating it.)
+
+   **With no figure up the button does nothing, and that is accepted rather than
+   hidden.** `hideAsset` is idempotent in the empty state — a `hidden` already
+   true, a sheet already empty, no URL to revoke — which is exactly what the
+   `Escape` handler already relies on and says so in place. The cost is a row
+   that looks pressable and, in the common case, changes nothing; the alternative
+   is the state-dependent drawing Phase 5 refused, which this clause does not
+   reopen.
+
+   **The title stays the bare path.** The gesture's *meaning* depends on page
+   state even where its drawing does not, so a title naming either state is false
+   in the other — and `fileRow`'s own comment requires the title chain to move
+   with `opens`, which this clause does not touch.
+
+- **No fixture is added, and the parse failure is argued rather than gated.**
+  A `broken.pdf` beside `plan.pdf` is the obvious way to reach the rejection
+  branch — **`pdfjs.getDocument` rejects a promise where an `<img>` fires
+  `onerror`**, so it is a genuinely different branch from the one Phase 5 gated.
+  It is refused on price. Phase 5 paid two edits for `plan.pdf`; a second `.pdf`
+  now costs six, and **four of them fail silently**:
+  `tests/fixtures/panel-manifest.txt` and
+  `app/src/document.rs:the_listing_is_the_disk_and_what_the_master_names` fail
+  loudly, while `app/harness/serve.mjs:PANEL_ENTRIES`, `app/src/document.rs`'s
+  *"keeps its eleven rows"*, `app/harness/checks.mjs`'s *"the fixture's eleven
+  entries"* and `tests/gates/mpdf-010-phase4.js`'s *"the ten a fresh copy
+  holds"* do not. **`specs/desktop_app_spec.md` has already priced exactly this
+  and refused a fixture over it** — *"a twelfth row moves `PANEL_ENTRIES`,
+  `tests/fixtures/panel-manifest.txt`, the listing test's literal and a doc
+  comment that says the fixture does not grow"* — and this phase takes that
+  answer rather than arguing with a sibling spec over the same eleven rows.
+
+  What the rejection branch costs instead is one `catch` around `getDocument`
+  calling `saySoInstead`, which is the shape `showAsset` already ships for an
+  image's `onerror`. **The failure that reads as the app having done nothing is
+  covered by gate clause 1**, which is the one Phase 5's own comment was written
+  about: a canvas of the right size drawing nothing.
+
+- **Exit gate:** at the window, on `tests/gates/mpdf-010-phase9.js`, opening
+  `tests/fixtures/panel/sections/text.md` — which roots at the fixture, per
+  Phase 1, and is the only project in this repository holding a `.pdf` a fresh
+  clone really has:
+  1. Clicking `plan.pdf` puts a `<canvas>` in the sheet and **no `<img>`**, and
+     the canvas is **not uniform**: two pixels of its `ImageData` differ from
+     each other. Stated as a difference and not against a named background,
+     because nothing in this phase's scope says what the canvas is cleared to,
+     and a clause keyed to a colour would be keyed to an implementation choice
+     the scope does not make. A canvas of the right size drawing nothing is
+     precisely the failure this clause exists for, and the size alone would pass
+     it.
+  2. `invoke('status')`'s `edited`, `main` and `revision` are unchanged across
+     that click and the pane's text is the same string — Phase 5 clause 2's
+     assertion, re-run for the kind that could not reach it.
+  3. The surface's left and width equal `#text`'s for the PDF, and the canvas's
+     **`getBoundingClientRect`** — its CSS box, not its `width`/`height`
+     attributes, which are the backing store and are expected to be larger — is
+     no wider than the sheet's content box and no taller. Phase 5's clauses 1
+     and 6 for the new kind, and the clause that fails if the CSS rule in
+     clause 1 is left at `img`.
+  4. With the figure up, clicking the row the pane holds puts the text back:
+     `#viewer` is hidden, `edited` is unchanged, and `divergence` is what it was.
+  5. **The same click with unsaved work in the pane** — type one character first
+     — puts the text back, leaves the pane's text as typed, and moves neither
+     `edited` nor `divergence`. **This is the clause that fails if the row is
+     ever routed through `openInPane`**, and it is the reason clause 5 above is
+     written as a handler and not as a widening of `opens`.
+  6. With no figure up, that same click changes nothing: `edited`, `revision` and
+     the pane's text are what they were, and no error bar appears. **Settle
+     first, and against the debounce rather than against a plateau**: clause 5
+     typed a character, so an edit is armed, and `watch::TYPING_DEBOUNCE` is
+     300 ms — a check that merely waits for `revision` to stop moving reads the
+     same number before the compile starts as after it finishes, and passes the
+     wait. It waits the 300 ms out and then asks for quiet across three reads.
+     Without that this clause fails on the compile clause 5 armed rather than on
+     anything it asserts, which is what the first run of the gate did.
+  7. `Escape` and `Back to the text` both still put a PDF figure away — four ways
+     back, not one traded for another.
+  8. **Disposal, to the extent a page can see it**: `plan.pdf` → `cover.jpg` →
+     `plan.pdf` → `Escape` leaves `#viewer` hidden with an empty sheet, and the
+     sheet holds exactly one child at each of the three steps before it. The
+     worker a proxy holds is not observable from the page, so what this clause
+     asserts is the reachable half and **the single `releaseFigure()` of clause 3
+     is what carries the rest**; the middle step is there because the
+     PDF-then-image click is the one that reaches the third release site.
+  9. Clicking `plan.pdf` **leaves `#pages` without its `stale` class** — clause
+     4's reasoning asserted rather than argued, and the assertion that a click
+     which compiled nothing has not told the reader their page is out of date.
+
+  Run against the build before this phase, clause 1 fails at once: `plan.pdf`
+  shows a sentence and the sheet holds no canvas at all.
+
+- **Close-out:** `rules/desktop-panel.md` carries almost all of it, and **the
+  cap there is the tight one — 246 of 250**, so the edits are substitutions or
+  they do not land. What this phase falsifies in that file is more than two
+  clauses and is enumerated rather than estimated: in `covers:`, **"the sentence
+  it shows where a figure cannot be drawn"** (the sentence keeps its place and
+  loses its PDF caller), **"the three gestures on a file row"** (four now, the
+  row the pane holds carrying one) and **"the three ways back"** (four); and in
+  the body, the paragraph holding *"Three ways back, because the reader arrives
+  by three routes"*, *"The markdown row the pane already holds stays inert"*,
+  *"A `.pdf` row draws no figure and says so in a sentence the page writes
+  itself"* and *"`document::asset_bytes` is never called for a `.pdf` at all.
+  `mpdf-010` OQ-8 carries whether the vendored `pdf.js` should draw one
+  instead"* — that last sentence being the one this phase answers. **"The rows
+  hold no selection", also in that file, stays exactly as it is**: this phase is
+  the occasion to check that sentence, not to change it. If the substitutions
+  cannot be made line-neutral, this close-out takes whatever answer Phase 8's
+  reached for `rules/desktop-panes.md` rather than raising a number on its own.
+
+  `rules/desktop-panes.md`: **"`hideAsset` is the one exit all three ways back go
+  through"** becomes four, and that is the whole of it there.
+
+  `app/harness/checks.mjs`, **clause 11**: its prose says it asserts *"the
+  sentence a `.pdf` row gets"*, and `app/harness/serve.mjs:PANEL_ENTRIES` copies
+  `plan.pdf` into the scratch project, so after this phase that click draws a
+  canvas. Its assertion is on the footer cell and **passes either way**, which is
+  the problem — it would go on passing while documenting a behaviour the app no
+  longer has. It is re-pointed at what the row now does in this phase's own
+  commit.
+
+  README: the paragraph beginning **"Click a figure and it opens over the
+  pane"** — *"A PDF is a legal figure here, so the list holds one — it says so
+  rather than drawing it"* becomes that it draws the first page. **The sentence
+  beside it, *"Bibliographies are listed but not opened"*, has been false since
+  Phase 8 shipped and is corrected in the same pass**: it is one sentence inside
+  the paragraph this phase already rewrites, and leaving a known-false sentence
+  standing because another phase should have caught it is not a rule this
+  repository has.
+
+  `specs/file_panel_spec.md`: **OQ-3 and OQ-8 both resolve here**, inline per §4
+  of the methodology, and OQ-8's own *"this waits on that one"* is what makes
+  them one resolution rather than two. **Phase 5 clause 4 takes a dated
+  `CORRECTED` note** pointing at this phase, because *"the row the pane already
+  holds is inert and stays inert"* is a decision statement a reader would
+  otherwise believe, and §6.1 gives the note rather than an edit. **No
+  `CLAUDE.md` change**: the stanza names the id prefixes and the observable, and
+  this phase changes neither.
+
+- **Commit plan.** One push, three commits: the CSS rule and the surface's PDF
+  branch with `releaseFigure`; the row's button with its handler; then the gate
+  script, the harness clause, the rules and the README.
 
 <!--
 The review record is a sibling file, not a section: it lives at

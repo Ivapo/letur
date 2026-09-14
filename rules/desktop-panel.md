@@ -9,8 +9,8 @@ covers: >
   states it keeps apart, the flat entries it is drawn from and the folders
   derived rather than sent, the two folds the page holds and the one of them
   that has to reach the rows, the three gestures on a file row and the two marks
-  it may carry, the fourth that is a folder row's own and the invariant it does
-  not break, the mark that says which way a disclosure is set and where it is
+  it may carry, the fourth that is the held row's own and the fifth that is a
+  folder row's, and the invariant neither breaks, the mark that says which way a disclosure is set and where it is
   drawn, the two opens that empty the folds and the third caller that is why
   they are not emptied lower, the create that expands what it would otherwise
   land behind, the two rows the delete is not on and the edge two buttons share,
@@ -20,8 +20,8 @@ covers: >
   the two things the page holds, the surface over the text pane and the three boxes that place it,
   the ink layer placed off the same reading, the box measurement it holds for a
   keystroke that must not take one and the timer it arms where it hides,
-  the sentence it shows where a figure cannot be drawn, the sequence its read
-  carries and the three ways back, and the disk half that is walked twice beside
+  the two elements it draws a figure with and the sentence left where one will
+  not parse, the sequence its read carries and the four ways back, and the disk half that is walked twice beside
   the missing half that follows the text
 max_lines: 250
 generated: 2026-09-03
@@ -102,7 +102,7 @@ still names the pane's file whatever the panel is doing. Whether a collapsed
 folder should *say* it holds one of them is `mpdf-010` OQ-9, left open rather
 than built because it would make a folder row carry a mark.
 
-**A file row carries three gestures and can carry two marks.** The body of a markdown
+**A file row carries four gestures and can carry two marks.** The body of a markdown
 row is a `button.name` that puts that file in the pane; the `main` button appears
 beside it on hover and on focus and sets which file compiles; the basket
 beside *that* moves the file to the Trash. **One is a word and one is a mark**,
@@ -119,15 +119,18 @@ resolved: the compile is `main`'s, so a `.bib` in the pane feeds its unsaved
 bytes to the citation pass while the page draws the whole document, and the
 `main` control still appears on markdown alone. A marked-missing row is the one
 that opens nothing and says so in its `title`, naming a file the disk does not
-hold. **The `title` is a second chain with its own kind test and it moves with
-`opens`'**, or `— not edited here` lands on exactly the row the pane is
+hold. **The row the pane holds is a button too, and it is a way back**: its handler
+is `hideAsset` and not `openInPane`, because `set_edited` refuses a switch while the
+pane is dirty — so the open would ask a reader clicking the row they are already on
+to discard their own work. With no figure up it does nothing. **The `title` is a
+second chain with its own kind test and it moves with `opens`'**, or `— not edited here` lands on exactly the row the pane is
 holding; with both moved that branch is unreachable for all three kinds and is
 left standing, an unreachable branch putting no sentence in the window. So the
 panel is still rebuilt whole on every status, and that is still
 right: **the rows hold no selection.** Both files live in Rust and arrive in the
 status, and each control reads its path off the DOM at the moment it is clicked.
 
-**A folder row is the fourth gesture and it does not break that**, which has to
+**A folder row is the fifth gesture and it does not break that**, which has to
 be written down because a careless reading has the invariant falling here. Its
 `<span class="name">` became a `<button>`, the move a file row already makes for
 a row that does something, and it carries `aria-expanded` — a disclosure that
@@ -251,19 +254,20 @@ unconditional for the same reason**: while the read is in flight the surface is
 still hidden, so a guard on `!viewer.hidden` made the key do nothing in exactly
 the case a reader presses it.
 
-**Three ways back, because the reader arrives by three routes**: the surface's
-own control, `Escape`, and clicking a markdown row that opens — which already
-means *put that file in the pane* and must not leave a picture over it.
-`clear()` closes it too, an open being a new project. The markdown row the pane
-already holds stays inert, so clicking the row you are on while a figure is up
-does nothing; that is accepted rather than fixed, the alternative being a row
-whose drawing depends on page state. **A `.pdf` row draws no figure and says so
-in a sentence the page writes itself** — a deliberate exception to "the status is
-placed and never composed", on the ground that this is a label for a file kind
-and not a status about the document. `app/dist/index.html:fail` was the other
-route and it marks the compiled page stale, which a click that compiled nothing
-must not do; `document::asset_bytes` is never called for a `.pdf` at all.
-`mpdf-010` OQ-8 carries whether the vendored `pdf.js` should draw one instead.
+**Four ways back**: the surface's own control, `Escape`, clicking a markdown row
+that opens — which already means *put that file in the pane* and must not leave a
+picture over it — and clicking the row the pane already holds, which means the same
+with the pane left where it is. `clear()` closes it too, an open being a new
+project. None of the four reads page state to draw itself, which is what the held
+row was inert to protect. **A `.pdf` row draws its first page onto a `<canvas>`**
+through the `pdf.js` the page imports for the pane, the first page being the one the
+compiled document embeds; it is the surface's own `getDocument` and never the pane's
+retained one, which holds a generation counter and two release sweeps keyed to one
+document. **The sentence survives for the file that will not parse** — a deliberate
+exception to "the status is placed and never composed", this being a label for a
+file kind and not a status about the document. `app/dist/index.html:fail` was the
+other route and it marks the compiled page stale, which a click that compiled
+nothing must not do.
 
 **The disk half is stable and only the marked-missing half moves.**
 `document::files_under` walks the tree at an open and at a `Change::Tree` event,

@@ -196,8 +196,11 @@ headings for it to follow.
 can check that `emit.svg` is the diagram you meant without leaving for Preview: nothing
 compiles, the page goes on showing the whole document, and `⌘S` still writes the markdown
 you were editing. `Escape`, or `Back to the text`, puts it away, and so does opening any
-other file. A PDF is a legal figure here, so the list holds one — it says so rather than
-drawing it. Bibliographies are listed but not opened.
+other file — **including clicking the row you are already on**, which is the shortest way
+back when the figure went up over the file you were writing. A PDF is a legal figure here,
+so the list holds one, and clicking it draws the first page — the one the document itself
+embeds. **A bibliography opens in the pane** like a markdown file, and the page goes on
+compiling the whole document while you edit the citations.
 
 ## Developing
 

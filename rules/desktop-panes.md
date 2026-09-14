@@ -334,10 +334,13 @@ from two places showing whichever wrote last rather than what is on screen. The 
 is `(figureInPane ?? editedPath)` reduced to its bare name, `report` keeping
 `editedPath` current beside `parts(state)`; the rule above holds, so this is a cell of
 its own, and the empty state collapses it to nothing while the brand stays. **Both
-surfaces count as held, including the one that draws nothing** — a `.pdf` row gets
-`saySoInstead`'s sentence rather than a picture, and the pane holds that file just as
-much. **Page state, for `folded`'s reason**: it decides nothing but its own drawing,
-and `hideAsset` is the one exit all three ways back go through. **Nothing marks that
+surfaces count as held, the canvas and the sentence alike** — a `.pdf` row draws its
+first page where an `<img>` cannot, and a file that will not parse gets
+`saySoInstead`'s sentence, and the pane holds that file just as much either way.
+**Page state, for `folded`'s reason**: it decides nothing but its own drawing;
+`raiseFigure` is the one place a figure goes up — the tail both drawing paths share, and
+a block `serve.mjs`'s `figure-unnamed` mutation requires to be unique — and
+`releaseFigure` the one place it is given back, under the four ways back. **Nothing marks that
 `edited` may differ from `main`** — `rules/desktop-panel.md` draws that
 distinction.
 
