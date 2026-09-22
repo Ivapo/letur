@@ -42,10 +42,20 @@ tauri-build = { version = "2.6.3", features = [] }
 # construction and `src/main.rs` says so.
 [dependencies]
 # **The engine, from the registry.** `mpdf-011` Phase 3 published `md2pdf-core`
-# and this line took its version. `"0.1"` and not `"=0.1.0"`, per that spec's
+# and this line took its version. `"0.3"` and not `"=0.3.0"`, per that spec's
 # OQ-5: a patch release arrives without a commit here, and what would reopen the
 # question is the first engine patch that moves a number
 # `rules/desktop-panes.md` measures off its frozen showcase.
+#
+# **A minor release is a commit here, because under `0.x` it is the breaking
+# one.** `"0.1"` stopped at 0.1.3; 0.2.0 added the diagram fence and 0.3.0 the
+# URL image, each with an `Error` variant, and this line took both at once —
+# 0.3.0's showcase PDF and Typst source are byte-identical to 0.1.3's, so the
+# condition above is still unspent. **The diagram renderer has a cost, and it
+# is stated**: `merman` declares Rust 1.95 as its floor, and it links three
+# MPL-2.0 crates into this binary (`cssparser`, `dtoa-short`, `selectors`) beside
+# the one Tauri already brought, `option-ext`. The README's licence section says
+# where all four crates' source is.
 #
 # It was a git revision at the split, pinned to the engine's `main`, and that
 # shape stays the documented seam rather than a workaround: a `{ git, rev }`
@@ -53,7 +63,7 @@ tauri-build = { version = "2.6.3", features = [] }
 # wait for. **Spelled without the `=` on purpose** — Phase 3's gate 3 greps
 # these two manifests for that literal and requires nothing back, and a comment
 # is not worth blunting the check that proves the dependency left.
-md2pdf-core = "0.1"
+md2pdf-core = "0.3"
 notify = "8.2.0"
 objc2-foundation = { version = "0.3.2", features = [
   "NSError",
