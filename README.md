@@ -20,7 +20,8 @@ $ cargo tauri build
 
 That writes `target/release/bundle/macos/Letur.app`, and a `.dmg` beside it under
 `target/release/bundle/dmg/`. Drag the `.app` into `/Applications` and launch it from
-there; double-clicking a `.md` file opens it too.
+there; double-clicking a `.md` file opens it too. It needs Rust 1.95 or later, the floor
+the engine's diagram renderer sets.
 
 **The bundle is not signed.** Copy it over — a USB stick, `scp`, a shared folder — and
 it runs. Download it or send it by AirDrop and macOS marks it quarantined, and
@@ -233,3 +234,15 @@ The app draws its page with Mozilla's `pdf.js`, vendored as two modules under
 
 The fonts are the engine's and ship inside `md2pdf-core`; its README carries their
 licences.
+
+**The engine's Rust crates are listed in the engine's own notice.** `md2pdf-core` ships
+`THIRD-PARTY-LICENSES.md` inside the published crate, so the version this app pins carries
+the list that matches it — drawn for the engine's own binary, and a superset of what the
+engine brings here — with the text of every licence among them. **The window's own crates —
+Tauri's, and the rest of what `app/Cargo.toml` names — are not yet listed anywhere.**
+
+**Four crates in this binary are MPL-2.0**, which is copyleft per file. `cssparser` 0.36.0,
+`dtoa-short` 0.3.5 and `selectors` 0.37.0 arrive with the engine's diagram renderer and are
+on its list; `option-ext` 0.2.0 arrives with Tauri, under `dirs`, and is on none. All four
+are compiled in unmodified, and each one's source is on crates.io at
+`https://crates.io/crates/<name>/<version>`.

@@ -21,7 +21,7 @@ on:
     # is no `core/` in this repository to watch. A new engine version reaches
     # the page through a commit to that manifest or to `web/Cargo.lock`, both of
     # which `web/**` covers. It was a git revision until `mpdf-011` Phase 3 and
-    # is `md2pdf-core = "0.1"` off the registry since.
+    # is `md2pdf-core = "0.3"` off the registry since.
     paths:
       - 'web/**'
       - '.github/workflows/pages.yml'

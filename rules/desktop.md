@@ -103,11 +103,11 @@ so neither adds a crate to the tree**, and that fact is what picked
 `objc2-foundation` over the `trash` crate, whose macOS implementation is the
 same `NSFileManager` call. There is no `target.'cfg(...)'` table: this binary is
 macOS only by construction and `src/main.rs` says so. **`md2pdf-core` is a
-registry dependency at `"0.1"`**, since `mpdf-011` Phase 3 published it; it was
-pinned to the engine's split commit in `Ivapo/md2pdf` until then, and a
-`{ git, rev }` table stays the documented seam for any publish Letur cannot wait
-for. The range takes a patch release without a commit here, which is that spec's
-OQ-5 answered and what its own reopening condition watches. **This crate owns its
+registry dependency at `"0.3"`** since `mpdf-011` Phase 3 published it, a `{ git, rev }`
+table staying the seam for any publish Letur cannot wait for. A patch lands with no
+commit here — that spec's OQ-5, and what its reopening condition watches — and a minor,
+`0.x`'s breaking release, takes one. Its diagram renderer `merman` sets a Rust 1.95 floor
+and links three of the binary's four MPL-2.0 crates. **This crate owns its
 `version`** — `0.1.0` inline rather than `version.workspace`, because a library
 versions by API and a product by release; `app/tauri.conf.json` carries **no**
 `"version"` key, Tauri falling back to this one, so the two cannot disagree,
@@ -298,17 +298,15 @@ the watch filter alive while nothing compiles.
 unconditionally**: `Some(sections ++ bibliography ++ images)` when the two walks
 answer, `Some(sections)` when they do not and the master names any, `None`
 otherwise — and on `None` the caller keeps the list it had, which is what stops a
-transient out-of-dialect edit from dropping the images the app knows about. The
-first branch is what this returned before sections existed, in the same order,
-with an empty list in front of it. **The middle branch is why the sections are
-unconditional**: `section_paths` cannot fail where both shopping lists now fail
-with `Error::MissingSection` for a section that does not exist yet, and
-`Preview::compile` replaces the list only when it is `Some` — so without it the
-list would stay empty, `classify` would drop the section's creation event, and
-the window would never recover. It *replaces* the list with a shorter one, so
-such a document stops watching its figures until the section returns: a
-deliberate trade, since recovering the section beats watching figures through a
-window in which nothing compiles anyway.
+transient out-of-dialect edit from dropping the images the app knows about.
+**The middle branch is why the sections are unconditional**: `section_paths`
+cannot fail where both shopping lists now fail with `Error::MissingSection` for a
+section that does not exist yet, and `Preview::compile` replaces the list only
+when it is `Some` — so without it the list would stay empty, `classify` would
+drop the section's creation event, and the window would never recover. It
+*replaces* the list with a shorter one, so such a document stops watching its
+figures until the section returns: a deliberate trade, since recovering the
+section beats watching figures through a window in which nothing compiles anyway.
 
 **`Render::sections` is that same list kept on its own, and its type is the
 claim.** A plain `Vec` where `assets` is an `Option`: `assets` is `None` exactly
@@ -326,7 +324,9 @@ and travel `Render::assets` → the watch filter. **The bytes are what make the
 document compile; the paths are what make a change to one of them redraw.** The
 image and bibliography exports come off one walk, so they answer or fail
 together, and the paths arrive even when a read failed — which is what an asset
-named before it exists depends on.
+named before it exists depends on. **An image named by an http or https URL makes
+neither journey**: `ImageRef::is_url` drops it from both, because a URL is a name
+and not a file, and `core`'s `Error::UnfetchedImage` is what names it on the page.
 
 The compile itself is `md2pdf_core::md_to_pdf_with_anchors`, and `Render` carries
 its `anchors` beside the bytes. **They go the other way from `assets`**: a failed

@@ -39,9 +39,8 @@ console_error_panic_hook = "0.1.7"
 # 2.5 MB of that; the rest is Typst and the PDF writer.
 #
 # That is a dated measurement and not the current figure. The number the record
-# tracks is `web/pkg/md2pdf_web_spike_bg.wasm` in the tree, which `mpdf-007`
-# Phase 4 last measured at 25,362,143 bytes on 2026-08-23; `rules/web-demo.md`
-# carries it, and carries it once.
+# tracks is `web/pkg/md2pdf_web_spike_bg.wasm` in the tree, and
+# `rules/web-demo.md` carries its latest measurement, and carries it once.
 [profile.release]
 opt-level = "s"
 lto = true

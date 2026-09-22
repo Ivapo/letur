@@ -64,11 +64,13 @@ brotli, of which `core/assets/fonts` is 2.5 MB; nothing in the design is keyed t
 figure. `web/Cargo.toml`'s release profile is tuned for size over speed — `opt-level = "s"`,
 `lto`, one codegen unit, `panic = "abort"`.
 
-`web/pkg/md2pdf_web_spike_bg.wasm` was **25,362,143 bytes** on 2026-08-23, against the
-**25,342,182** `mpdf-006` Phase 4 recorded: **+19,961**. The record is the requirement,
-never a ceiling — and the delta is **not one phase's**. That baseline predates `mpdf-007`
-Phase 2, which put `core/src/bibliography.rs` and `hayagriva`'s reader inside the wasm
-build; Phase 4 added two `wasm_bindgen` parameters apiece to two exports.
+`web/pkg/md2pdf_web_spike_bg.wasm` is **33,160,438 bytes** at `md2pdf-core` 0.3.0 and
+**9,906,385** under brotli, measured 2026-09-21 against **25,415,506** and **7,912,959** at
+0.1.3 on the same day, toolchain and profile: **+7,744,932 raw, +1,993,426 over the wire**,
+and all of it the engine's. 0.2.0 brought the diagram renderer — `merman`, and `lol_html`
+with `cssparser` and `selectors` under it — and 0.3.0 the URL image, which in a browser is
+always refused, since nothing here fetches. The record is the requirement, never a ceiling;
+the one before it was 25,362,143 on 2026-08-23, after `mpdf-007` Phase 4.
 
 The panes sit beneath the list, so the page scrolls and `main` takes a slice of the
 viewport — `clamp(360px, 70svh, 720px)`, in `svh` rather than `dvh` so browser chrome
@@ -191,7 +193,7 @@ the emitter, so it is not a second renderer but the one the page's whole claim i
 about. It shows what this parse looks like when something other than the emitter sets it
 down: the caption marker is lost because nothing but the emitter is looking for it. The
 twelve labels read `the same parse, as HTML`. **The bytes are inlined rather than produced
-at load**, so no column sits behind the 7.8 MB and a reader with scripting off meets both
+at load**, so no column sits behind the module and a reader with scripting off meets both
 halves of every row.
 
 **The blocks sit between `<!--html:NAME-->` and `<!--/html:NAME-->`**, keyed to the row's
@@ -264,7 +266,7 @@ share link: `mpdf-001` §1.1 refuses servers permanently, and Pages serves stati
 trigger with `mpdf-011` Phase 1**: the engine is a dependency of `web/Cargo.toml` rather
 than a directory beside it, so there is no `core/` here to watch and a new version of it
 reaches the page through a commit to that manifest or its lockfile, both of which `web/**`
-covers. It was a git revision until `mpdf-011` Phase 3 and is `md2pdf-core = "0.1"` off
+covers. It was a git revision until `mpdf-011` Phase 3 and is `md2pdf-core = "0.3"` off
 the registry since. It assembles
 `_site` from **`web/index.html` and `web/pkg/` only**, so anything the page needs must be
 inline in that file or added to that step — which is why both of the page's files are. `wasm-pack`'s

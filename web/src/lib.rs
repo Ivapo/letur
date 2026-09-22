@@ -14,7 +14,7 @@
 //! both reach the pane. They arrive as scalar pairs rather than an array
 //! deliberately: `web/Cargo.toml` carries `wasm-bindgen` alone, so a
 //! `Vec<Vec<u8>>` across this boundary is a new dependency on a page whose
-//! entire cost is its 7.8 MB — and the set is closed, `mpdf-006` §1.2 parking
+//! entire cost is its module — and the set is closed, `mpdf-006` §1.2 parking
 //! a reader's own files permanently.
 //!
 //! A browser still has no filesystem, so `md2pdf_core::image_paths`' shopping
