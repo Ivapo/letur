@@ -206,7 +206,13 @@ pub fn render_with(
                         .flatten()
                         .map(|named| named.path),
                 )
-                .chain(images.into_iter().map(|image| image.path))
+                // A URL is a name and not a file, so no event can change it.
+                .chain(
+                    images
+                        .into_iter()
+                        .filter(|image| !image.is_url())
+                        .map(|image| image.path),
+                )
                 .collect()
         })
         .or_else(|| (!named.is_empty()).then(|| named.clone()));
@@ -1186,7 +1192,8 @@ pub fn write_appearance(
 /// errors differently, which is most of what those forty lines do.
 ///
 /// The image list arrives in document order and may name one path twice, so
-/// this reads each file once. The bibliography is one frontmatter value rather
+/// this reads each file once, and an image named by a URL is read from nowhere
+/// and left for `core` to refuse. The bibliography is one frontmatter value rather
 /// than something the walk finds, so it comes from an export of its own — and
 /// it is read first of the two, since the line it names is the earliest one in
 /// the file.
@@ -1238,7 +1245,13 @@ fn read_assets_with(
     }
 
     for image in images {
-        if !seen.insert(image.path.clone()) {
+        // A URL gets no bytes, and `core`'s own refusal is what names it. It
+        // is never joined onto the directory: that would hand the OS
+        // `dir/https://…` and the author an OS error about a file that was
+        // never meant to exist. `cli/src/main.rs:read_assets` skips it the
+        // same way when it is run without `--fetch`, and this app fetches
+        // nothing.
+        if image.is_url() || !seen.insert(image.path.clone()) {
             continue;
         }
 
@@ -1392,6 +1405,48 @@ mod tests {
         assert_eq!(assets.len(), 1);
         assert_eq!(assets[0].path, "dot.png");
         assert_eq!(reads, [dir.join("dot.png")]);
+    }
+
+    /// An image named by a URL is read from nowhere, watched for nothing, and
+    /// refused in the words the terminal uses without `--fetch`.
+    ///
+    /// Before `md2pdf-core` 0.3 the dialect refused the scheme itself. Since
+    /// then the URL is a name on `image_paths`' list like any other, and joining
+    /// it onto the directory put an OS error about `dir/https:/…` on the page.
+    /// The file beside it is still read, so the refusal is the URL's and not the
+    /// first image's.
+    #[test]
+    fn a_url_image_is_read_from_nowhere_and_refused_in_the_engine_s_words() {
+        let dir = scratch_dir("url-image");
+        std::fs::copy(fixture("dot.png"), dir.join("dot.png")).unwrap();
+
+        let markdown = "![here](dot.png)\n\n![there](https://example.com/figure.png)\n";
+
+        let mut reads = Vec::new();
+        let render = render_with(&dir, markdown, Pane::Master, |file| {
+            reads.push(file.to_path_buf());
+            std::fs::read(file)
+        });
+
+        assert_eq!(reads, [dir.join("dot.png")]);
+        assert_eq!(
+            render.pdf,
+            Err("no image fetched for 'https://example.com/figure.png' at line 3".to_string())
+        );
+        assert_eq!(render.assets, Some(vec!["dot.png".to_string()]));
+    }
+
+    /// A `mermaid` fence draws on the page, which is `md2pdf-core` 0.2's
+    /// diagram reaching this app through the path the pane compiles on.
+    #[test]
+    fn a_mermaid_fence_compiles() {
+        let dir = scratch_dir("mermaid");
+        let markdown = "```mermaid\nflowchart LR\n  A[write] --> B[see the page]\n```\n";
+
+        let render = render(&dir, markdown);
+
+        assert!(render.pdf.is_ok(), "{:?}", render.pdf.err());
+        assert_eq!(render.assets, Some(Vec::new()));
     }
 
     /// A document and the bibliography it declares, read from beside it.
