@@ -10,6 +10,7 @@
 
 mod document;
 mod preview;
+mod remote;
 mod watch;
 
 use std::path::{Path, PathBuf};

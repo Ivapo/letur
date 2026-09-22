@@ -1053,7 +1053,8 @@ pub fn move_to_trash(path: &Path) -> Result<(), String> {
 }
 
 /// The file the store lives in, inside the directory the platform gives this
-/// app. [`settings_file`] is its sibling and the only other one.
+/// app. [`settings_file`] and [`sites_file`] are its siblings and the only
+/// others.
 ///
 /// **Not a dotfile in the author's own folder**, and that was refused for two
 /// reasons either of which is sufficient: it is the manifest
@@ -1179,6 +1180,71 @@ pub fn write_appearance(
             .map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
     }
     std::fs::write(settings, text).map_err(|e| format!("cannot write {}: {e}", settings.display()))
+}
+
+/// The third file this app writes, beside [`store_file`] and [`settings_file`]
+/// and in the same directory: which sites each folder's author allowed images
+/// to be fetched from. `mpdf-003` Phase 25.
+///
+/// **A third file and not a member of `projects.json`**, for [`settings_file`]'s
+/// reason, which `writing_the_appearance_does_not_touch_the_store` holds: a
+/// member beside the mains would make every store on disk malformed, and
+/// malformed means forgotten.
+///
+/// **Per folder and per site, and remembered across launches.** Asking on every
+/// launch trains a click nobody reads, and per *site* keeps it narrow: a `git
+/// pull` that brings in a tracker's URL asks again rather than being fetched
+/// silently.
+pub fn sites_file(support: &Path) -> PathBuf {
+    support.join("sites.json")
+}
+
+/// Which sites each root allows, keyed by the root as [`key`] spells it and
+/// each list sorted, so two writes of the same consent produce the same bytes.
+type Sites = std::collections::BTreeMap<String, Vec<String>>;
+
+/// [`read_store`]'s rule, inherited whole: a missing, unreadable or malformed
+/// file is nothing allowed, and never an error in the window. The failure state
+/// is the state a first launch is in, and the button is still there to press.
+fn read_all_sites(sites: &Path) -> Sites {
+    std::fs::read_to_string(sites)
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+/// The sites this root's author allowed, or none.
+pub fn read_sites(sites: &Path, root: &Path) -> std::collections::BTreeSet<String> {
+    read_all_sites(sites)
+        .remove(&key(root))
+        .unwrap_or_default()
+        .into_iter()
+        .collect()
+}
+
+/// Remember that this root allows exactly these sites.
+///
+/// **A failed write is reported**, for [`write_override`]'s reason: the author
+/// has just pressed the button. It writes this file and reads nothing else, so
+/// neither `projects.json` nor `settings.json` is opened.
+pub fn write_sites(
+    sites: &Path,
+    root: &Path,
+    allowed: &std::collections::BTreeSet<String>,
+) -> Result<(), String> {
+    let mut held = read_all_sites(sites);
+    held.insert(key(root), allowed.iter().cloned().collect());
+
+    let text = serde_json::to_string_pretty(&held)
+        .map_err(|e| format!("cannot write {}: {e}", sites.display()))?;
+
+    if let Some(parent) = sites.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
+    }
+    std::fs::write(sites, text).map_err(|e| format!("cannot write {}: {e}", sites.display()))
 }
 
 /// Read every file the document names, from beside the document.
@@ -2114,6 +2180,87 @@ mod tests {
             "the remembered main did not survive an appearance being written"
         );
         assert_ne!(store, settings, "the two files must not be one file");
+    }
+
+    // -- the third file ----------------------------------------------------
+    //
+    // `mpdf-003` Phase 25. The sites a folder's author allowed are per-root, as
+    // the store's one fact is, and they are a third file for the second's
+    // reason — which the last test below holds.
+
+    /// `sites.json` round-trips per root, and a malformed one is nothing
+    /// allowed rather than an error in the window.
+    #[test]
+    fn the_sites_round_trip_per_root_and_a_bad_file_allows_nothing() {
+        let dir = scratch_dir("sites-round-trip");
+        let sites = sites_file(&dir);
+        let root = fixture("panel");
+        let other = fixture("panel-pair");
+        let set = |named: &[&str]| -> std::collections::BTreeSet<String> {
+            named.iter().map(|site| site.to_string()).collect()
+        };
+
+        assert!(read_sites(&sites, &root).is_empty(), "no file at all");
+
+        write_sites(&sites, &root, &set(&["b.example", "a.example"])).unwrap();
+        write_sites(&sites, &other, &set(&["c.example"])).unwrap();
+        assert_eq!(read_sites(&sites, &root), set(&["a.example", "b.example"]));
+        assert_eq!(read_sites(&sites, &other), set(&["c.example"]));
+
+        // Sorted on disk, under the root the filesystem spells.
+        let held: Sites = serde_json::from_str(&std::fs::read_to_string(&sites).unwrap()).unwrap();
+        assert_eq!(
+            held.get(&key(&root)),
+            Some(&vec!["a.example".to_string(), "b.example".to_string()])
+        );
+
+        // A second write of the same root replaces rather than accumulates.
+        write_sites(&sites, &root, &set(&["a.example"])).unwrap();
+        assert_eq!(read_sites(&sites, &root), set(&["a.example"]));
+        assert_eq!(read_sites(&sites, &other), set(&["c.example"]));
+
+        for malformed in ["{\"/some/root\": ", "not json at all", "{\"/r\": \"a.example\"}"] {
+            std::fs::write(&sites, malformed).unwrap();
+            assert!(
+                read_sites(&sites, &root).is_empty(),
+                "{malformed:?} must read as nothing allowed"
+            );
+        }
+    }
+
+    /// Writing the sites leaves `projects.json` **and** `settings.json`
+    /// byte-identical — the third-file decision's own check, worded against the
+    /// bytes for `writing_the_appearance_does_not_touch_the_store`'s reason.
+    #[test]
+    fn writing_the_sites_does_not_touch_the_store() {
+        let dir = scratch_dir("sites-beside-store");
+        let store = store_file(&dir);
+        let settings = settings_file(&dir);
+        let sites = sites_file(&dir);
+        let root = fixture("panel");
+
+        write_override(&store, &root, "book.md").unwrap();
+        write_appearance(&settings, crate::preview::Appearance::Dark).unwrap();
+        let (mains, appearance) = (
+            std::fs::read(&store).unwrap(),
+            std::fs::read(&settings).unwrap(),
+        );
+
+        write_sites(&sites, &root, &["images.example".to_string()].into()).unwrap();
+        write_sites(&sites, &root, &["other.example".to_string()].into()).unwrap();
+
+        assert_eq!(
+            std::fs::read(&store).unwrap(),
+            mains,
+            "writing the sites rewrote projects.json"
+        );
+        assert_eq!(
+            std::fs::read(&settings).unwrap(),
+            appearance,
+            "writing the sites rewrote settings.json"
+        );
+        assert_ne!(sites, store);
+        assert_ne!(sites, settings);
     }
 
     /// The path arithmetic the panel's union needs: a master that does not sit
