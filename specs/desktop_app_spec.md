@@ -5,7 +5,7 @@ note: >
   A macOS desktop app that shows the PDF while you write: a Tauri window wraps
   the same core crate, watches the document and its images, and re-renders.
 status: accepted
-last_updated: 2026-09-04
+last_updated: 2026-09-22
 
 phases:
   - name: "Phase 1 — the window, and one compile on screen"
@@ -128,6 +128,11 @@ phases:
     shipped: 2026-09-05
     cut: null
     by: null
+  - name: "Phase 25 — an image on the web, fetched when the author says so"
+    reviewed: 2026-09-22
+    shipped: null
+    cut: null
+    by: null
 
 extends: null
 supersedes: null
@@ -137,7 +142,9 @@ reference: >
   Typst's own web app is the inspiration for the two-pane shape and for
   re-rendering as you type. Its collaboration, its package registry and its
   server are all out of scope permanently: this app runs on the local machine
-  and fetches nothing, per mpdf-001 §2.
+  and fetches nothing, per mpdf-001 §2. CORRECTED 2026-09-22, by Phase 25: it
+  fetches an image the author named by URL, once the author allows that site,
+  and nothing else; see §1.1.
 ---
 
 # desktop app
@@ -187,6 +194,24 @@ core crate. It is not a rewrite."
 - **No servers, no network. Ever.** `mpdf-001` §2's decision is inherited
   whole. The app fetches nothing at run time, and any asset it needs is
   bundled at build time.
+
+  > **CORRECTED 2026-09-22, by Phase 25.** The bullet above is kept as it was
+  > written, and half of it is no longer true: **the app reaches the network
+  > when the author says so.** A document may name an image by an http or https
+  > URL since `md2pdf-core` 0.3, and the engine settled whose job the fetch is in
+  > its own `specs/images_spec.md` §2, *"Why a URL is a name, and the caller
+  > fetches it"*: `core` fetches nothing, and a caller that fetches supplies the
+  > bytes. The CLI does it under `--fetch`; this app does it when the author
+  > presses the button beside the refusal, for the sites that document names,
+  > and remembers that answer per project folder. **Nothing is fetched before
+  > that press, and nothing else in the app touches the network** — no update
+  > check, no telemetry, no font, no package.
+  >
+  > **What the bullet was about survives in full: no servers.** Nothing a shipped
+  > build runs listens — the WebDriver server is a test rig's, behind the
+  > `driven` feature — nothing is uploaded, and the document never leaves the
+  > machine. The only requests are `GET`s, and the redirects they follow, for
+  > images the author named.
 - **No change to the dialect.** The app converts exactly what `mpdf-001` and
   `mpdf-002` accept, and refuses exactly what they refuse, with the same
   message. A construct the CLI names is a construct this app names.
@@ -1371,6 +1396,34 @@ list to one item.
   **Decided at the window: Phase 24 ships first and the experiment runs on a branch after**,
   so the pane that is built, gated and shipped stays the one on `main` while the question is
   answered. **Not opened further until that branch has a figure beside the 34 ms.**
+
+- **OQ-19** — how is a site's consent taken back? Raised 2026-09-22 by Phase 25.
+  *(design call, the author's)*
+
+  Phase 25 remembers the sites an author allowed, per project folder, across launches
+  — so there must be a way to withdraw it that is not editing a JSON file in
+  Application Support. **Recommended: one menu item, and it is the withdrawal rather
+  than a second route to the button.** The button already appears exactly when there
+  is something to fetch, so a menu item that fetched would add a path and no reach;
+  *"Stop Fetching Images for This Folder"* has no other home. It would be the seventh
+  id `app/src/main.rs`'s one filter enumerates, and enabled only while the open
+  project has a site remembered. **Not blocking Phase 25**, which ships the grant;
+  the withdrawal is a phase of its own or a line in this one, decided at the window.
+
+- **OQ-20** — does Letur need its own licence notice before a build that carries a TLS
+  stack ships? Raised 2026-09-22 by Phase 25. *(design call, the author's)*
+
+  `README.md`'s licence section already says the window's own crates are listed
+  nowhere, and the step that moved the engine to 0.3 left that gap logged rather than
+  closed. Phase 25 adds thirteen crates to the lock and twelve to a macOS build
+  (`windows-sys` is the thirteenth), measured on the prototype: `ureq` and `rustls` among them, `ring` under Apache-2.0 **and** ISC,
+  `rustls-webpki` and `untrusted` under ISC, `subtle` under BSD-3-Clause, and
+  `webpki-roots` under CDLA-Permissive-2.0 — the first licence in this binary whose
+  terms are about **data**, the Mozilla root store compiled in, and which asks that
+  its text travel with it. **Recommended: close the gap before the first bundle with
+  this phase in it leaves the machine**, by running the engine's
+  `tools/third-party-licenses.py` over this workspace with its roots widened. Not a
+  gate on building Phase 25, which is a local window until then.
 
 ## 4. Implementation phases
 
@@ -7202,6 +7255,439 @@ rejected below; that the dialect fits in four is the check on the vocabulary.
   cross-reference correction; the block family with `$$`, `:::`, captions, names and tables;
   then clauses 23–25 with their mutations, the rule, the README and the regenerated index.
   The drafted spec lands first, on its own.
+### Phase 25 — an image on the web, fetched when the author says so
+
+*Produces the observable: **yes**.* A document whose image is named by an http or https
+URL shows that image on the page once the author presses the button beside the refusal —
+the page the author sees beside their text, carrying a figure it could not carry before.
+
+Appended 2026-09-22, per §6.1. **Step 0 says decision**: §1.1's first non-goal said the
+app fetches nothing, and this makes it fetch. **Step 1 fires on prose and not on work**:
+nothing shipped is removed — a URL nobody has consented to is refused exactly as it has
+been since the engine moved to 0.3, in `core`'s own `no image fetched for '<url>' at line
+N` — but the non-goal's sentence is now misleading, so it carries a dated **CORRECTED**
+note in place, as does the frontmatter's `reference`. **Step 2 puts it here**: this spec
+owns the app's file I/O (§2, *"Why the app owns file I/O, exactly as the CLI does"*), and
+a fetch is that I/O's network half.
+
+**Asked for at the window**, with a document whose one image was
+`https://cdn.prod.website-files.com/…/6a8739a1b934ffe55bfc9715_44592f18.png`: Letur
+refused it, and the engine had just made a URL a name the caller fills (`Ivapo/md2pdf`
+`specs/images_spec.md`, Phases 3 and 4). The shape asked for is the email client's *load
+remote images*: nothing by default, one button naming the site, and the press is consent.
+
+**Prototyped in the window before it was specced**, on 2026-09-22, and the decisions below
+were taken against it rather than against a description of it. Measured there:
+
+- **Press to page, 430–740 ms** for the reported image, over three runs; the page read
+  `current` with the image in it, and the author confirmed it by eye.
+- **Eight in-place edits of a URL on an allowed site, one per 500 ms — slow enough that
+  the 300 ms typing debounce compiled every one — made one request**, for the last.
+- **Reopening the document in the same session made none.**
+- **A file the CDN does not have is answered `403 Forbidden`**, and the page said
+  `cannot fetch <url> for the image at line 7: 403 Forbidden` — the site's word, carried
+  in the CLI's sentence.
+- **`ureq` adds thirteen crates** to the lock, twelve of them compiled on macOS — OQ-20's
+  list.
+
+**And it showed two defects this phase designs out.** While a request was out the line
+said *"Fetching 1 image…"* above `core`'s *"no image fetched for …"* — two sentences
+contradicting each other — and the line cleared the moment the bytes arrived, a compile
+before the page they were for.
+
+#### What was decided at the window (decision, recorded)
+
+1. **Consent is per project folder and per site, and it is remembered across launches.**
+   Asking on every launch trains a click that is not read, and consent that is always
+   given is not consent. Per *site* keeps it narrow: the button's sentence names the
+   sites, and a URL on a site not yet allowed asks again — a `git pull` that brings in a
+   tracker's URL is not fetched silently. The site is the URL's host, lower-cased, read
+   with `ureq::http::Uri`; a URL with no host to read is its own site.
+2. **The fetched bytes are held in memory, for the process, and never on disk.** One
+   fetch per URL per launch is cheap; a disk cache is a second store with its own
+   staleness, eviction and location, and keeps a site's bytes after the author stops
+   trusting it. The CLI caches nothing either, so an export and `md2pdf --fetch` agree
+   whenever the site serves the same bytes. **The cost is named**: after a relaunch
+   offline, the page says `cannot fetch …` for images it drew yesterday. **Consent and the
+   bytes are held apart**: a compile reads only bytes from sites the *open* project
+   allows, so a second project that never allowed a site does not draw that site's image
+   out of memory while its line says the image is not fetched.
+3. **While an image is on its way, the line says so and nothing contradicts it.** `core`'s
+   *"no image fetched"* is not shown for a URL that is waiting out the settle, being
+   fetched, or fetched and not yet compiled; it **is** shown, exactly as today, for a URL on
+   a site not yet allowed — the refusal the button sits beside. The line reads *"Fetching
+   …"* from the moment a request goes out until the compile that read the bytes has landed.
+   **No placeholder**: a box of a guessed size draws a page that is not the document and
+   moves when the real image lands. The last good page stays under the line, marked stale,
+   per §2's *"Why the last good page survives an error"*.
+4. **The web demo stays without it** and goes on showing `core`'s refusal. In a browser,
+   CORS would make a URL work on some sites and not others, and going round it is a proxy,
+   which is a server; the demo is `mpdf-006`'s subject in any case.
+
+**Two more, taken from the prototype rather than asked:**
+
+5. **A URL a compile newly names on an allowed site waits one second before it is fetched**
+   (`remote::SETTLE`), and is dropped if the text stopped naming it meanwhile. It is what
+   made eight edits one request. **Only the press skips it.** The prototype also skipped
+   it for an open, and that exception is dropped: every compile path claims through the
+   one writer, `Preview::absorb`, which does not know which path called it, and teaching
+   it would be a flag threaded through every caller. An open of a project whose sites are
+   remembered therefore fetches a second after it compiles.
+6. **The client is the CLI's, value for value.** `cli/src/main.rs:fetch_agent` and
+   `fetch_image` are copied rather than shared — the two wrappers report errors
+   differently, which is `read_assets`' own reason for being duplicated — with the same
+   30 s global timeout, the 20 MB cap read with `limit(FETCH_LIMIT + 1)`, ten redirects,
+   2xx only through `http_status_as_error(false)`, no gzip, no cookies, no cache, and
+   `Content-Type` ignored. **A failed fetch is refused in the CLI's sentence**: `cannot
+   fetch <url> for the image at line N: <reason>`.
+
+#### Scope
+
+- **`app/Cargo.toml`** — `ureq = { version = "3.4", default-features = false, features =
+  ["rustls"] }`, spelled as `cli/Cargo.toml` spells it, with its cost in the comment as
+  every dependency there carries one.
+- **`app/src/remote.rs`**, new:
+  - the CLI's three constants, and `SETTLE`;
+  - `fetch`, which is `fetch_image`;
+  - `host`;
+  - `Web`, the consent and the bytes (below);
+  - `Web::line`, which words `WebLine { sentence, action }` (below).
+
+  **`Web`** holds the sites the open project allows, and one state per URL asked about:
+  **`Waiting` → `Fetching` → `Arrived` → `Done`**. The last two each hold the bytes or the
+  reason, and a **generation** that is bumped every time a fetch lands.
+
+  **`Web::line`** chooses a sentence and an action, and every word of both is chosen in
+  Rust. It takes the **first** of these that applies to the URLs the document names:
+  1. **Any URL on a site not allowed** — *"1 image on cdn.example.com is not fetched."*,
+     or *"3 images on a.example, b.example and c.example are not fetched."*, counting and
+     naming only the URLs on sites not allowed. Its action is **Fetch images from the
+     web**.
+  2. **Any URL `Fetching` or `Arrived`** — *"Fetching 1 image from cdn.example.com…"*,
+     with no action.
+  3. **Any URL `Done` with a failure** — *"1 image could not be fetched."*, with the
+     action **Try again**.
+  4. **Otherwise** no line at all. A URL that is only `Waiting` shows none, which is what
+     keeps a URL being typed from flashing a sentence per keystroke.
+
+  **The order is what keeps consent narrow.** Both buttons run the same command, and that
+  command allows every site the document names. **Try again** can only appear once no
+  site is waiting to be allowed, so pressing it allows nothing new.
+- **`app/src/document.rs`**:
+  - `Render` gains `urls`, the images named by URL once each in document order — **`None`
+    exactly when `md2pdf_core::image_paths` fails**, so a walk that cannot answer leaves the
+    caller's list alone, where `assets` may still be `Some(sections)`.
+  - It also gains `refused`, the URL the compile was refused on. That is either the one
+    `md2pdf_core::Error::UnfetchedImage` names, **read off the typed error before
+    `render_with` turns it into a string**, or the one `read_assets_with` refused in the
+    CLI's `cannot fetch` sentence. Either one is what lets decision 3 hide one error and no
+    other without matching words. That includes a failure's own *"cannot fetch"* while
+    **Try again**'s fetch is out.
+  - `render_with`, `render_project` and `read_assets_with` gain the finished fetches as a
+    parameter; their test call sites pass an empty map. A URL's bytes are supplied under
+    the URL itself, a failed fetch is refused in the CLI's sentence, and a URL with neither
+    is left for `core`, as now.
+  - `sites_file`, `read_sites` and `write_sites` sit beside `store_file` and
+    `settings_file`, with the store's forgiving read and reported write. They keep a
+    **third** file in the same directory, `sites.json`: a `BTreeMap` from canonical root
+    (the store's own `key`) to a sorted list of sites. **A third file and not a member of
+    `projects.json`**, for `settings.json`'s reason, which `rules/desktop-project.md`
+    states and `document.rs:writing_the_appearance_does_not_touch_the_store` holds: a member
+    beside the mains would make every store on disk malformed, and malformed means
+    forgotten.
+- **`app/src/preview.rs`**:
+  - **`Web` is a field of `Preview`**, carried across `Session::open_at`'s rebuild beside
+    `started`, by moving it out of the old `Preview` and into the new one. It sits under
+    the one lock every step already takes, so there is no second lock and no lock order.
+    `open_at` installs the new root's allowed sites, read from `sites.json`, **before**
+    `load` compiles. That compile's `absorb` claims and filters against them, so installing
+    them after would let the previous project's consent decide the first page.
+  - **`Preview::absorb` is the one place a fetch is claimed.** After it writes `urls` it
+    marks every named URL on an allowed site that has no state `Waiting`, and sends it to
+    the **fetch worker** down `Preview::claims`, a channel sender carried across the rebuild
+    as `Web` is. Every compile path — the typing loop, the watch loop, `load`, `reload`,
+    `save_as`, the press — reaches `absorb`, so none of them can strand a URL. A `Preview`
+    with no sender, as in a test that builds one bare, claims nothing.
+  - **The fetch worker** is one thread `Session::new` starts. It holds a `Weak` to the
+    state rather than an `Arc`, so a dropped `Session` takes its `Preview` with it; that
+    `Preview` holds the channel's only sender, so the worker's `recv` ends and the thread
+    exits. The suite builds hundreds of sessions. The worker also holds `on_render`, the
+    fetch and the render — **the last two injected**, the render through
+    the seam `Session::recompile_with` already takes — so no test in the suite touches the
+    network, and a test can hold a compile open. For each claim it starts a thread:
+    1. Wait out `SETTLE`, unless the claim came from the press.
+    2. Under the lock, move `Waiting` to `Fetching` if the text still names the URL **and
+       the open project allows its site**, and otherwise drop its state. Then announce. A
+       claim made under one project that settles after another opens is thereby dropped,
+       not fetched on the second project's behalf.
+    3. Fetch, off the lock.
+    4. Under the lock, record `Arrived` with a new generation, and announce.
+    5. The typing loop's three steps: plan under the lock, render off it, absorb under it.
+       Then announce.
+    
+    **A keystroke never waits on the network**, which is Phase 22's property extended to a
+    new source of work.
+  - `Compile` carries the finished fetches, and **only those on sites the open project
+    allows**. The bytes are shared, so a plan copies no image. It also records the
+    generation of each fetch it read.
+  - `Preview::absorb` promotes `Arrived` to `Done` **only for the entries its plan read, at
+    the generation it read them**. So an older plan that lands after a retry cannot clear
+    the line for bytes it never compiled.
+  - `Preview` keeps `refused` from each `Render`, and **clears it on every error it writes
+    that did not come from one**: `absorb`'s early `Err` arm and `load`'s. Otherwise a
+    stale `refused` would hide a *"cannot read"* about the master.
+  - **`Preview::status` gains `web`**. It leaves `error` out **exactly while `refused`
+    names a URL whose state is `Waiting`, `Fetching` or `Arrived` and whose site the open
+    project allows**. Any other URL shows its error as it always has:
+    - one with no state, because its site is not allowed;
+    - one that is `Done`;
+    - one left `Arrived` by a project that has since closed.
+  - **`Session::fetch_images`** is the press:
+    - under the lock, allow every site the document names, and write `sites.json`;
+    - claim, without the settle, every named URL that has no state or failed;
+    - **always send the worker a compile**, even when no fetch starts. The bytes may
+      already be in memory, from a project that allowed the site first, and a press that
+      only widens consent must still redraw.
+    
+    **It holds no lock across the network or the render**, since the command that calls it
+    holds `Mutex<Session>`, as `edit` does.
+  - `Session::new` gains the `sites.json` path and the worker's two seams. Production passes
+    `remote::fetch` and `Compile::run`; `tests::counted_with` passes fakes.
+  - The typedef test, `the_page_typedefs_name_exactly_the_fields_status_serializes`, moves
+    from **12** to **13**. `WebLine` joins the two-declaration check `Anchor` and `Entry`
+    already have, with `web: Some(…)` in its literal so the check has a line to compare.
+- **`app/src/main.rs`**:
+  - `fetch_images` is **the nineteenth command**;
+  - `Session::new` takes `document::sites_file(&support)` beside the store and the
+    settings, and the real fetch.
+- **`app/dist/index.html`**:
+  - `#web` is a sentence and one button in `#divergence`'s shape. `report` places it from
+    `state.web` and never composes it, and the button is hidden when `action` is `null`.
+  - **The stale mark follows `state.state === 'stale'`**, not `state.error !== null &&
+    state.page`. The two agree on every page except the one this phase adds: a stale page
+    whose error is hidden while its image is on the way.
+  - `#error` gains `overflow-wrap: anywhere`, so a long URL wraps inside the pane rather
+    than being clipped at its edge, as the reported one was.
+  - The `Status` typedef gains `web`, and a `WebLine` typedef is added.
+  - The link filter's comment gives §1.1's *"no network"* as its reason, and it is restated:
+    the page never navigates out, and the one network use is Rust's, for an image the
+    author allowed.
+- **`app/harness/stub.mjs`** — `EMPTY` and `OPEN` gain `web: null`, so every existing
+  clause sees the line hidden.
+- **Two fixtures:**
+  - **`tests/fixtures/web/images.md`** names two images on two sites, over the internet,
+    and is checked by eye.
+  - **`tests/fixtures/web/local.md`** names one image at `http://127.0.0.1:4446/dot.png`,
+    and is what driver clause 6 opens.
+
+  Neither disturbs a test that walks `tests/fixtures/`. `masters` does not recurse, the
+  panel manifest covers `panel/` alone, and opening `web/local.md` roots at
+  `tests/fixtures/web` with the opened file as main.
+
+**Not in scope, each for a reason:**
+- **The withdrawal of consent** is OQ-19.
+- **The licence notice** is OQ-20.
+- **The macOS proxy settings** are a recorded limit. `ureq` honours the environment's
+  proxies, and a window launched from Finder has none, so a proxy set in System Settings
+  is not used.
+- **Noticing that an image changed at its URL** is not done. A URL is not a file and is
+  not watched, so a changed image arrives on the next launch.
+
+#### Rejected
+
+- **`NSURLSession`, through `objc2-foundation`**, which this app already depends on. It
+  would use the system's proxies and trust store, and cost no crate. It was priced and
+  refused:
+  - App Transport Security refuses plain `http://`;
+  - it always sends `Accept-Encoding` and decompresses;
+  - capping the redirects and the body needs a delegate class;
+  - its failures are not the CLI's words.
+- **Fetching from the page.** WKWebView's `fetch` is subject to CORS like any page's, and
+  it would put the network in the front end and send every image across IPC twice.
+- **Keeping `Web` on `Session` behind a second lock.** `plan`, `absorb` and `status` all
+  read it, and `Preview::compile` runs where no `Session` is in reach, so a separate field
+  there would need a lock order that one field on `Preview` does not.
+- **Claiming a fetch at each compile path's call site** rather than in `absorb`. That is
+  eight call sites to remember, and missing one strands the URL — the watch loop's was
+  the one the draft forgot.
+- **A placeholder while fetching**, **a disk cache**, **session-only consent** and
+  **consent per document** are decisions 3, 2 and 1.
+- **Fetching on every compile, with no settle.** The prototype's eight edits would have
+  been eight requests, seven of them for paths the author was still typing, and each one
+  telling the site what was being typed.
+
+#### Exit gate
+
+**`cargo test --workspace` passes**, with these new cases.
+- **No case touches the network.** The fetch is a fake that counts its calls.
+- **Cases that need an intermediate state block on a `Condvar` until released.** The fake
+  fetch does this, and so does a fake render passed through the worker's seam.
+- **A case that waits for the settle waits `SETTLE` plus the suite's usual margin.**
+
+1. **`Web::line`'s precedence and its words.** It covers:
+   - a site not allowed, with one, two and three sites;
+   - a site not allowed beside a URL being fetched, and beside a failed one — both give
+     the first sentence;
+   - a URL being fetched beside a failed one — *"Fetching"*;
+   - a failure alone — **Try again**;
+   - a URL only `Waiting` — no line.
+2. A fetched URL is supplied under its own name, and read from nowhere else.
+3. A failed fetch is refused in the CLI's sentence.
+4. `Render::refused` names the URL `core` refused on, and the URL a failed fetch was
+   refused for. `Render::urls` is `None` when
+   `image_paths` fails, while `assets` is `Some(sections)` for a master whose section is
+   missing.
+5. `sites.json` round-trips, a malformed one reads as nothing allowed, and
+   `writing_the_sites_does_not_touch_the_store` holds `projects.json` and `settings.json`
+   byte for byte.
+6. **Nothing is fetched before the press.** Open, wait past `SETTLE`: zero calls,
+   `status.error` is `core`'s `no image fetched` refusal, and the line offers **Fetch
+   images from the web**.
+7. **The press fetches each URL once, writes the site under the root, and the page goes
+   `current`.**
+8. **Consent carries across launches, and the bytes do not.**
+   - A second open in the same `Session` draws `current` at once, with no call.
+   - A fresh `Session` over the same `sites.json` draws with no press, after `SETTLE`,
+     with one call.
+9. **A URL on a site not allowed asks again**, while its neighbour on an allowed site is
+   fetched.
+10. **The watch loop claims too.** An external write to the master that adds a URL on an
+    allowed site is fetched after `SETTLE`, with no press. That goes through
+    `Session::on_change_with`, the path the draft forgot.
+11. **The settle drops a URL the text stopped naming.** Two edits inside `SETTLE` make
+    one call, for the second. **Each edit is waited on until its compile has landed.**
+    Otherwise the typing debounce would fold the two into one compile, and the case
+    would pass with no settle at all.
+12. **The display while an image is on its way.** With the fetch held, `status` carries
+    *"Fetching"* and no `error`. Released with the render held, it still carries both, the
+    URL now `Arrived`. With the render released, there is no line, no error, and the state
+    is `current`.
+13. **A retry's line survives an older plan.** After a failure and **Try again**, a plan
+    that read the failure and absorbs after the retry has landed leaves *"Fetching"* up,
+    and **no error**, including the failure's own *"cannot fetch"*.
+14. **A master that stops reading while a fetch is out shows *"cannot read"*.**
+    `refused` is cleared on that write.
+15. **`edit` returns while the fetch is held, and while the fetch thread's render is
+    held** — Phase 22's property, over the new source of work.
+
+**The other rigs:**
+
+- `cargo clippy --workspace --all-targets` is clean, and `bun app/typecheck.mjs` passes.
+- **`bun app/harness/checks.mjs` passes in both engines.** A new clause is appended as
+  **26**, and the uncaught-error clause moves to **27**, which is `checks.mjs:run`'s own
+  rule that that clause *"stays last … its number moves"*. Clause 26 checks three things:
+  - the web line shows Rust's sentence, and its button exactly when there is an action;
+  - `{ state: 'stale', error: null, page: true }` wears the stale mark;
+  - an error naming a 200-character URL wraps inside the pane's width.
+
+  Its mutation, **`web-button-always`**, shows the button when there is no action, and
+  `OWNS` gives it to clause 26. `--falsify` passes, twenty-four mutations each isolated.
+- **`bun app/driver/drive.mjs` passes six clauses.** The new clause 6 runs last, over the
+  shipped binary.
+
+  **Setup, before its launch:**
+  - **Prepare `sites.json`.** Read the file, and remove the fixture root's entry. An
+    earlier run that was interrupted would otherwise leave `127.0.0.1` allowed, and
+    nothing in the app can take it back (OQ-19).
+  - **Start a server** on `127.0.0.1:4446` that serves `tests/fixtures/dot.png` and counts
+    requests. No other rig uses the port: the driver is on 4445, and the harness binds
+    port 0.
+  - **Launch the app with the proxies cleared** — `HTTP_PROXY`, `HTTPS_PROXY` and
+    `ALL_PROXY` removed, and `NO_PROXY=127.0.0.1`. `ureq` honours those variables with no
+    loopback exemption.
+
+  **What it asserts:**
+  - **Open `local.md`, and wait past `SETTLE`.** `core`'s refusal and the line are both
+    shown, and the server has had zero requests.
+  - **Press.** One request, the page `current`, and `sites.json` holding `127.0.0.1` under
+    the fixture's canonical root.
+  - **Read the mutation counter, then quit.** It must be read here, before the process it
+    lives in is gone.
+  - **Relaunch and open `local.md` again.** The page is `current` with no press, after
+    `SETTLE`, and the server has had one more request.
+
+  **Both processes are killed, whatever fails.** `sites.json` and `settings.json` are
+  restored to what the run found.
+
+  **Clause 6 carries no mutation.** Its defects are Rust's, and cases 6–10 falsify them.
+  The driver's `--falsify` stays at three mutations, each isolated, and it is part of this
+  gate. **The server is local on purpose**: the gate needs no internet, gives the same
+  answer every run, and exercises plain `http://`, which the CLI accepts and
+  `NSURLSession` would not.
+
+**By eye**, over the internet, with `tests/fixtures/web/images.md`:
+
+1. **Before the press**, `core`'s refusal names the long CDN URL, and it wraps.
+2. Both images arrive on one press.
+3. Nothing on screen says *"no image fetched"* while the line says *"Fetching"*.
+4. Light and dark both read.
+
+#### Close-out
+
+- **`rules/desktop.md` splits, as its own frontmatter already requires.** It is at 730/730
+  and records that the next phase needing room there splits it where the watch loop and
+  the compile meet.
+  - **A new `rules/desktop-compile.md`** takes `## The watch loop` (93 lines), `## The
+    state` (76) and `## The rule an external change runs` (27), and adds this phase's
+    fetch: consent, the settle, the worker and the line.
+    - `sources`: `app/src/preview.rs`, `app/src/watch.rs`, `app/src/document.rs`,
+      `app/src/remote.rs`.
+    - `covers`: the watch loop and its two debounces, the compile's three steps and the two
+      guards on its answer, the state the loop writes, the rule an external change runs,
+      and the images fetched by URL — the sites allowed and where they are kept, the one
+      place a fetch is claimed, the settle, the worker, and the line that says what is on
+      its way.
+    - `max_lines`: **300**.
+  - **`rules/desktop.md` keeps** the crate, the window, the file I/O, the project, the
+    session, the export, the bundle and the document association. That is some 534 lines
+    and a pointer to the new file, so its `max_lines` goes to **600**. Its *"last raise"*
+    comment is replaced by the record of this split.
+    - The commands go from eighteen to **nineteen**, in the body and in `covers`.
+    - The file I/O's *"An image named by an http or https URL makes neither journey"*
+      becomes: its bytes travel from memory once fetched, and its path still reaches no
+      watch.
+- **`rules/desktop-project.md`**:
+  - a third file, `sites.json`;
+  - *"the one fact this app remembers about a folder"* becomes two;
+  - `max_lines` goes **180 → 200** — it is at 179, and the third file is some fifteen lines
+    written the way the second one is.
+- **`rules/desktop-panes.md`**:
+  - the web line;
+  - the stale mark read off the state;
+  - the error that wraps;
+  - the link filter's restated reason;
+  - **three in-place counts**: the harness's twenty-six clauses become twenty-seven, its
+    twenty-three broken pages become twenty-four, and the driver's five clauses become
+    six;
+  - driver clause 6's server, relaunch and second restored file;
+  - `max_lines` goes **780 → 820**: it is at 761, and this is some forty lines.
+- **`rules/desktop-geometry.md`, `rules/desktop-panel.md` and `rules/web-demo.md` need
+  nothing.** No box, observer or published figure moves. The panel lists files, and a URL
+  is not one. The web crate is untouched, which is decision 4.
+- **`README.md`**:
+  - line 121's *"the app fetches nothing and opens nothing"*, and the opening's *"no
+    server, no SaaS"*, keep what is still true and name the one exception;
+  - *Use* gains a paragraph on images named by URL;
+  - the harness's *"twenty-three ways"* becomes twenty-four;
+  - **the licence section** records OQ-20's answer. If OQ-20 is still open when this
+    ships, its *"not yet listed anywhere"* sentence names the TLS crates and
+    `webpki-roots`' data licence, so the gap is logged rather than silent.
+- **The rigs' own headers:**
+  - `app/harness/checks.mjs`'s *"`--falsify` runs all twenty-three"* becomes
+    twenty-four;
+  - `app/driver/drive.mjs`'s *"`settings.json` stays the whole of what is restored"*
+    names `sites.json` beside it.
+- **The indexes:** `specs/INDEX.md` and `rules/INDEX.md` are regenerated.
+- **`CLAUDE.md` needs nothing**: the observable and the flow are unchanged.
+
+**Commit plan.** The drafted spec, with its two CORRECTED notes, lands first on its own
+once its review converges. Then one push:
+
+1. the client, the store and `ureq`;
+2. the compile path, the worker and the command;
+3. the page's line, with harness clause 26;
+4. driver clause 6, its server and the two fixtures;
+5. the rule split, the rules, the README, the rigs' headers and the indexes.
 <!--
 The review record is a sibling file, not a section: it lives at
 specs/reviews/mpdf-003.md, append-only, one heading per round. See §7 of the

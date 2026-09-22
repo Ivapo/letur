@@ -2,6 +2,97 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 41 — Phase 25 only — 2026-09-22 — both reviewers, resumed — **READY (converged)**
+
+Zero blocking from both lenses, at the second round. Both verified against the file rather
+than the changelog; the gate lens re-derived the split's arithmetic (730 − 93 − 76 − 27 =
+534) and the correctness lens that a send on the claims channel under the lock never
+blocks and that the worker never takes `Mutex<Session>`, so the new steps cannot deadlock.
+
+**Five non-blocking refinements folded in at convergence**, all accepted:
+
+- **`open_at` installs the new root's sites before `load` compiles** (both lenses). That
+  compile's `absorb` claims and filters against them; after it, the previous project's
+  consent would decide the first page. Case 8's fresh `Session` catches the wrong order.
+- **A failure's own *"cannot fetch"* stayed on screen beside *"Fetching…"* during Try
+  again**, because the hiding was keyed to `core`'s refusal alone — decision 3's
+  contradiction by another route. `Render::unfetched` became `Render::refused`, the URL the
+  compile was refused on by `core` *or* by `read_assets_with`, and case 13 now asserts no
+  error.
+- **Two ways a project switch bypassed per-project consent**: a claim settling after
+  another project opened, and an `Arrived` left by the closed project hiding the new one's
+  refusal. The worker's step 2 and the hiding rule both now also ask that the open project
+  allows the URL's site.
+- **Every `Session` leaked its worker**: the worker held the state's `Arc` and the
+  `Preview` held the only sender, so `recv` never saw a disconnect. The worker holds a
+  `Weak`.
+- **Case 11 could pass with no settle**: two edits inside the typing debounce fold into one
+  compile. Each edit is now waited on until its compile lands.
+
+`reviewed` set to 2026-09-22. The phase goes to plan mode next; this round reviewed the
+spec, and the plan for building it is a different artifact.
+
+### Round 40 — Phase 25 only — 2026-09-22 — a panel of two, fresh — **NOT READY**
+
+**Round 0**: the phase produces the observable — an image named by URL appears on the page
+beside the text after one press — and it is the right thing to build: the author's own
+document was refused, and the engine had already settled that the caller fetches
+(`Ivapo/md2pdf` `specs/images_spec.md` §2). It was prototyped in the window first, and the
+four decisions were taken against the prototype.
+
+Two lenses: correctness of the Rust design against the code, and exit-gate testability with
+cross-file consistency. **Six blockers after deduplication, two raised by both.** Every
+citation into the engine, every count the close-out moves and every licence OQ-20 names
+was verified correct by one lens or both; what failed was the design's own consistency.
+
+**Where `Web` lives contradicted itself.** *"`Session` holds the `Web` … the way `started`
+does"* names two homes — `started` is a `Preview` field copied across `open_at` — and
+`plan`, `absorb`, `status` and `Preview::compile` (run where no `Session` is in reach) all
+need it. Resolved: a field of `Preview`, moved across the rebuild, under the one lock.
+
+**The error-hiding rule hid the refusal before the press** (both lenses). *"Leaves `error`
+out exactly while `unfetched` names a URL that is not `Done`"* also covers a URL whose site
+is not allowed, which has no state — contradicting decision 3, the §6.1 paragraph and the
+CORRECTED note, with no gate able to tell. Resolved: hidden only while the URL is `Waiting`,
+`Fetching` or `Arrived`, and case 6 and driver clause 6 now assert the refusal is shown.
+
+**No compile path but the press, the open and an unplaced settle started a fetch**, so a
+URL on an allowed site arriving through the watch loop — decision 1's own `git pull` — was
+stranded with no sentence and no action. Resolved by moving the claim into
+`Preview::absorb`, the one writer every path reaches, handing claims to a fetch worker down
+a channel; case 10 drives it through `Session::on_change_with`. **That changed decision 5**:
+the open's exemption from the settle is dropped, since `absorb` cannot know its caller.
+
+**`Web::line` stated no precedence**, and one ordering let **Try again** — the same command
+as the first button, which allows every site the document names — widen consent to a site
+no sentence named; and *"only while a request is actually out"* contradicted the line being
+held through `Arrived`. Resolved: not-allowed, then on its way (`Fetching` or `Arrived`),
+then failed, with `Waiting` alone showing nothing; case 1 pins the mixed cases.
+
+**The harness clause was numbered against the rig's own rule.** `checks.mjs:run` keeps the
+uncaught-error clause last and moves its number; the new clause is 26 and the error clause
+27. The totals — twenty-seven clauses, twenty-four mutations — were already right.
+
+**Folded in from the non-blocking findings**, all accepted: `urls` is `None` exactly when
+`image_paths` fails; `unfetched` is cleared on error writes not from a `Render`; promotion
+is per generation, so an older plan cannot clear a retry's line; a compile reads only
+fetches on sites the open project allows, and a press always compiles; the fetch thread's
+render goes through the injected seam, which makes case 12 deterministic; every transition
+that changes the line announces; the plumbing is named (`Session::new`'s new arguments, the
+typedef test's 12 → 13, `WebLine` in the two-declaration check, `stub.mjs`'s `web: null`);
+driver clause 6 clears its root's `sites.json` entry first, waits past `SETTLE` before
+counting, clears the proxy variables, reads the mutation counter before relaunching, and
+the driver's `--falsify` is back in the gate; the stale mark gets a harness assertion; the
+rule split is named with its sources, covers and caps; every stale *"fetches nothing"* the
+close-out missed is named — `README.md`'s line 121, `rules/desktop-panes.md`'s link-filter
+reason and its comment in `app/dist/index.html`, the rigs' headers, and the frontmatter's
+`reference`, which now carries its own dated correction; the CORRECTED note no longer says
+nothing listens (the `driven` build does) or that the one request is a `GET` (redirects).
+
+**Logged and not acted on here**: the engine's own CORRECTED note on `mpdf-001` §2 says
+*"one exception: `md2pdf --fetch`"*, and this phase is a second. It is another
+repository's record.
+
 ### Round 39 — Phase 24 only — 2026-09-04 — both reviewers, resumed — **READY (converged)**
 
 Zero blocking from both lenses, at the third and last round. Both traced the two reshaped
