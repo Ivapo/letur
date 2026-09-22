@@ -506,6 +506,16 @@ const MUTATIONS = {
       "          for (const row of lines.children) row.classList.add('here')\n" +
         "          for (const row of mirror.children) row.classList.add('here')\n"
     )
+  },
+
+  /* The button beside the web line is drawn whether or not there is anything to
+     press. The line itself still says what is happening, so the page reads right
+     until you look at the button — which then offers a press that would allow
+     sites nobody was asked about. `mpdf-003` Phase 25, clause 26. */
+  'web-button-always': (page) => {
+    const guard = 'fetchButton.hidden = !state.web?.action'
+    if (page.split(guard).length !== 2) die('the mutation web-button-always found no single button guard')
+    return page.replace(guard, 'fetchButton.hidden = false')
   }
 }
 

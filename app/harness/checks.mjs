@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all twenty-three. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all twenty-four. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -79,7 +79,8 @@ const OWNS = {
   'ink-band-tiles': 22,
   'ink-anchor-is-a-link': 23,
   'ink-captions-anywhere': 24,
-  'ink-math-per-line': 25
+  'ink-math-per-line': 25,
+  'web-button-always': 26
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -2146,6 +2147,115 @@ const displayMathIsOneInk = async (browser, url) => {
 }
 
 
+/* 26. **The line about images named by URL, the mark a stale page wears, and a
+       refused URL inside the pane.** Three readings of one bar, `mpdf-003` Phase
+       25.
+
+       **The sentence and the button's label are both Rust's**, so this places
+       neither: it sets what Rust would send and reads what the page drew. The
+       button is the half that can be wrong quietly — `action` is `null` while an
+       image is on its way, and a button that stayed would offer a press that
+       allows a site nobody was asked about.
+
+       **The stale mark follows `state` and not the error**, which is the one
+       page where the two differ: an error withheld while its image is fetching
+       leaves a page that is still stale and must still say so.
+
+       **And a refused URL is one unbreakable word.** The reported one was 108
+       characters and was clipped at the pane's edge; this sets one of 195 and
+       asks the box to hold it — no horizontal overflow, nothing past `#preview`'s own
+       edge, and more than one line, so a clause that passed because nothing
+       wrapped at all is not possible. */
+const theWebLineAndWhatWrapsInThePane = async (browser, url) => {
+  const page = await opened(browser, url)
+
+  const LINES = [
+    { sentence: '2 images on a.example and b.example are not fetched.', action: 'Fetch images from the web' },
+    { sentence: 'Fetching 1 image from a.example…', action: null },
+    null
+  ]
+
+  const drawn = []
+  for (const web of LINES) {
+    drawn.push(
+      await page.evaluate(async (web) => {
+        window.__harness.set({ web })
+        window.__harness.fire('rendered')
+        await new Promise((r) => setTimeout(r, 150))
+        const line = document.getElementById('web')
+        const button = document.getElementById('fetch')
+        return {
+          asked: web,
+          hidden: line.hidden,
+          text: document.getElementById('web-text').textContent,
+          button: { hidden: button.hidden, label: button.textContent }
+        }
+      }, web)
+    )
+  }
+
+  const stale = await page.evaluate(async () => {
+    window.__harness.set({ state: 'stale', time: '12 ms', error: null, page: true })
+    window.__harness.fire('rendered')
+    await new Promise((r) => setTimeout(r, 150))
+    return document.getElementById('pages').classList.contains('stale')
+  })
+
+  const long = `https://cdn.example.com/${'0123456789'.repeat(16)}/figure.png`
+  const wrapped = await page.evaluate(async (url) => {
+    window.__harness.set({
+      state: 'stale',
+      time: '12 ms',
+      error: `no image fetched for '${url}' at line 7`,
+      page: true
+    })
+    window.__harness.fire('rendered')
+    await new Promise((r) => setTimeout(r, 150))
+    const error = document.getElementById('error')
+    const box = error.getBoundingClientRect()
+    const pane = document.getElementById('preview').getBoundingClientRect()
+    const line = parseFloat(getComputedStyle(error).lineHeight) || 16
+    return {
+      overflow: error.scrollWidth - error.clientWidth,
+      past: box.right - pane.right,
+      rows: Math.round(box.height / line),
+      length: url.length
+    }
+  }, long)
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const placed = drawn.every(
+    (d) =>
+      d.hidden === (d.asked === null) &&
+      d.text === (d.asked?.sentence ?? '') &&
+      d.button.hidden === !d.asked?.action &&
+      d.button.label === (d.asked?.action ?? '')
+  )
+  const inside = wrapped.overflow <= 1 && wrapped.past <= 1 && wrapped.rows > 1
+
+  for (const d of drawn) note(`${JSON.stringify(d.text)} | button ${d.button.hidden ? 'hidden' : JSON.stringify(d.button.label)}`)
+  note(`the ${wrapped.length}-character URL drew ${wrapped.rows} rows, ${wrapped.overflow}px of overflow, ${wrapped.past}px past the pane`)
+
+  ok(
+    26,
+    'the web line is placed with its button only where there is one, a stale page is marked by its state, and a refused URL wraps inside the pane',
+    placed && stale && inside,
+    [
+      placed ? null : `the line drew ${JSON.stringify(drawn)}`,
+      stale ? null : 'a stale page with no error wore no mark',
+      inside
+        ? null
+        : `the URL overflowed by ${wrapped.overflow}px, ran ${wrapped.past}px past the pane and drew ${wrapped.rows} rows`
+    ]
+      .filter(Boolean)
+      .join('; ') || 'three lines placed, the mark off the state, and the URL wrapped'
+  )
+  return errors
+}
+
+
 const run = async ({ engine, headed, rev, doc, mutate }) => {
   passed = 0
   failed = 0
@@ -2190,7 +2300,8 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       theBandIsOnTheCaretsRow,
       theBracketFamilyReadsFiveWays,
       aGroupACaptionAndAName,
-      displayMathIsOneInk
+      displayMathIsOneInk,
+      theWebLineAndWhatWrapsInThePane
     ]) {
       gather(await check(browser, held.url))
     }
@@ -2205,7 +2316,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    26,
+    27,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +

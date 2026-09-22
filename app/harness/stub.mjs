@@ -78,13 +78,13 @@ const derived = (state) => ({
 const EMPTY = {
   state: 'empty', time: null, error: null, page: false, divergence: null,
   revision: 0, reloaded: 0, anchors: [], entries: [], main: null, edited: null,
-  appearance: 'system'
+  appearance: 'system', web: null
 }
 const OPEN = {
   state: 'current', time: '31 ms', error: null, page: true, divergence: null,
   revision: 1, reloaded: 1, anchors: [{ line: 5, page: 1 }],
   entries: CONFIG.entries, main: CONFIG.main, edited: CONFIG.main,
-  appearance: 'system'
+  appearance: 'system', web: null
 }
 
 let status = { ...EMPTY }

@@ -1330,7 +1330,18 @@
         Its label is the page's, as every control's label is; the sentence
         beside it is Rust's, as every status sentence is.
       */
-      #divergence {
+      /*
+        The line about the images this document names by URL, in the divergence
+        bar's own shape and for the same reason: a sentence Rust worded, and one
+        button beside it whose label Rust chose too — *Fetch images from the web*
+        while a site is waiting to be allowed, *Try again* after a fetch failed,
+        and no button at all while one is on its way. `mpdf-003` Phase 25.
+
+        **The label is Rust's here and the `Discard` above is the page's**, and
+        the difference is that this one says *which* of two things pressing does.
+      */
+      #divergence,
+      #web {
         flex: none;
         display: flex;
         align-items: baseline;
@@ -1340,14 +1351,22 @@
         background: var(--chrome);
         border-bottom: 1px solid var(--edge);
       }
-      #divergence[hidden] {
+      #divergence[hidden],
+      #web[hidden],
+      #fetch[hidden] {
         display: none;
       }
-      #divergence-text {
+      #divergence-text,
+      #web-text {
         flex: 1;
         min-width: 0;
       }
-      #discard {
+      /* A URL is one long word, so the sentence naming sites wraps inside it. */
+      #web-text {
+        overflow-wrap: anywhere;
+      }
+      #discard,
+      #fetch {
         flex: none;
       }
 
@@ -1357,6 +1376,9 @@
         margin: 0;
         padding: 8px 12px;
         white-space: pre-wrap;
+        /* A refused URL is one unbreakable word and would otherwise be clipped
+           at the pane's edge rather than wrapped inside it. */
+        overflow-wrap: anywhere;
         color: var(--alarm);
         background: var(--chrome);
         border-bottom: 1px solid var(--edge);
@@ -1706,6 +1728,10 @@
           <span id="divergence-text"></span>
           <button id="discard" type="button">Discard</button>
         </p>
+        <p id="web" hidden>
+          <span id="web-text"></span>
+          <button id="fetch" type="button"></button>
+        </p>
         <p id="error" hidden></p>
         <div
         id="pages"
@@ -2015,6 +2041,9 @@
       const message = document.getElementById('message')
       const divergence = document.getElementById('divergence')
       const divergenceText = document.getElementById('divergence-text')
+      const web = document.getElementById('web')
+      const webText = document.getElementById('web-text')
+      const fetchButton = document.getElementById('fetch')
       const error = document.getElementById('error')
       const status = document.getElementById('status')
       /*
@@ -2467,9 +2496,21 @@
         divergenceText.textContent = state.divergence ?? ''
         divergence.hidden = state.divergence === null
 
+        // The web line is placed exactly as the divergence is, and composed no
+        // more than it: both words are Rust's, and the button is drawn only
+        // where there is something to press.
+        webText.textContent = state.web?.sentence ?? ''
+        web.hidden = state.web === null
+        fetchButton.textContent = state.web?.action ?? ''
+        fetchButton.hidden = !state.web?.action
+
         message.hidden = state.state !== 'empty'
         text.disabled = state.state === 'empty'
-        pages.classList.toggle('stale', state.error !== null && state.page)
+        // **The mark follows the state and not the error**, which are the same
+        // on every page but the one `mpdf-003` Phase 25 adds: a page whose error
+        // is withheld while its image is on its way is still stale, and still
+        // says so.
+        pages.classList.toggle('stale', state.state === 'stale')
 
         // The foot of the window names the file the pane is holding, as a bare
         // name. **Its own cell, and nothing is composed into the status**: the
@@ -3513,6 +3554,24 @@
       }
 
       /*
+        The author allows the sites this document names, and Rust fetches their
+        images. **The press is the consent**, and it is the only thing in this
+        app that reaches the network at all.
+
+        It returns before anything is fetched: Rust fetches on threads of its
+        own and announces at every step, so the line, the page and the error all
+        arrive through `refresh` like any other compile. The one refusal it can
+        answer is a `sites.json` that would not write. `mpdf-003` Phase 25.
+      */
+      async function fetchImages() {
+        try {
+          await invoke('fetch_images')
+        } catch (problem) {
+          fail(problem)
+        }
+      }
+
+      /*
         **The pane draws the page itself.** One page per page in a container
         this app owns and scrolls: a canvas `pdf.js` rasterises off the main
         thread, with the text it carries and the links it carries laid over
@@ -4184,7 +4243,11 @@
         external one has no element, no `href` and nothing to activate, so
         "refused" is something a second person can check in the inspector
         rather than a behaviour observed not to happen. `mpdf-003` §1.1 is the
-        reason: no servers, no network, ever. The filter takes a third class
+        reason, as Phase 25 restated it: **the page never navigates out**, and
+        the one network use in this app is Rust's, for an image the author
+        allowed by pressing the button beside the line. A link is not that, and
+        a click on one would take the window itself somewhere. The filter takes
+        a third class
         with it without needing a second rule — a markdown link *with text*
         pointing at a figure is an ordinary link, reaches the PDF as a `/URI`,
         and `pdf.js` refuses it on its protocol, so it arrives with `url` and
@@ -4371,6 +4434,7 @@
         nameFile(false)
         message.hidden = false
         divergence.hidden = true
+        web.hidden = true
         error.hidden = true
         status.textContent = ''
         status.className = ''
@@ -5997,6 +6061,7 @@
       )
 
       document.getElementById('discard').addEventListener('click', discardEdits)
+      fetchButton.addEventListener('click', fetchImages)
       document.getElementById('open').addEventListener('click', openDocument)
       document.getElementById('save').addEventListener('click', saveDocumentAs)
       listen('open', openDocument)
