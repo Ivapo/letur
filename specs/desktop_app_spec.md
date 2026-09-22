@@ -130,7 +130,7 @@ phases:
     by: null
   - name: "Phase 25 — an image on the web, fetched when the author says so"
     reviewed: 2026-09-22
-    shipped: null
+    shipped: 2026-09-22
     cut: null
     by: null
 
