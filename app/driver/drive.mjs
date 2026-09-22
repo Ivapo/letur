@@ -24,13 +24,13 @@
    rewrites the crate's feature lists on every run, which would dirty the tree in
    the same file this feature was added to. **And it restores what it moved** —
    `set_appearance` writes `settings.json` in the app's Application Support
-   directory, so this reads that file before the launch and puts it back after
-   the kill. A gate that left the appearance where it happened to stop is one of
+   directory and clause 6's press writes `sites.json` beside it, so this reads
+   both before the launch and puts both back after the kill. A gate that left the appearance where it happened to stop is one of
    the four instrument defects `specs/desktop_app_spec.md` Phase 14 is built on.
 
    **Falsified before it is trusted.** `--mutate <name>` installs a deliberate
    defect into the live session and judges that **exactly** the clause that owns
-   it fails; `--falsify` runs both, one child process each. The page is compiled
+   it fails; `--falsify` runs all three, one child process each. The page is compiled
    into the binary — `generate_context!` walks `frontendDist` in — so there is no
    served copy to edit the way `app/harness/serve.mjs` builds one, and a mutation
    is injected instead. **It cannot be the page's own function**: the page has one
@@ -50,7 +50,9 @@
    open path writes: `app/src/preview.rs` holds two production writers, `export`
    and `save`, and neither is reachable from an open, `projects.json` being
    `set_main`'s. And it leaves nothing behind either: the two toggles clause 4
-   presses are page state, so `settings.json` stays the whole of what is restored.
+   presses are page state, so `settings.json` and the `sites.json` beside it —
+   which clause 6's press writes, and which nothing in the app can take back
+   (OQ-19) — are the whole of what is restored.
 
    **What this does not reach.** The title bar's own pixels and the launch flash:
    W3C `Take Screenshot` is the viewport and not the OS window, and the session
@@ -66,7 +68,8 @@
    now, and it says which of the two a 0 was.                                   */
 
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -127,6 +130,24 @@ const DOCUMENT = join(REPO, 'tests', 'fixtures', 'panel', 'book.md')
 const LONG = join(REPO, 'tests', 'fixtures', 'long.md')
 const LONG_TEXT = readFileSync(LONG, 'utf8')
 const LONG_LINES = LONG_TEXT.split('\n').length
+
+/* The document clause 6 opens, the image it names, and the server this file
+   starts to serve it.
+
+   **Local on purpose**, `mpdf-003` Phase 25: the gate needs no internet, gives
+   the same answer every run, and exercises plain `http://`, which the CLI
+   accepts. **No other rig uses 4446** — this driver is on 4445 and
+   `app/harness/serve.mjs` binds port 0. */
+const LOCAL = join(REPO, 'tests', 'fixtures', 'web', 'local.md')
+const LOCAL_ROOT = realpathSync(dirname(LOCAL))
+const LOCAL_PORT = 4446
+const LOCAL_IMAGE = `http://127.0.0.1:${LOCAL_PORT}/dot.png`
+const DOT = join(REPO, 'tests', 'fixtures', 'dot.png')
+
+/* `app/src/remote.rs:SETTLE`, which a URL newly named on an allowed site waits
+   out before it is fetched. Mirrored rather than read: this file drives a
+   binary, not the crate. */
+const SETTLE = 1000
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -325,13 +346,65 @@ const session = async () => {
 
 /* ------------------------------------------------------------------ the app */
 
-/** Where the one thing this app remembers about its appearance lives. The
+/** One of the files this app keeps in its Application Support directory. The
     identifier is read rather than written down, so a rename in
-    `tauri.conf.json` moves this too instead of silently restoring nothing. */
-const settingsFile = () => {
+    `tauri.conf.json` moves these too instead of silently restoring nothing. */
+const supportFile = (name) => {
   const identifier = JSON.parse(readFileSync(CONFIG, 'utf8')).identifier
   if (!identifier) die(`${CONFIG} names no identifier`)
-  return join(homedir(), 'Library', 'Application Support', identifier, 'settings.json')
+  return join(homedir(), 'Library', 'Application Support', identifier, name)
+}
+
+/** Where the one thing this app remembers about its appearance lives. */
+const settingsFile = () => supportFile('settings.json')
+
+/** Where the sites each folder's author allowed images to be fetched from
+    live. Clause 6 presses the button that writes it. */
+const sitesFile = () => supportFile('sites.json')
+
+/** Take the fixture's own folder out of `sites.json`, before the app is
+    launched.
+
+    **A run that was interrupted after the press would otherwise leave
+    `127.0.0.1` allowed**, and clause 6's first half — nothing is fetched before
+    the press — would pass on a window that had never asked. Nothing in the app
+    can take consent back; `specs/desktop_app_spec.md` OQ-19 is that question. A
+    file that will not parse is left alone: the app reads a malformed one as
+    nothing allowed, which is the state this wants. */
+const forgetTheFixtureRoot = (sites) => {
+  if (!existsSync(sites)) return
+  try {
+    const held = JSON.parse(readFileSync(sites, 'utf8'))
+    delete held[LOCAL_ROOT]
+    writeFileSync(sites, JSON.stringify(held, null, 2))
+  } catch {
+    /* Malformed is nothing allowed. */
+  }
+}
+
+/** The one server in this rig: `tests/fixtures/dot.png` over the loopback, and
+    a count of what it was asked for. */
+const imageServer = async () => {
+  const bytes = readFileSync(DOT)
+  let served = 0
+  const server = createServer((request, response) => {
+    served++
+    if (request.url === '/dot.png') {
+      response.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': bytes.length })
+      response.end(bytes)
+    } else {
+      response.writeHead(404)
+      response.end()
+    }
+  })
+  await new Promise((settled, failed) => {
+    server.once('error', failed)
+    server.listen(LOCAL_PORT, '127.0.0.1', settled)
+  })
+  return {
+    served: () => served,
+    close: () => new Promise((closed) => server.close(closed))
+  }
 }
 
 /** The app, up and answering. Preflight first, because both failures below are
@@ -345,7 +418,17 @@ const launch = async () => {
   for (let i = 0; i < 6 && (await answering()); i++) await wait(500)
   if (await answering()) die(`something is already answering on ${PORT} — quit it, or this drives the wrong window`)
 
-  const app = spawn(BINARY, [], { stdio: ['ignore', 'pipe', 'pipe'] })
+  /* **The proxies are cleared, and the loopback exempted.** `ureq` honours
+     `ALL_PROXY`, `HTTPS_PROXY` and `HTTP_PROXY` with no exemption of its own, so
+     a machine that names one would send clause 6's fetch through it and the
+     server here would count nothing. */
+  const env = { ...process.env, NO_PROXY: '127.0.0.1' }
+  for (const named of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY']) {
+    delete env[named]
+    delete env[named.toLowerCase()]
+  }
+
+  const app = spawn(BINARY, [], { stdio: ['ignore', 'pipe', 'pipe'], env })
   const log = []
   app.stdout.on('data', (d) => log.push(String(d)))
   app.stderr.on('data', (d) => log.push(String(d)))
@@ -476,6 +559,36 @@ const OPEN_DOCUMENT = `
 const PRESS = `
   document.getElementById(arguments[0]).click()
   return true
+`
+
+/* What clause 6 reads: the status Rust answers, and what the page drew from it.
+   **Both**, because the claim spans the two: Rust words the line and the page
+   places it, and a clause that read only one could not tell a window that says
+   nothing from one that was told nothing.
+
+   **`Status::error` is carried back as `refused`**, and the rename is not
+   cosmetic: `call` reads `value.error` as the WebDriver protocol's own failure,
+   so a status carrying `core`'s refusal would be thrown as if the script had
+   broken. */
+const ASK_WEB = `
+  const done = arguments[arguments.length - 1]
+  window['__TAURI__'].core.invoke('status').then(
+    (state) => {
+      const line = document.getElementById('web')
+      const button = document.getElementById('fetch')
+      const error = document.getElementById('error')
+      done({
+        state: state.state,
+        refused: state.error,
+        web: state.web,
+        shown: !line.hidden,
+        sentence: document.getElementById('web-text').textContent,
+        label: button.hidden ? null : button.textContent,
+        refusal: error.hidden ? null : error.textContent
+      })
+    },
+    (problem) => done(null, String(problem))
+  )
 `
 
 /* Put a buffer in the pane the way typing puts one there: `edit` reaches Rust and
@@ -895,6 +1008,102 @@ const theInkWrapsWhereTheTextareaDoes = async (held) => {
   )
 }
 
+
+/* 6. **An image on the web is fetched when the author says so, and the site is
+      remembered across a launch.** `mpdf-003` Phase 25, over the shipped binary
+      and the real client — which is what puts it here rather than in the suite:
+      the fifteen Rust cases hand `Session::new` a fake fetch, and nothing in
+      them proves that `remote::fetch` reaches a server, that the button in the
+      page reaches the command, or that `sites.json` in Application Support is
+      read at the next launch.
+
+      **The server is local on purpose**: the gate needs no internet, gives the
+      same answer every run, and exercises plain `http://`, which the CLI accepts
+      and `NSURLSession` would not — the reason `specs/desktop_app_spec.md`
+      Phase 25 records for refusing it.
+
+      **It runs last, and it is the one clause that outlives its own window.**
+      The mutation counter is read before the quit, because the page holding it
+      goes with the process; `relaunch` is the run's, since the app and its log
+      are the run's to kill and to print.
+
+      **It carries no mutation**, and that is deliberate rather than an omission:
+      every defect this clause could catch is Rust's, and the suite's cases 6 to
+      10 falsify those. What a page-level mutation would reach here is the line
+      and the button, which `app/harness/checks.mjs` clause 26 owns. */
+const theSiteIsAllowedOnceAndRememberedAcrossALaunch = async (held, server, relaunch) => {
+  const sites = sitesFile()
+  const opened = await held.async(OPEN_DOCUMENT, [LOCAL])
+  if (opened !== true) throw new Error(`open_document refused ${LOCAL}: ${opened}`)
+
+  /* Past the settle, which is what makes "nothing is fetched" a claim about
+     consent rather than about the second it takes to ask. */
+  await wait(SETTLE + 1000)
+  const before = await held.async(ASK_WEB)
+  const asked = before.state !== 'current' &&
+    before.shown &&
+    before.label === 'Fetch images from the web' &&
+    (before.refusal ?? '').includes(`no image fetched for '${LOCAL_IMAGE}'`)
+  const quiet = server.served() === 0
+  note(`before the press: ${JSON.stringify(before.sentence)} | ${JSON.stringify(before.label)} | ${server.served()} requests`)
+
+  await held.sync(PRESS, ['fetch'])
+  const drawn = await untilDrawn(held)
+  const fetched =
+    server.served() === 1 && drawn.state === 'current' && drawn.web === null && drawn.refused === null
+  note(`the press: ${drawn.state}, ${server.served()} request(s), the line ${JSON.stringify(drawn.sentence)}`)
+
+  let remembered = []
+  try {
+    remembered = JSON.parse(readFileSync(sites, 'utf8'))[LOCAL_ROOT] ?? []
+  } catch {
+    /* A file that will not parse remembers nothing, which the check below says. */
+  }
+  const kept = remembered.includes('127.0.0.1')
+  note(`sites.json holds ${JSON.stringify(remembered)} under ${LOCAL_ROOT}`)
+
+  /* The counter, then the quit, then a second window over the same file. */
+  const second = await relaunch()
+  const reopened = await second.async(OPEN_DOCUMENT, [LOCAL])
+  if (reopened !== true) throw new Error(`open_document refused ${LOCAL} on the relaunch: ${reopened}`)
+  const atOpen = server.served()
+  const again = await untilDrawn(second)
+  const carried = again.state === 'current' && again.web === null && server.served() === 2 && atOpen === 1
+  note(`the relaunch: ${again.state} with no press, ${server.served()} requests in all`)
+
+  ok(
+    6,
+    'nothing is fetched before the press, the press fetches once and draws, and the site is still allowed at the next launch',
+    asked && quiet && fetched && kept && carried,
+    [
+      asked ? null : `before the press the window said ${JSON.stringify(before)}`,
+      quiet ? null : `${server.served()} requests before the press`,
+      fetched ? null : `the press left ${drawn.state} after ${server.served()} request(s): ${JSON.stringify(drawn)}`,
+      kept ? null : `sites.json holds ${JSON.stringify(remembered)} under ${LOCAL_ROOT}`,
+      carried
+        ? null
+        : `the relaunch drew ${again.state} with ${server.served()} requests in all (${atOpen} before the settle)`
+    ]
+      .filter(Boolean)
+      .join('; ') ||
+      `refused, then one request on the press, then a second window that needed none`
+  )
+}
+
+/** Poll until the page is drawn, or give up and answer what it last said.
+    Bounded on the settle rather than on a compile: the second window fetches a
+    second after it opens, with nobody pressing anything. */
+const untilDrawn = async (held) => {
+  let said = {}
+  for (let i = 0; i < 40; i++) {
+    said = await held.async(ASK_WEB)
+    if (said.state === 'current') return said
+    await wait(250)
+  }
+  return said
+}
+
+
 /* ----------------------------------------------------------------- the run */
 
 const run = async ({ mutate }) => {
@@ -904,10 +1113,20 @@ const run = async ({ mutate }) => {
 
   if (mutate && !MUTATIONS[mutate]) die(`no such mutation: ${mutate} — ${Object.keys(MUTATIONS).join(', ')}`)
 
+  /* **Two files are moved and both are put back.** `set_appearance` writes the
+     first and clause 6's press the second, and a gate that left either where it
+     happened to stop is one of the four instrument defects
+     `specs/desktop_app_spec.md` Phase 14 is built on. */
   const settings = settingsFile()
-  const before = existsSync(settings) ? readFileSync(settings) : null
+  const sites = sitesFile()
+  const found = {
+    settings: existsSync(settings) ? readFileSync(settings) : null,
+    sites: existsSync(sites) ? readFileSync(sites) : null
+  }
+  forgetTheFixtureRoot(sites)
 
-  const { app, log } = await launch()
+  const server = await imageServer()
+  let { app, log } = await launch()
   let fired = null
   /* **Kept and rethrown after the `finally`, never `process.exit`ed inside the
      `try`.** An exit there terminates the process before the block below runs,
@@ -915,33 +1134,47 @@ const run = async ({ mutate }) => {
   let broke = null
 
   try {
-    const held = await session()
-    console.log(`\n${held.engine} | ${BINARY.replace(`${REPO}/`, '')}${mutate ? ` | MUTATED ${mutate}` : ''}\n`)
+    const driven = await session()
+    console.log(`\n${driven.engine} | ${BINARY.replace(`${REPO}/`, '')}${mutate ? ` | MUTATED ${mutate}` : ''}\n`)
 
     if (mutate) {
-      await held.sync(MUTATIONS[mutate])
+      await driven.sync(MUTATIONS[mutate])
       note(`${mutate} installed, and it owns clause ${OWNS[mutate]}`)
     }
 
-    await valueReachesRustAndThePagePlacesIt(held)
-    await marksAtAWidthTheDriverSet(held)
-    await theInstrumentSeesALoop(held)
-    await marksInTheEngineThatShips(held)
-    /* Last, and its own comment says why: it opens a second document and types
-       into it, and the four above were written against neither. */
-    await theInkWrapsWhereTheTextareaDoes(held)
+    await valueReachesRustAndThePagePlacesIt(driven)
+    await marksAtAWidthTheDriverSet(driven)
+    await theInstrumentSeesALoop(driven)
+    await marksInTheEngineThatShips(driven)
+    /* Last but one, and its own comment says why: it opens a second document and
+       types into it, and the four above were written against neither. */
+    await theInkWrapsWhereTheTextareaDoes(driven)
 
-    if (mutate) fired = (await held.sync('return window.__mutation')).count
+    /* **Last, and it quits this window in the middle of itself.** The mutation
+       counter is read here, before the process holding it is gone. */
+    await theSiteIsAllowedOnceAndRememberedAcrossALaunch(driven, server, async () => {
+      if (mutate) fired = (await driven.sync('return window.__mutation')).count
+      app.kill('SIGKILL')
+      await wait(500)
+      ;({ app, log } = await launch())
+      return await session()
+    })
   } catch (problem) {
     broke = problem
   } finally {
     app.kill('SIGKILL')
+    await server.close()
     /* The port is the next child's preflight, so it is let go of before this
        process is. */
     await wait(500)
 
-    if (before === null) rmSync(settings, { force: true })
-    else writeFileSync(settings, before)
+    for (const [file, kept] of [
+      [settings, found.settings],
+      [sites, found.sites]
+    ]) {
+      if (kept === null) rmSync(file, { force: true })
+      else writeFileSync(file, kept)
+    }
   }
 
   if (broke) {
@@ -951,6 +1184,7 @@ const run = async ({ mutate }) => {
 
   const back = existsSync(settings) ? JSON.parse(readFileSync(settings, 'utf8')).appearance : null
   note(`settings.json is back at ${JSON.stringify(back)}, where the run found it`)
+  note(`sites.json is back at ${found.sites === null ? 'no file at all' : `${found.sites.length} bytes`}`)
 
   if (mutate && !fired) {
     die(`the mutation ${mutate} was never invoked — it has falsified nothing, whatever the clauses said`)
