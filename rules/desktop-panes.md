@@ -54,20 +54,21 @@ covers: >
   the pane does not draw, and the pane that loses both when it empties, the check that reads this file and the
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
-  because the DOM cannot show one, the twenty-six clauses it
-  asserts as properties and the twenty-three broken pages that falsify them, the rule
+  because the DOM cannot show one, the twenty-seven clauses it
+  asserts as properties and the twenty-four broken pages that falsify them, the rule
   that decides what a clause may read as well as what it may assert, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
-max_lines: 780
-generated: 2026-09-03
+max_lines: 820
+generated: 2026-09-22
 ---
 
 # Desktop panes
 
 What the window puts on screen, and the geometry it keeps while it does.
-`rules/desktop.md` has the crate, the commands, the file I/O, the watch and the
-bundle; this file has the two panes those things feed.
+`rules/desktop.md` has the crate, the commands, the file I/O and the bundle;
+`rules/desktop-compile.md` has the watch and the compile; this file has the two
+panes those things feed.
 
 ## The page
 
@@ -160,8 +161,9 @@ cannot move either any more, so only a phase of *this* repository's can.
 **Only a link carrying an internal destination is rendered**, filtered before the
 layer is built. An external one has no element, no `href` and nothing to
 activate, so *refused* is something a second person can check rather than a
-behaviour observed not to happen — `mpdf-003` §1.1, no servers and no network,
-ever. The same filter needs no second rule for a markdown link *with text*
+behaviour observed not to happen — `mpdf-003` §1.1 as Phase 25 restated it: **the
+page never navigates out**, and the one network use in this app is Rust's, for an
+image the author allowed. The same filter needs no second rule for a markdown link *with text*
 pointing at a figure: it reaches the PDF as a `/URI`, `pdf.js` refuses it on its
 protocol, and it arrives with `url` and `dest` both null. The showcase's sixteen
 internal links are seven cross-references *plus* the footnote marks and their return
@@ -249,8 +251,18 @@ its own headings, and **a section in the pane syncs on that section's**, which
 the caret could never do while the pane held only what compiles.
 
 `report` places the status: the line in the header, the message in a bar above
-the pane, the divergence in a bar of its own, and the dimming a stale page wears
-— with no page under it the message takes the whole pane instead. **Every word it
+the pane, the divergence in a bar of its own, **the line about images named by a
+URL in a second bar of the divergence's own shape**, and the dimming a stale page
+wears — with no page under it the message takes the whole pane instead. The web
+line's sentence *and its button's label* are both Rust's, the label being the one
+that says which of two things a press does — *Fetch images from the web* while a
+site waits to be allowed, *Try again* after a fetch failed — and the button is
+drawn only where `action` is not null, which is what keeps a press from allowing
+a site nobody was asked about. **The stale mark follows `state` and not the
+error**, which agree on every page but the one `mpdf-003` Phase 25 adds: an error
+withheld while its image is on its way leaves a page that is still stale. And
+`#error` wraps inside the pane rather than being clipped at its edge, a refused
+URL being one unbreakable word — the reported one was 108 characters. **Every word it
 places was chosen in Rust**, so the page composes none of it and the four states
 are checked by tests rather than by eye. It survives a failure, because an author
 mid-edit passes
@@ -735,11 +747,13 @@ the top of its script, the DOM subtypes `getElementById` cannot know, `doc` and
 fields `pdf.js` tolerates the absence of at runtime.
 
 **The page and `Status` are held to each other from both sides.** The typedef
-block declares `Status`'s twelve fields and `Anchor`'s two; the type check binds
+block declares `Status`'s thirteen fields, `Anchor`'s two, `Entry`'s three and
+`WebLine`'s two; the type check binds
 the page's reads to those, and `app/src/preview.rs`'s
 `the_page_typedefs_name_exactly_the_fields_status_serializes` compares the same
-`@property` lists against a serialized `Status` carrying one `Anchor` — which it
-must carry, since an empty list puts no `Anchor` in the JSON at all. **Two
+`@property` lists against a serialized `Status` carrying one `Anchor`, one
+`Entry` and one `WebLine` — which it must carry, since an empty list puts no
+`Anchor` in the JSON at all and a `None` no line. **Two
 declarations compared with each other**, rather than usage compared against a
 declaration. A field renamed on either side alone fails one of the two.
 
@@ -767,8 +781,8 @@ sentence — found by a mutation that falsified nothing, not by reading.
 `core:default`'s own words — the half a stub that merely omits it never tests. It also keeps
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
-asserts twenty-six clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against twenty-three broken copies
+asserts twenty-seven clauses in Playwright's Chromium and WebKit, **both of which must pass, every
+clause a property and none a metric literal**, and is falsified first against twenty-four broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
 without either being redundant**, and clause 3 is where that now stands: `flex-min` reaches
 the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`
@@ -798,7 +812,7 @@ driver's; and **a claim about how the engine that ships *renders*** is the drive
 not because it is about the window but because only the driver reaches that engine. The
 two drawn marks are that third kind: it reads them at the size their own `svg` attributes
 declare, in their two inks, with the footer still the height its own rule declares —
-**five clauses and three mutations**, the third `marks-unlit` in this rig's terms, an own
+**six clauses and three mutations**, the third `marks-unlit` in this rig's terms, an own
 `setAttribute` swallowing the state attribute the ink rule selects on. **The fifth is the
 ink's**, and it is the only place the two boxes are compared in the engine that ships:
 `#mirror` and `#text` report `scrollHeight` **236612 and 236612** over 1,880 rows, exactly
@@ -807,7 +821,28 @@ rather than opening the document it measures** — `tests/fixtures/` holds sever
 so an open there climbs to that root and puts one of *them* in the pane, which makes that
 document unreachable from this rig as it is from the other, for a different reason. It opens
 `tests/fixtures/panel/book.md` in place and writing nothing to do it, a control over a
-pane needing the pane. Neither rig reaches more of the seven below than the other.
+pane needing the pane.
+
+**The sixth is the fetch, and it is the one clause that outlives its own window.**
+It starts a server on `127.0.0.1:4446` serving `tests/fixtures/dot.png` and
+counting requests — local on purpose, so the gate needs no internet, answers the
+same every run and exercises plain `http://` — opens
+`tests/fixtures/web/local.md`, and waits past the settle: `core`'s refusal and the
+line are both shown and the server has had nothing. It presses `#fetch`, which
+makes one request and draws the page, with `127.0.0.1` written under the
+fixture's canonical root in `sites.json`. **Then it reads the mutation counter,
+quits the app, launches a second one and opens the same file**: the page is
+current with no press and the server has had one more. The counter is read before
+the quit because the page holding it goes with the process. The app is launched
+with `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY` cleared and `NO_PROXY=127.0.0.1`
+set, `ureq` honouring those with no loopback exemption of its own, and
+`sites.json` is prepared before the launch — the fixture's entry removed, since an
+interrupted run would otherwise leave the site allowed and nothing in the app can
+take it back. It carries **no mutation**: its defects are Rust's, and the suite's
+own cases falsify those. **So the run restores two files rather than one**,
+`settings.json` and `sites.json` both, to whatever it found.
+
+Neither rig reaches more of the seven below than the other.
 
 **What none of it reaches is most of what has gone wrong in this file.** Of the eight defects it
 has produced, a type check catches **one** — a `destroy` that `PDFDocumentProxy` does not have,

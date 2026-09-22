@@ -8,7 +8,9 @@ Letur is the desktop front end for [md2pdf](https://github.com/Ivapo/md2pdf), th
 that turns one markdown file — or a master and the sections it names — into one typeset
 PDF. It wraps that same crate, so it converts exactly what the command converts and
 refuses exactly what the command refuses, in the same words. Everything happens on your
-machine: no server, no SaaS, and no LaTeX toolchain.
+machine: no server, no SaaS, and no LaTeX toolchain. The one thing Letur asks the
+network for is an image your document names by a URL, and only after you press the
+button that says so.
 
 **What the markdown may contain** is the engine's to say, and its README says it.
 
@@ -95,6 +97,23 @@ A document that will not compile leaves the last good page on screen, dimmed, wi
 error above it — the same sentence the command prints — and the page comes back when you
 fix it.
 
+**An image named by a URL is not fetched until you say so.** A document may write
+`![a diagram](https://example.com/plot.png)` as well as a file beside it, and Letur
+draws neither the image nor a box where it would go: a line above the page names the
+sites the document wants, with **Fetch images from the web** beside it. Press it and
+those sites are allowed **for that folder**, now and the next time you open it, so a
+document whose images you have already seen draws itself a second after it opens. A URL
+on a site you have not allowed asks again — so a file that arrives with a tracker's URL
+in it is not fetched because a file beside it once was. While an image is on its way the
+line says so; a site that will not serve it says that instead, with **Try again**.
+
+The bytes are kept in memory and never written to disk, so the same image is fetched
+once per launch and offline you are told, rather than shown yesterday's copy. Nothing
+else in Letur touches the network: no update check, no telemetry, no font and no
+package, and a link in the page still does not open. Letur has no way to take a site's
+permission back yet; until it has, the list is in `sites.json`, beside the other two
+files, under `~/Library/Application Support/dev.letur.desktop/`.
+
 **A redraw opens the page on the heading you are writing under.** The app draws the page
 itself, so it knows where you are: it follows your cursor to the nearest heading above it,
 which is as close as it can get without one. Opening a file, and taking one that changed
@@ -118,8 +137,9 @@ back to `Fit width`.
 **The page is text, not a picture of text.** Select and copy from it as you would in any
 PDF reader — on a long document, from the pages around the one you are reading, which are
 the ones the app keeps drawn — and click a cross-reference to jump to the figure, table,
-equation, footnote or reference it names. A link out to the web does not open: the app fetches nothing and opens
-nothing, so those links are inert on the page.
+equation, footnote or reference it names. A link out to the web does not open: the window
+never navigates anywhere, so those links are inert on the page — the one request Letur
+makes is for an image you allowed, and it is made by the app and not by the page.
 
 The header says where the page stands — `current` with the time the compile took, or
 `stale` when the last one failed and the page you are looking at is the older one.
@@ -223,7 +243,7 @@ $ bun harness/checks.mjs
 
 `app/harness/serve.mjs` serves a copy of the front end with a stub in its head, so the
 real page can be driven outside a window; `bun harness/checks.mjs --falsify` breaks the
-page twenty-three ways and checks that each break fails the one clause that owns it.
+page twenty-four ways and checks that each break fails the one clause that owns it.
 
 ## Licence
 
@@ -239,7 +259,13 @@ licences.
 `THIRD-PARTY-LICENSES.md` inside the published crate, so the version this app pins carries
 the list that matches it — drawn for the engine's own binary, and a superset of what the
 engine brings here — with the text of every licence among them. **The window's own crates —
-Tauri's, and the rest of what `app/Cargo.toml` names — are not yet listed anywhere.**
+Tauri's, `ureq`'s TLS stack, and the rest of what `app/Cargo.toml` names — are not yet
+listed anywhere.** The gap is logged rather than closed, and `ureq` widened it: `ring` is
+Apache-2.0 **and** ISC, `rustls-webpki` and `untrusted` are ISC, `subtle` is
+BSD-3-Clause, and **`webpki-roots` is CDLA-Permissive-2.0** — the first licence in this
+binary whose terms are about *data*, the Mozilla root store compiled in, and which asks
+that its text travel with it. `specs/desktop_app_spec.md` OQ-20 is that question, and it
+is open.
 
 **Four crates in this binary are MPL-2.0**, which is copyleft per file. `cssparser` 0.36.0,
 `dtoa-short` 0.3.5 and `selectors` 0.37.0 arrive with the engine's diagram renderer and are

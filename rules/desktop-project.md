@@ -17,18 +17,19 @@ covers: >
   confinement the walk and the commands now share, the one a write obeys
   differently and the third a delete asks, the two further questions a create
   asks and the empty file it stops at, the row a delete acts on by name and the
-  panel it refreshes itself, the one
-  fact this app remembers about a folder and where it refuses to keep it, and the
-  second file beside it for the fact that is about no folder at all
-max_lines: 180
-generated: 2026-09-03
+  panel it refreshes itself, the two
+  facts this app remembers about a folder and where it refuses to keep them, and
+  the second file beside them for the fact that is about no folder at all
+max_lines: 200
+generated: 2026-09-22
 ---
 
 # The desktop app's project
 
 What the window opens when the author picks one file: the folder it belongs to,
 the file under that folder which compiles, and the list of everything in it.
-`rules/desktop.md` has the crate, the commands, the watch and the bundle;
+`rules/desktop.md` has the crate, the commands and the bundle;
+`rules/desktop-compile.md` has the watch and the compile;
 `rules/desktop-panel.md` has the panel this feeds.
 
 **The opened file's parent is where the search starts, not where it stops.**
@@ -178,7 +179,7 @@ already in the asset list, so deleting one answers `Change::Asset` and never the
 inconsistency**: a created file is in no asset list, so the watch gets that one
 right.
 
-`app/src/document.rs:store_file` names the first of the two files this app writes
+`app/src/document.rs:store_file` names the first of the three files this app writes
 outside the author's own folders — `projects.json` under the directory Tauri's
 resolver gives `dev.letur.desktop` — and `read_override`/`write_override` keep one main per
 canonical root in it, a `BTreeMap` so two writes of one map are two identical
@@ -201,4 +202,19 @@ already on disk malformed — and malformed means forgotten. Every author's
 remembered main would have been dropped, silently, by the upgrade that put a toggle
 in the footer, and `document.rs:writing_the_appearance_does_not_touch_the_store` is
 what holds that as bytes rather than as intent.
+
+`app/src/document.rs:sites_file` names the third, `sites.json`, beside the other
+two, and it holds **the second fact this app remembers about a folder**: which
+sites that folder's author allowed images to be fetched from. `read_sites` and
+`write_sites` keep a `BTreeMap` from canonical root — `key`'s own spelling, the
+store's — to a sorted list of sites, with the store's forgiving read and its
+reported write, and `document.rs:writing_the_sites_does_not_touch_the_store` holds
+`projects.json` **and** `settings.json` byte for byte, for the reason the file
+above it exists. **A third file and not a member of either**, the same reason
+again. Consent is per folder and per site because asking on every launch trains a
+click nobody reads, and per site keeps it narrow: a `git pull` that brings in a
+tracker's URL asks again. `rules/desktop-compile.md` has what the app does with
+it; taking it back is `specs/desktop_app_spec.md` OQ-19, and until that is
+answered this file is where it is written down and the only place it can be
+edited.
 
