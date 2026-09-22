@@ -19,7 +19,7 @@ use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
-use preview::{Appearance, Session, Status};
+use preview::{Appearance, Compile, Session, Status};
 
 /// The label of the one window, which `tauri.conf.json` names too.
 const MAIN: &str = "main";
@@ -189,10 +189,18 @@ fn main() {
             }
 
             let handle = app.handle().clone();
+            // **The fetch and the render are the real ones here, and nowhere
+            // else**: every test hands `Session::new` fakes, so this is the one
+            // line that puts `remote::fetch` — the app's only network use, for
+            // an image the author allowed — behind the button. `mpdf-003` Phase
+            // 25.
             app.manage(Mutex::new(Session::new(
                 document::store_file(&support),
                 settings,
+                document::sites_file(&support),
                 appearance,
+                remote::fetch,
+                Compile::run,
                 move || {
                     let _ = handle.emit(RENDERED, ());
                 },
@@ -205,6 +213,7 @@ fn main() {
             set_main,
             set_edited,
             discard,
+            fetch_images,
             asset_bytes,
             create_file,
             trash_file,
@@ -356,6 +365,26 @@ fn discard(session: tauri::State<'_, Mutex<Session>>) {
         .lock()
         .expect("the session lock was poisoned")
         .discard();
+}
+
+/// Fetch the document's images from the web, for every site it names.
+///
+/// **The press is the consent**, and this is the whole of how an author gives
+/// it: the button that reaches this is drawn only beside the sentence that asks,
+/// and [`Session::fetch_images`] remembers the answer for the folder. It needs
+/// no dialog and no capability, for [`discard`]'s reason.
+///
+/// **It returns before anything is fetched.** The fetch runs on the worker's
+/// threads and each step announces, so the page learns the outcome through
+/// `refresh` like any other compile, and the lock this takes is released at
+/// once. The one error it can answer is a `sites.json` that would not write.
+/// `mpdf-003` Phase 25.
+#[tauri::command]
+fn fetch_images(session: tauri::State<'_, Mutex<Session>>) -> Result<(), String> {
+    session
+        .lock()
+        .expect("the session lock was poisoned")
+        .fetch_images()
 }
 
 /// The bytes of one of the project's files, for the page to draw.

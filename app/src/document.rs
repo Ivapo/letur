@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 use md2pdf_core::Asset;
 use serde::{Deserialize, Serialize};
 
+use crate::remote::Fetched;
+
 /// One heading, and the page its typeset form landed on.
 ///
 /// This is `md2pdf_core::Anchor` again, and the duplication is deliberate for
@@ -99,6 +101,26 @@ pub struct Render {
     /// declined to answer. Unlike [`Render::assets`] this describes the *page*
     /// rather than the text, so it is only ever as good as the bytes beside it.
     pub anchors: Vec<Anchor>,
+
+    /// The images the document names by URL, once each, in the order it first
+    /// names them. `mpdf-003` Phase 25.
+    ///
+    /// **`None` exactly when `md2pdf_core::image_paths` fails**, so a walk that
+    /// cannot answer leaves the caller's list alone — which is not the same
+    /// condition as [`Render::assets`] being `None`: a master whose section is
+    /// missing answers `Some(sections)` there and `None` here, because it names
+    /// its sections from its own text and its images only once they are joined.
+    pub urls: Option<Vec<String>>,
+
+    /// The URL this compile was refused on, if it was refused on one.
+    ///
+    /// **Either the one `md2pdf_core::Error::UnfetchedImage` names**, read off
+    /// the typed error before it becomes a sentence, **or the one
+    /// [`read_assets_with`] refused in the CLI's `cannot fetch` sentence.** It
+    /// is what lets `crate::preview::Preview::status` hide exactly one error —
+    /// the one about an image that is on its way — and no other, without
+    /// matching words.
+    pub refused: Option<String>,
 }
 
 /// Which file's headings become anchors: the one the pane is holding.
@@ -166,10 +188,16 @@ impl Pane<'_> {
 /// checking. [`read_sections_with`] borrows it and [`read_assets_with`] takes
 /// what is left, so every file this app opens for one compile goes through the
 /// one closure — a second would leave half the reads unwatched.
+///
+/// **The images already fetched by URL are a parameter too**, since
+/// `mpdf-003` Phase 25: a URL's bytes are supplied under the URL itself, a
+/// failed fetch is refused in the CLI's sentence, and a URL with neither is left
+/// for `core` to refuse, as it was before anything was fetched.
 pub fn render_with(
     directory: &Path,
     markdown: &str,
     pane: Pane<'_>,
+    fetched: &Fetched,
     mut read: impl FnMut(&Path) -> std::io::Result<Vec<u8>>,
 ) -> Render {
     // **The sections come first**, exactly as `cli/src/main.rs:run` orders
@@ -194,8 +222,17 @@ pub fn render_with(
     // `cli/src/main.rs:read_assets` orders them — and the sections go in front
     // of both whatever they answer. [`Render::assets`] argues the three
     // branches.
-    let assets: Option<Vec<String>> = md2pdf_core::image_paths(markdown, supplied)
-        .ok()
+    let images = md2pdf_core::image_paths(markdown, supplied).ok();
+    let urls: Option<Vec<String>> = images.as_ref().map(|images| {
+        let mut urls: Vec<String> = Vec::new();
+        for image in images.iter().filter(|image| image.is_url()) {
+            if !urls.contains(&image.path) {
+                urls.push(image.path.clone());
+            }
+        }
+        urls
+    });
+    let assets: Option<Vec<String>> = images
         .map(|images| {
             named
                 .iter()
@@ -217,10 +254,24 @@ pub fn render_with(
         })
         .or_else(|| (!named.is_empty()).then(|| named.clone()));
 
+    // **The refused URL is read here, off the two places a refusal about a URL
+    // can come from, and before either becomes a sentence.** Every other
+    // failure leaves it `None`.
+    let mut refused: Option<String> = None;
     let rendered = sections
-        .and_then(|sections| read_assets_with(markdown, sections, directory, read))
+        .and_then(|sections| {
+            read_assets_with(markdown, sections, directory, fetched, read).map_err(|unread| {
+                refused = unread.url;
+                unread.message
+            })
+        })
         .and_then(|supplied| {
-            md2pdf_core::md_to_pdf_with_anchors(markdown, &supplied).map_err(|e| e.to_string())
+            md2pdf_core::md_to_pdf_with_anchors(markdown, &supplied).map_err(|e| {
+                if let md2pdf_core::Error::UnfetchedImage { url, .. } = &e {
+                    refused = Some(url.clone());
+                }
+                e.to_string()
+            })
         });
 
     // The anchors describe the bytes, so a failure has none — where `assets`
@@ -250,6 +301,8 @@ pub fn render_with(
         sections: named,
         pdf,
         anchors,
+        urls,
+        refused,
     }
 }
 
@@ -271,7 +324,12 @@ pub fn render_with(
 /// [`read_document`]'s own sentence, built by wrapping the decode in the
 /// `std::io::Error` `read_to_string` would have raised, so a main that will not
 /// read reads the same in the window whichever path reached it.
-pub fn render_project(main: &Path, edited: &Path, buffer: &str) -> Result<Render, String> {
+pub fn render_project(
+    main: &Path,
+    edited: &Path,
+    buffer: &str,
+    fetched: &Fetched,
+) -> Result<Render, String> {
     let read = |file: &Path| -> std::io::Result<Vec<u8>> {
         if crate::watch::resolve(file) == crate::watch::resolve(edited) {
             Ok(buffer.as_bytes().to_vec())
@@ -301,7 +359,7 @@ pub fn render_project(main: &Path, edited: &Path, buffer: &str) -> Result<Render
         }
     };
 
-    Ok(render_with(directory(main), &markdown, pane, read))
+    Ok(render_with(directory(main), &markdown, pane, fetched, read))
 }
 
 /// Read a document's text, in the words the terminal uses for a file it cannot
@@ -1258,8 +1316,7 @@ pub fn write_sites(
 /// errors differently, which is most of what those forty lines do.
 ///
 /// The image list arrives in document order and may name one path twice, so
-/// this reads each file once, and an image named by a URL is read from nowhere
-/// and left for `core` to refuse. The bibliography is one frontmatter value rather
+/// this reads each file once. The bibliography is one frontmatter value rather
 /// than something the walk finds, so it comes from an export of its own — and
 /// it is read first of the two, since the line it names is the earliest one in
 /// the file.
@@ -1280,15 +1337,24 @@ pub fn write_sites(
 /// The read is a parameter for one gate. Phase 1 asks that a path the document
 /// names twice is read *once*, and a caller that counts its own reads is the
 /// only way to check that rather than argue it from the loop below.
+///
+/// **An image named by a URL is read from nowhere, and since `mpdf-003` Phase 25
+/// it has three answers**, each `cli/src/main.rs:read_assets`' own under
+/// `--fetch`. Bytes that were fetched are supplied under the URL itself, which is
+/// the name the generated Typst source asks for. A fetch that failed is refused
+/// here, in the CLI's `cannot fetch` sentence. A URL nothing has fetched gets no
+/// bytes and is left for `core`'s own refusal. It is never joined onto the
+/// directory in any of the three: that would hand the OS `dir/https://…` and the
+/// author an OS error about a file that was never meant to exist.
 fn read_assets_with(
     markdown: &str,
     sections: Vec<Asset>,
     directory: &Path,
+    fetched: &Fetched,
     mut read: impl FnMut(&Path) -> std::io::Result<Vec<u8>>,
-) -> Result<Vec<Asset>, String> {
-    let images = md2pdf_core::image_paths(markdown, &sections).map_err(|e| e.to_string())?;
-    let bibliography =
-        md2pdf_core::bibliography_path(markdown, &sections).map_err(|e| e.to_string())?;
+) -> Result<Vec<Asset>, Unread> {
+    let images = md2pdf_core::image_paths(markdown, &sections).map_err(Unread::from)?;
+    let bibliography = md2pdf_core::bibliography_path(markdown, &sections).map_err(Unread::from)?;
 
     let mut seen: HashSet<String> = sections.iter().map(|s| s.path.clone()).collect();
     let mut assets = sections;
@@ -1296,11 +1362,11 @@ fn read_assets_with(
     if let Some(named) = bibliography {
         let file = directory.join(&named.path);
         let bytes = read(&file).map_err(|e| {
-            format!(
+            Unread::from(format!(
                 "cannot read {} for the bibliography {}: {e}",
                 file.display(),
                 named.location
-            )
+            ))
         })?;
 
         seen.insert(named.path.clone());
@@ -1311,24 +1377,34 @@ fn read_assets_with(
     }
 
     for image in images {
-        // A URL gets no bytes, and `core`'s own refusal is what names it. It
-        // is never joined onto the directory: that would hand the OS
-        // `dir/https://…` and the author an OS error about a file that was
-        // never meant to exist. `cli/src/main.rs:read_assets` skips it the
-        // same way when it is run without `--fetch`, and this app fetches
-        // nothing.
-        if image.is_url() || !seen.insert(image.path.clone()) {
+        if !seen.insert(image.path.clone()) {
             continue;
         }
 
-        let file = directory.join(&image.path);
-        let bytes = read(&file).map_err(|e| {
-            format!(
-                "cannot read {} for the image {}: {e}",
-                file.display(),
-                image.location
-            )
-        })?;
+        let bytes = if image.is_url() {
+            match fetched.get(&image.path) {
+                Some(Ok(bytes)) => bytes.to_vec(),
+                Some(Err(reason)) => {
+                    return Err(Unread {
+                        message: format!(
+                            "cannot fetch {} for the image {}: {reason}",
+                            image.path, image.location
+                        ),
+                        url: Some(image.path),
+                    });
+                }
+                None => continue,
+            }
+        } else {
+            let file = directory.join(&image.path);
+            read(&file).map_err(|e| {
+                Unread::from(format!(
+                    "cannot read {} for the image {}: {e}",
+                    file.display(),
+                    image.location
+                ))
+            })?
+        };
 
         assets.push(Asset {
             path: image.path,
@@ -1336,6 +1412,29 @@ fn read_assets_with(
         });
     }
     Ok(assets)
+}
+
+/// Why [`read_assets_with`] stopped: the sentence the terminal prints, and the
+/// URL when that sentence is a failed fetch's.
+///
+/// **The URL rides beside the words rather than being read back out of them**,
+/// which is [`Render::refused`]'s whole reason for existing.
+#[derive(Debug)]
+struct Unread {
+    message: String,
+    url: Option<String>,
+}
+
+impl From<String> for Unread {
+    fn from(message: String) -> Self {
+        Self { message, url: None }
+    }
+}
+
+impl From<md2pdf_core::Error> for Unread {
+    fn from(error: md2pdf_core::Error) -> Self {
+        Self::from(error.to_string())
+    }
 }
 
 /// Read every section file the master names, in the order it names them.
@@ -1390,7 +1489,7 @@ mod tests {
     fn render(directory: &Path, markdown: &str) -> Render {
         // The closure is not noise: `std::fs::read` names one lifetime where
         // the parameter asks for any, so passing it directly does not compile.
-        render_with(directory, markdown, Pane::Master, |file| {
+        render_with(directory, markdown, Pane::Master, &Fetched::new(), |file| {
             std::fs::read(file)
         })
     }
@@ -1425,7 +1524,7 @@ mod tests {
 
         let markdown = std::fs::read_to_string(fixture("figure.md")).unwrap();
         let assets =
-            read_assets_with(&markdown, Vec::new(), &dir, |file| std::fs::read(file)).unwrap();
+            read_assets_with(&markdown, Vec::new(), &dir, &Fetched::new(), |file| std::fs::read(file)).unwrap();
 
         let paths: Vec<&str> = assets.iter().map(|a| a.path.as_str()).collect();
         assert_eq!(paths, ["dot.png", "figures/mark.svg"]);
@@ -1438,10 +1537,11 @@ mod tests {
     #[test]
     fn a_missing_image_names_the_path_the_line_and_the_reason() {
         let markdown = std::fs::read_to_string(fixture("figure.md")).unwrap();
-        let error = read_assets_with(&markdown, Vec::new(), &fixture(""), |file| {
+        let error = read_assets_with(&markdown, Vec::new(), &fixture(""), &Fetched::new(), |file| {
             std::fs::read(file)
         })
-        .unwrap_err();
+        .unwrap_err()
+        .message;
 
         assert!(error.contains("figures/mark.svg"), "{error}");
         assert!(error.contains("line 5"), "{error}");
@@ -1462,7 +1562,7 @@ mod tests {
         let markdown = "![the first](dot.png)\n\nText between them.\n\n![the second](dot.png)\n";
 
         let mut reads = Vec::new();
-        let assets = read_assets_with(markdown, Vec::new(), &dir, |file| {
+        let assets = read_assets_with(markdown, Vec::new(), &dir, &Fetched::new(), |file| {
             reads.push(file.to_path_buf());
             std::fs::read(file)
         })
@@ -1489,7 +1589,7 @@ mod tests {
         let markdown = "![here](dot.png)\n\n![there](https://example.com/figure.png)\n";
 
         let mut reads = Vec::new();
-        let render = render_with(&dir, markdown, Pane::Master, |file| {
+        let render = render_with(&dir, markdown, Pane::Master, &Fetched::new(), |file| {
             reads.push(file.to_path_buf());
             std::fs::read(file)
         });
@@ -1500,6 +1600,119 @@ mod tests {
             Err("no image fetched for 'https://example.com/figure.png' at line 3".to_string())
         );
         assert_eq!(render.assets, Some(vec!["dot.png".to_string()]));
+        assert_eq!(
+            render.urls,
+            Some(vec!["https://example.com/figure.png".to_string()])
+        );
+    }
+
+    // -- images fetched by URL -----------------------------------------------
+    //
+    // `mpdf-003` Phase 25's cases 2 to 4. The fetch itself is
+    // `crate::remote`'s; these hold what a compile does with what came back.
+
+    /// A fetched URL is supplied under its own name, and read from nowhere else.
+    ///
+    /// The bytes are `dot.png`'s, handed over as though a site had served them,
+    /// and the read closure is counted: it sees the file beside the document and
+    /// never the URL.
+    #[test]
+    fn a_fetched_url_is_supplied_under_its_own_name_and_read_from_nowhere() {
+        let dir = scratch_dir("url-fetched");
+        std::fs::copy(fixture("dot.png"), dir.join("dot.png")).unwrap();
+        let url = "https://images.example/figure.png";
+        let markdown = format!("![here](dot.png)\n\n![there]({url})\n\n![again]({url})\n");
+
+        let fetched: Fetched = [(
+            url.to_string(),
+            Ok(std::sync::Arc::new(std::fs::read(fixture("dot.png")).unwrap())),
+        )]
+        .into();
+
+        let mut reads = Vec::new();
+        let assets = read_assets_with(&markdown, Vec::new(), &dir, &fetched, |file| {
+            reads.push(file.to_path_buf());
+            std::fs::read(file)
+        })
+        .unwrap();
+        assert_eq!(reads, [dir.join("dot.png")]);
+        let paths: Vec<&str> = assets.iter().map(|a| a.path.as_str()).collect();
+        assert_eq!(paths, ["dot.png", url], "one asset per name, the URL's its own");
+
+        let render = render_with(&dir, &markdown, Pane::Master, &fetched, |file| {
+            std::fs::read(file)
+        });
+        assert!(render.pdf.is_ok(), "{:?}", render.pdf.err());
+        assert_eq!(render.refused, None);
+        assert_eq!(render.urls, Some(vec![url.to_string()]));
+    }
+
+    /// A fetch that failed is refused in `cli/src/main.rs:read_assets`' own
+    /// sentence, word for word, and names the URL it was refused for.
+    #[test]
+    fn a_failed_fetch_is_refused_in_the_terminals_own_words() {
+        let dir = scratch_dir("url-failed");
+        let url = "https://images.example/gone.png";
+        let markdown = format!("# Title\n\n![gone]({url})\n");
+        let fetched: Fetched = [(url.to_string(), Err("403 Forbidden".to_string()))].into();
+
+        let unread = read_assets_with(&markdown, Vec::new(), &dir, &fetched, |file| {
+            std::fs::read(file)
+        })
+        .unwrap_err();
+        assert_eq!(
+            unread.message,
+            format!("cannot fetch {url} for the image at line 3: 403 Forbidden")
+        );
+        assert_eq!(unread.url.as_deref(), Some(url));
+
+        let render = render_with(&dir, &markdown, Pane::Master, &fetched, |file| {
+            std::fs::read(file)
+        });
+        assert_eq!(render.pdf, Err(unread.message));
+    }
+
+    /// [`Render::refused`] names the URL `core` refused on and the URL a failed
+    /// fetch was refused for, and nothing for any other failure. [`Render::urls`]
+    /// is `None` when `image_paths` fails, while [`Render::assets`] still names
+    /// the sections of a master whose section is missing.
+    #[test]
+    fn the_refused_url_is_read_off_the_error_and_the_urls_off_the_walk() {
+        let dir = scratch_dir("url-refused");
+        let url = "https://images.example/figure.png";
+        let markdown = format!("# Title\n\n![there]({url})\n");
+
+        let unfetched = render_with(&dir, &markdown, Pane::Master, &Fetched::new(), |file| {
+            std::fs::read(file)
+        });
+        assert_eq!(unfetched.refused.as_deref(), Some(url), "core's refusal");
+
+        let failed: Fetched = [(url.to_string(), Err("503 Service Unavailable".to_string()))].into();
+        let refused = render_with(&dir, &markdown, Pane::Master, &failed, |file| {
+            std::fs::read(file)
+        });
+        assert_eq!(refused.refused.as_deref(), Some(url), "a failed fetch");
+
+        let missing = render_with(&dir, "![here](absent.png)\n", Pane::Master, &Fetched::new(), |file| {
+            std::fs::read(file)
+        });
+        assert!(missing.pdf.is_err());
+        assert_eq!(missing.refused, None, "a missing file is not a URL");
+
+        // A master beside none of its sections: the walk cannot answer, so
+        // there is no list of URLs, and the sections are still named.
+        let master = std::fs::read_to_string(fixture("multi_file.md")).unwrap();
+        let empty = scratch_dir("url-section-absent");
+        let sectioned = render_with(&empty, &master, Pane::Master, &Fetched::new(), |file| {
+            std::fs::read(file)
+        });
+        assert_eq!(sectioned.urls, None);
+        assert_eq!(sectioned.refused, None);
+        assert_eq!(
+            sectioned.assets.as_deref(),
+            Some(sectioned.sections.as_slice())
+        );
+        assert!(!sectioned.sections.is_empty());
     }
 
     /// A `mermaid` fence draws on the page, which is `md2pdf-core` 0.2's
@@ -1529,7 +1742,7 @@ mod tests {
 
         let markdown = std::fs::read_to_string(fixture("citations.md")).unwrap();
         let mut reads = Vec::new();
-        let assets = read_assets_with(&markdown, Vec::new(), &dir, |file| {
+        let assets = read_assets_with(&markdown, Vec::new(), &dir, &Fetched::new(), |file| {
             reads.push(file.to_path_buf());
             std::fs::read(file)
         })
@@ -1554,7 +1767,7 @@ mod tests {
 
         let markdown = std::fs::read_to_string(fixture("citations.md")).unwrap();
         let error =
-            read_assets_with(&markdown, Vec::new(), &dir, |file| std::fs::read(file)).unwrap_err();
+            read_assets_with(&markdown, Vec::new(), &dir, &Fetched::new(), |file| std::fs::read(file)).unwrap_err().message;
 
         assert!(error.contains("refs.yml"), "{error}");
         assert!(error.contains("for the bibliography"), "{error}");
@@ -1643,7 +1856,7 @@ mod tests {
         let markdown = std::fs::read_to_string(fixture("multi_file.md")).unwrap();
 
         let mut reads = Vec::new();
-        let rendered = render_with(&dir, &markdown, Pane::Master, |file: &Path| {
+        let rendered = render_with(&dir, &markdown, Pane::Master, &Fetched::new(), |file: &Path| {
             reads.push(file.to_path_buf());
             std::fs::read(file)
         });
@@ -1935,7 +2148,7 @@ mod tests {
         let sections =
             read_sections_with(&markdown, &showcase, |file| std::fs::read(file)).unwrap();
         let assets =
-            read_assets_with(&markdown, sections, &showcase, |file| std::fs::read(file)).unwrap();
+            read_assets_with(&markdown, sections, &showcase, &Fetched::new(), |file| std::fs::read(file)).unwrap();
         let pdf = md2pdf_core::md_to_pdf(&markdown, &assets).unwrap();
 
         let out = std::env::temp_dir().join("letur-mpdf-011-phase1-showcase.pdf");
@@ -2326,7 +2539,7 @@ mod tests {
 
         let markdown = "# A preface of the master's own\n\nText.\n\n[](sections/one.md)\n";
         let lines = |pane| {
-            render_with(&dir, markdown, pane, |file: &Path| std::fs::read(file))
+            render_with(&dir, markdown, pane, &Fetched::new(), |file: &Path| std::fs::read(file))
                 .anchors
                 .into_iter()
                 .map(|anchor| anchor.line)
@@ -2362,11 +2575,11 @@ mod tests {
         std::fs::write(&edited, "# On disk\n\nThe disk's own text.\n").unwrap();
 
         let buffer = "# In the pane\n\nText nobody has saved.\n";
-        let unsaved = render_project(&main, &edited, buffer).expect("the master would not read");
+        let unsaved = render_project(&main, &edited, buffer, &Fetched::new()).expect("the master would not read");
 
         std::fs::write(&edited, buffer).unwrap();
         let master = std::fs::read_to_string(&main).unwrap();
-        let saved = render_project(&main, &main, &master).expect("the master would not read");
+        let saved = render_project(&main, &main, &master, &Fetched::new()).expect("the master would not read");
 
         assert_eq!(
             unsaved.pdf.expect("the unsaved compile failed"),
@@ -2396,19 +2609,19 @@ mod tests {
 
         let missing = dir.join("nothing.md");
         assert_eq!(
-            render_project(&missing, &pane, "# Held\n").err(),
+            render_project(&missing, &pane, "# Held\n", &Fetched::new()).err(),
             read_document(&missing).err()
         );
 
         let binary = dir.join("binary.md");
         std::fs::write(&binary, [0xff, 0xfe, 0x00]).unwrap();
         assert_eq!(
-            render_project(&binary, &pane, "# Held\n").err(),
+            render_project(&binary, &pane, "# Held\n", &Fetched::new()).err(),
             read_document(&binary).err()
         );
 
         assert!(
-            render_project(&missing, &missing, "# Text the disk never held\n").is_ok(),
+            render_project(&missing, &missing, "# Text the disk never held\n", &Fetched::new()).is_ok(),
             "the pane holds the main, so the disk is not consulted at all"
         );
     }
@@ -2464,11 +2677,11 @@ mod tests {
             "the buffer matches the disk, so this clause proves nothing"
         );
 
-        let unsaved = render_project(&main, &edited, &buffer).expect("the master would not read");
+        let unsaved = render_project(&main, &edited, &buffer, &Fetched::new()).expect("the master would not read");
 
         std::fs::write(&edited, &buffer).unwrap();
         let master = std::fs::read_to_string(&main).unwrap();
-        let saved = render_project(&main, &main, &master).expect("the master would not read");
+        let saved = render_project(&main, &main, &master, &Fetched::new()).expect("the master would not read");
 
         assert_eq!(
             unsaved.pdf.expect("the unsaved compile failed"),

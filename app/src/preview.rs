@@ -10,15 +10,21 @@
 //! **The buffer is what compiles.** The file beside it need never have held
 //! that text, and the two are compared rather than conflated: [`external_change`]
 //! is the whole of what an event naming the open document now means.
+//!
+//! **A third source of work arrived with `mpdf-003` Phase 25**: an image named
+//! by URL, fetched by a worker [`Session::new`] starts, for a site the author
+//! allowed. It compiles through the same three steps the two loops use, so a
+//! keystroke waits on neither the network nor the render it causes.
 
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
 use crate::document;
+use crate::remote::{self, Web};
 use crate::watch::{self, Change, Changed, Watch};
 
 /// What the window says about the last compile.
@@ -240,9 +246,17 @@ pub struct Status {
     /// with the value the author chose; [`Preview::status`] fills
     /// [`Appearance::System`] and says so where it does it.
     pub appearance: Appearance,
+    /// What the page says about the images the document names by URL, and
+    /// the button beside it. `None` when there is nothing to say, which
+    /// includes a URL only waiting out [`remote::SETTLE`].
+    ///
+    /// **Worded in Rust and only placed by the page**, as the status line is.
+    /// `mpdf-003` Phase 25.
+    pub web: Option<remote::WebLine>,
 }
 
-/// One compile's three inputs, owned, and the order it started in.
+/// One compile's three inputs, owned, the order it started in, and the images
+/// fetched by URL that it may read.
 ///
 /// **Nothing that runs it borrows a [`Preview`]**, and that is the structural
 /// half of `mpdf-003` Phase 22: [`Compile::run`] cannot hold the state lock
@@ -255,7 +269,11 @@ pub struct Status {
 /// [`Preview::current`] tests the three inputs and the serial answers a
 /// different question entirely. A derive would invite `self.plan() == Some(plan)`,
 /// which clones the buffer a second time to answer a question about three fields.
-struct Compile {
+///
+/// **Public, with every field private**, for one reason: `crate::main` hands
+/// [`Compile::run`] to [`Session::new`] as the fetch worker's render, the seam
+/// a test replaces. Nothing outside this file can build one.
+pub struct Compile {
     /// The file that compiles, resolved — [`Preview::main_path`]'s answer.
     main: PathBuf,
     /// The file the pane holds, whose text the buffer below stands in for.
@@ -264,6 +282,12 @@ struct Compile {
     buffer: String,
     /// Which compile of this [`Preview`] this is, from [`Preview::started`].
     serial: u64,
+    /// The fetches that came back, on sites the open project allows. The bytes
+    /// are shared, so a plan copies no image.
+    fetched: remote::Fetched,
+    /// Which landing of each of those this compile read, for
+    /// [`Preview::absorb`] to promote exactly those and no newer one.
+    read: Vec<(String, u64)>,
 }
 
 impl Compile {
@@ -273,9 +297,10 @@ impl Compile {
     /// [`Preview::compile`] used to take it only on the way to a success. It
     /// costs one `Instant` on a path that had none and changes nothing
     /// observable: [`Preview::absorb`] reads it in the success arm alone.
-    fn run(&self) -> (Result<document::Render, String>, Duration) {
+    pub fn run(&self) -> (Result<document::Render, String>, Duration) {
         let started = Instant::now();
-        let outcome = document::render_project(&self.main, &self.edited, &self.buffer);
+        let outcome =
+            document::render_project(&self.main, &self.edited, &self.buffer, &self.fetched);
         (outcome, started.elapsed())
     }
 }
@@ -348,6 +373,25 @@ pub struct Preview {
     stale: bool,
     error: Option<String>,
     divergence: Option<String>,
+    /// The images the document names by URL, off the last walk that answered.
+    urls: Vec<String>,
+    /// The URL the last compile was refused on, if it was one.
+    ///
+    /// **Cleared on every error written that did not come from a render** —
+    /// [`Preview::absorb`]'s early `Err` arm and [`Preview::load`]'s — or a stale
+    /// one would hide a *"cannot read"* about the master behind a fetch.
+    refused: Option<String>,
+    /// The sites the open project allows, and every URL asked about since
+    /// launch. **Carried across [`Session::open_at`]'s rebuild**, with only the
+    /// sites replaced: the bytes are the process's, consent is the folder's.
+    web: Web,
+    /// Where a claim goes: the fetch worker [`Session::new`] starts.
+    ///
+    /// **The channel's only sender**, carried across the rebuild as `web` is, so
+    /// a dropped [`Session`] drops it with the `Preview` and the worker's `recv`
+    /// ends. A `Preview` built bare, as a test builds one, has none and claims
+    /// nothing.
+    claims: Option<mpsc::Sender<Claim>>,
 }
 
 impl Preview {
@@ -440,11 +484,24 @@ impl Preview {
     /// every compile assigns from the master's own text. So a keystroke that
     /// half-types a marker moves one row and walks no directory, which is what
     /// makes this cheap enough to call on every render.
+    ///
+    /// **The error is left out exactly while it is `core`'s refusal of an image
+    /// that is on its way** — waiting, being fetched, or back and not yet
+    /// compiled, on a site the open project allows. The line says so, and
+    /// *"no image fetched"* beside *"Fetching"* would be two sentences
+    /// contradicting each other. Every other error shows as it always has: a
+    /// URL on a site not allowed, which is the refusal the button sits beside;
+    /// a fetch that landed and failed; and a URL left on its way by a project
+    /// that has since closed. `mpdf-003` Phase 25.
     pub fn status(&self) -> Status {
+        let hidden = self
+            .refused
+            .as_deref()
+            .is_some_and(|url| self.web.on_its_way(url));
         Status {
             state: self.state(),
             time: self.elapsed.map(|took| format!("{} ms", took.as_millis())),
-            error: self.error.clone(),
+            error: if hidden { None } else { self.error.clone() },
             page: self.pdf.is_some(),
             divergence: self.divergence.clone(),
             revision: self.revision,
@@ -459,6 +516,7 @@ impl Preview {
             // preference kept here would go back to `System` on every `⌘O`.
             // `Session::status` is what fills this with the author's choice.
             appearance: Appearance::System,
+            web: self.web.line(&self.urls),
         }
     }
 
@@ -544,6 +602,7 @@ impl Preview {
             Err(message) => {
                 self.stale = true;
                 self.error = Some(message);
+                self.refused = None;
             }
         }
     }
@@ -715,7 +774,8 @@ impl Preview {
     /// moved the document wholesale, already holds `crate::main`'s own
     /// `Mutex<Session>` for its duration, and may as well hold this one too. The
     /// two closures that fire while a hand is on the keys take the three steps
-    /// apart instead.
+    /// apart instead, and so does the fetch worker, which fires on the network's
+    /// time rather than the author's.
     pub fn compile(&mut self) {
         let Some(plan) = self.plan() else {
             return;
@@ -733,9 +793,10 @@ impl Preview {
     ///
     /// The buffer is cloned, which is this phase's whole per-compile cost: a
     /// copy of the document, four to five orders below the compile it is handed
-    /// to.
+    /// to. The fetched images are not: their bytes are shared.
     fn plan(&mut self) -> Option<Compile> {
         let (main, edited) = (self.main_path()?, self.edited.clone()?);
+        let (fetched, read) = self.web.finished();
 
         self.started += 1;
         Some(Compile {
@@ -743,6 +804,8 @@ impl Preview {
             edited,
             buffer: self.buffer.clone(),
             serial: self.started,
+            fetched,
+            read,
         })
     }
 
@@ -804,6 +867,14 @@ impl Preview {
     /// older answer cannot overwrite a newer failure either.
     ///
     /// `mpdf-003` Phase 22.
+    ///
+    /// **Since Phase 25 it is also the one place a fetch is claimed.** Every
+    /// compile path reaches it — the typing loop, the watch loop, an open, a
+    /// reload, a save-as, the fetch worker's own compile — so none of them can
+    /// strand a URL the text newly names on an allowed site. And past the guard
+    /// it marks what the plan read as on the page, **at the landing it read**,
+    /// whatever the outcome: a plan that read a failure and lands after a retry
+    /// has landed newer bytes leaves those bytes on their way.
     fn absorb(
         &mut self,
         plan: &Compile,
@@ -814,18 +885,25 @@ impl Preview {
             return;
         }
         self.landed = plan.serial;
+        self.web.promote(&plan.read);
 
         let render = match outcome {
             Ok(render) => render,
             Err(message) => {
                 self.stale = true;
                 self.error = Some(message);
+                self.refused = None;
                 return;
             }
         };
 
         if let Some(assets) = render.assets {
             self.assets = assets;
+        }
+        self.refused = render.refused;
+        if let Some(urls) = render.urls {
+            self.urls = urls;
+            self.claim();
         }
 
         // Taken whether or not the compile succeeded, as the asset list above
@@ -848,6 +926,23 @@ impl Preview {
             }
         }
     }
+
+    /// Hand the fetch worker every URL the text names on an allowed site that
+    /// nothing has asked about yet. Each waits out [`remote::SETTLE`] first,
+    /// which is what makes a URL edited in place one request and not one per
+    /// compile.
+    ///
+    /// **A `Preview` with no worker claims nothing**, and marks nothing either:
+    /// a URL marked waiting with nobody to take it would hide its refusal for
+    /// good.
+    fn claim(&mut self) {
+        let Some(claims) = &self.claims else {
+            return;
+        };
+        for url in self.web.claim(&self.urls, false) {
+            let _ = claims.send(Claim::Fetch { url, settle: true });
+        }
+    }
 }
 
 /// One open document: its preview, and the two loops that keep it current.
@@ -856,8 +951,8 @@ impl Preview {
 /// typing channel are dropped before the new ones start.
 pub struct Session {
     state: Arc<Mutex<Preview>>,
-    on_render: Arc<dyn Fn() + Send + Sync>,
-    /// The first of the two files this app writes outside the author's own
+    on_render: Announce,
+    /// The first of the three files this app writes outside the author's own
     /// folders: which root is remembered as compiling which file.
     ///
     /// **It is a parameter and not a call to the platform**, so a test hands in
@@ -865,7 +960,7 @@ pub struct Session {
     /// side of the window. `crate::main` resolves the real one from Tauri's own
     /// path resolver, which is the authority on the bundle identifier.
     store: PathBuf,
-    /// The second of the two files this app writes outside the author's own
+    /// The second of the three files this app writes outside the author's own
     /// folders: which palette the window wears.
     ///
     /// **A second file and not a second key in the first**, and the reason is
@@ -878,6 +973,10 @@ pub struct Session {
     /// It is a parameter for [`Session::store`]'s reason, and the same test
     /// hands in the same scratch directory.
     settings: PathBuf,
+    /// The third: which sites each folder's author allowed images to be
+    /// fetched from. Read at every open, written at every press, and a
+    /// parameter for [`Session::store`]'s reason. `mpdf-003` Phase 25.
+    sites: PathBuf,
     /// The palette the author chose, read from [`Session::settings`] at launch.
     ///
     /// **It is here and not on [`Preview`]** because it is global and a
@@ -896,17 +995,50 @@ impl Session {
     /// The callback carries no payload. The window's copy of it emits an event
     /// and the page then asks for the bytes, because handing them through the
     /// event would serialize them as a JSON array of numbers, one per byte.
+    ///
+    /// **It starts the fetch worker**, `mpdf-003` Phase 25, and hands it the
+    /// fetch and the render as seams: production passes `remote::fetch` and
+    /// [`Compile::run`], and a test passes fakes, so no case in the suite
+    /// touches the network and a case can hold a compile open. The worker
+    /// holds a [`Weak`] to the state, and the new [`Preview`] holds the
+    /// channel's only sender — so a dropped `Session` takes its `Preview` with
+    /// it, the worker's `recv` ends, and the thread exits. The suite builds
+    /// hundreds of these.
     pub fn new(
         store: PathBuf,
         settings: PathBuf,
+        sites: PathBuf,
         appearance: Appearance,
+        fetch: impl Fn(&str) -> Result<Vec<u8>, String> + Send + Sync + 'static,
+        render: impl Fn(&Compile) -> Rendered + Send + Sync + 'static,
         on_render: impl Fn() + Send + Sync + 'static,
     ) -> Self {
+        let (claims, claimed) = mpsc::channel();
+        let state = Arc::new(Mutex::new(Preview {
+            claims: Some(claims),
+            ..Preview::default()
+        }));
+        let on_render: Announce = Arc::new(on_render);
+
+        let worker = Worker {
+            state: Arc::downgrade(&state),
+            fetch: Arc::new(fetch),
+            render: Arc::new(render),
+            on_render: Arc::clone(&on_render),
+        };
+        std::thread::spawn(move || {
+            for claim in claimed {
+                let worker = worker.clone();
+                std::thread::spawn(move || worker.carry(claim));
+            }
+        });
+
         Self {
-            state: Arc::new(Mutex::new(Preview::default())),
-            on_render: Arc::new(on_render),
+            state,
+            on_render,
             store,
             settings,
+            sites,
             appearance,
             watch: None,
             typing: None,
@@ -921,7 +1053,7 @@ impl Session {
     /// Everything the window says, from the two places that know it.
     ///
     /// **The composition is here rather than in [`Preview::status`], and the
-    /// split is the point**: eleven of the twelve fields are the last compile's
+    /// split is the point**: twelve of the thirteen fields are the last compile's
     /// and one is the author's, held for a document's lifetime rather than for
     /// a compile's. [`Preview::status`] keeps its signature because some
     /// thirty-five call sites read it, nearly all of them tests.
@@ -1010,6 +1142,14 @@ impl Session {
             // error. `revision` and `reloaded` are still reset; those the page
             // resets alongside, in `clear()`.
             let started = preview.started;
+            // **The fetches and the worker's channel survive it too**, and the
+            // sites are replaced *before* `load` compiles: that compile's
+            // `absorb` claims and its plan reads against them, so installing
+            // them after would let the previous project's consent decide the
+            // first page of this one. `mpdf-003` Phase 25.
+            let mut web = std::mem::take(&mut preview.web);
+            web.install(document::read_sites(&self.sites, &root));
+            let claims = preview.claims.take();
             *preview = Preview {
                 root: Some(root.clone()),
                 main: Some(main),
@@ -1017,6 +1157,8 @@ impl Session {
                 tree: document::files_under(&root),
                 started,
                 landed: started,
+                web,
+                claims,
                 ..Preview::default()
             };
             preview.load();
@@ -1318,6 +1460,48 @@ impl Session {
         self.arm(root, document.clone(), document)
     }
 
+    /// The author pressed the button beside the line: fetch the document's
+    /// images from the web.
+    ///
+    /// **The press is the consent**, and it is as wide as the sentence it sits
+    /// beside: every site the document names is allowed for this folder, and
+    /// remembered in `sites.json`. The file is written *before* the sites are
+    /// worn, [`Session::set_main`]'s order, so a write that fails is reported
+    /// and memory and disk never disagree about what was allowed.
+    ///
+    /// Then every named URL nothing has asked about, or whose fetch failed, is
+    /// claimed **without the settle** — the press is the one thing that skips
+    /// it. **And the worker is always sent a compile, even when no fetch
+    /// starts**: the bytes may already be in memory from a project that allowed
+    /// the site first, and a press that only widens consent must still redraw.
+    ///
+    /// **It holds no lock across the network or the render**, since
+    /// `crate::main`'s command holds `Mutex<Session>` while it runs, as `edit`'s
+    /// does. It does not announce: the worker announces the moment a fetch
+    /// goes out, and a status read between the two would show the line empty.
+    /// `mpdf-003` Phase 25.
+    pub fn fetch_images(&self) -> Result<(), String> {
+        let mut preview = self.preview();
+        let root = preview
+            .root
+            .clone()
+            .ok_or_else(|| "no document is open".to_string())?;
+
+        let allowed = preview.web.widened(&preview.urls);
+        document::write_sites(&self.sites, &root, &allowed)?;
+        preview.web.install(allowed);
+
+        let urls = preview.urls.clone();
+        let claimed = preview.web.claim(&urls, true);
+        if let Some(claims) = &preview.claims {
+            for url in claimed {
+                let _ = claims.send(Claim::Fetch { url, settle: false });
+            }
+            let _ = claims.send(Claim::Compile);
+        }
+        Ok(())
+    }
+
     /// Drop what the pane holds and take the file again.
     ///
     /// **The second way out both refusals name.** `Preview::load` already reads
@@ -1581,6 +1765,106 @@ impl Session {
     }
 }
 
+/// What a render answers, and how long it took.
+type Rendered = (Result<document::Render, String>, Duration);
+
+/// The signal after a compile. It carries nothing; the page asks for the rest.
+type Announce = Arc<dyn Fn() + Send + Sync>;
+
+/// The worker's fetch: `remote::fetch`, or a test's fake.
+type Fetcher = Arc<dyn Fn(&str) -> Result<Vec<u8>, String> + Send + Sync>;
+
+/// The worker's render: [`Compile::run`], or a test's gate.
+type Renderer = Arc<dyn Fn(&Compile) -> Rendered + Send + Sync>;
+
+/// One piece of work for the fetch worker.
+enum Claim {
+    /// Fetch this URL, waiting out [`remote::SETTLE`] first unless it was
+    /// pressed for.
+    Fetch { url: String, settle: bool },
+    /// Compile, and announce. What the press sends whether or not it fetches.
+    Compile,
+}
+
+/// What each claim's thread carries: the state, reached only when it is
+/// needed, and the three things it calls.
+#[derive(Clone)]
+struct Worker {
+    /// **Weak, and upgraded one step at a time**, so no thread holds a
+    /// dropped session's state alive across a thirty-second request.
+    state: Weak<Mutex<Preview>>,
+    fetch: Fetcher,
+    render: Renderer,
+    on_render: Announce,
+}
+
+impl Worker {
+    /// Carry one claim out: `mpdf-003` Phase 25's five steps, of which a
+    /// [`Claim::Compile`] is the last alone.
+    ///
+    /// 1. Wait out the settle, unless the claim came from the press.
+    /// 2. Under the lock, start the fetch if the text still names the URL and
+    ///    the open project allows its site — or drop the claim — and announce.
+    ///    A claim made under one project that settles after another opens is
+    ///    thereby dropped, not fetched on the second project's behalf.
+    /// 3. Fetch, off the lock.
+    /// 4. Under the lock, record what came back, and announce.
+    /// 5. The typing loop's three steps — plan under the lock, render off it,
+    ///    absorb under it — and announce.
+    ///
+    /// **A keystroke never waits on the network**, which is `mpdf-003` Phase
+    /// 22's property extended to a new source of work: the lock is taken for
+    /// three short writes and a plan, and never across a request or a render.
+    fn carry(&self, claim: Claim) {
+        if let Claim::Fetch { url, settle } = claim {
+            if settle {
+                std::thread::sleep(remote::SETTLE);
+            }
+
+            let Some(state) = self.state.upgrade() else {
+                return;
+            };
+            let begun = {
+                let mut preview = state.lock().expect("the preview lock was poisoned");
+                let named = preview.urls.contains(&url);
+                preview.web.begin(&url, named)
+            };
+            drop(state);
+            (self.on_render)();
+            if !begun {
+                return;
+            }
+
+            let result = (self.fetch)(&url);
+
+            let Some(state) = self.state.upgrade() else {
+                return;
+            };
+            state
+                .lock()
+                .expect("the preview lock was poisoned")
+                .web
+                .land(&url, result);
+            drop(state);
+            (self.on_render)();
+        }
+
+        let Some(state) = self.state.upgrade() else {
+            return;
+        };
+        let planned = state.lock().expect("the preview lock was poisoned").plan();
+        if let Some(plan) = planned {
+            let (outcome, took) = (self.render)(&plan);
+            state
+                .lock()
+                .expect("the preview lock was poisoned")
+                .absorb(&plan, outcome, took);
+        }
+        drop(state);
+        (self.on_render)();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1656,14 +1940,35 @@ mod tests {
     /// directory. So a case that wants to read what an appearance wrote spells
     /// `document::settings_file` over the same scratch directory and gets the
     /// same path, and the twelve call sites of this helper do not move.
+    ///
+    /// **The worker's two seams are fakes here**, and for every case that does
+    /// not ask for others: a fetch that refuses, so no case in the suite can
+    /// touch the network, and the real render. `sites.json` is derived beside
+    /// the store the way `settings.json` is.
     fn counted_with(store: PathBuf) -> (Session, Arc<AtomicUsize>) {
+        seamed(
+            store,
+            |_: &str| Err("the suite touches no network".to_string()),
+            Compile::run,
+        )
+    }
+
+    /// The same, with the fetch worker's fetch and render named.
+    fn seamed(
+        store: PathBuf,
+        fetch: impl Fn(&str) -> Result<Vec<u8>, String> + Send + Sync + 'static,
+        render: impl Fn(&Compile) -> Rendered + Send + Sync + 'static,
+    ) -> (Session, Arc<AtomicUsize>) {
         let support = store.parent().map(Path::to_path_buf).unwrap_or_default();
         let compiles = Arc::new(AtomicUsize::new(0));
         let counter = Arc::clone(&compiles);
         let session = Session::new(
             store,
             document::settings_file(&support),
+            document::sites_file(&support),
             Appearance::System,
+            fetch,
+            render,
             move || {
                 counter.fetch_add(1, Ordering::SeqCst);
             },
@@ -4080,7 +4385,7 @@ mod tests {
     ///
     /// **This is the narrow edge `specs/desktop_app_spec.md` OQ-10 names.**
     /// `invoke` answers with an untyped value and `app/dist/index.html` reads
-    /// twelve fields off it by name, so a field renamed here and not there breaks
+    /// thirteen fields off it by name, so a field renamed here and not there breaks
     /// the window silently, at runtime, with no console anyone reads. The type
     /// check over that file (`app/typecheck.mjs`) makes the typedef bind on the
     /// page's side; this makes it bind on Rust's. **Two declarations compared
@@ -4092,8 +4397,11 @@ mod tests {
     /// **The count moved from ten to eleven in `mpdf-010` Phase 2**, which
     /// added `edited` beside `main` so the panel can mark the row the pane is
     /// holding, and **from eleven to twelve in `mpdf-003` Phase 13**, which
-    /// added `appearance` so the footer's toggle places what Rust decided.
-    /// Phase 1 left it at ten by coincidence — it removed `sections` and
+    /// added `appearance` so the footer's toggle places what Rust decided, and
+    /// **from twelve to thirteen in `mpdf-003` Phase 25**, which added `web` —
+    /// the line about images named by URL — and joined `WebLine` to the
+    /// declarations checked here, `Some` in the literal so there is a line to
+    /// compare. Phase 1 left it at ten by coincidence — it removed `sections` and
     /// `master` and added `entries` and `main` — and said so here, in a note
     /// each later phase's own scope is the authority for rewriting. A literal
     /// that has now moved twice is still not a thing to "fix" to silence a
@@ -4119,6 +4427,10 @@ mod tests {
             main: Some("report.md".to_string()),
             edited: Some("sections/method.md".to_string()),
             appearance: Appearance::Dark,
+            web: Some(remote::WebLine {
+                sentence: "1 image on images.example is not fetched.".to_string(),
+                action: Some("Fetch images from the web".to_string()),
+            }),
         };
         let sent = serde_json::to_value(&status).expect("a `Status` that will not serialize");
 
@@ -4135,7 +4447,7 @@ mod tests {
         // marker that stopped matching should fail loudly rather than pass.
         assert_eq!(
             declared.len(),
-            12,
+            13,
             "the page's `Status` typedef declares {} properties: {:?}",
             declared.len(),
             declared
@@ -4185,6 +4497,27 @@ mod tests {
         assert_eq!(
             drawn, listed,
             "the page's `Entry` typedef and the entries a `Status` carries name different fields"
+        );
+
+        let mut worded: Vec<String> = sent["web"]
+            .as_object()
+            .expect("a `WebLine` that is not a JSON object")
+            .keys()
+            .cloned()
+            .collect();
+        let mut placed = typedef_properties(PAGE, "WebLine");
+        worded.sort_unstable();
+        placed.sort_unstable();
+        assert_eq!(
+            placed.len(),
+            2,
+            "the page's `WebLine` typedef declares {} properties: {:?}",
+            placed.len(),
+            placed
+        );
+        assert_eq!(
+            placed, worded,
+            "the page's `WebLine` typedef and the line a `Status` carries name different fields"
         );
 
         // The kind crosses as a bare lowercase word, which is what the page
@@ -4251,7 +4584,7 @@ mod tests {
             "each appearance must announce exactly once"
         );
 
-        // And the eleven fields that are the last compile's are still the
+        // And the twelve fields that are the last compile's are still the
         // preview's own, so the override is one field and not a second status.
         let empty = Preview::default().status();
         let told = session.status();
@@ -4358,10 +4691,7 @@ mod tests {
 
         /// The render to hand to [`Session::recompile_with`] or
         /// [`Session::on_change_with`]. One gate can serve several.
-        fn render(
-            &self,
-        ) -> impl Fn(&Compile) -> (Result<document::Render, String>, Duration) + Send + 'static
-        {
+        fn render(&self) -> impl Fn(&Compile) -> Rendered + Send + Sync + 'static {
             let reporting = self.reporting.clone();
             let cleared = Arc::clone(&self.cleared);
 
@@ -4683,5 +5013,579 @@ mod tests {
             session.preview().revision > after_open.0,
             "the newly opened document stopped compiling: `landed` was left above `started`"
         );
+    }
+
+    // -- images fetched by URL ------------------------------------------------
+    //
+    // `mpdf-003` Phase 25's cases 6 to 15. **No case touches the network**: the
+    // fetch is a [`Fake`] that counts its calls, serves `tests/fixtures/dot.png`
+    // and can be held open, and every URL is on a reserved `.example` host. A
+    // case that needs a render held open passes a [`Gate`] as the worker's
+    // render, the seam [`Session::new`] takes. A case that waits for the settle
+    // waits [`remote::SETTLE`] plus the suite's usual margin.
+
+    /// The one URL most cases name, and the site it is on.
+    const IMAGE: &str = "http://images.example/dot.png";
+    const SITE: &str = "images.example";
+
+    /// A fetch that records every URL it is asked for, answers from a table —
+    /// `dot.png`'s bytes unless a case says otherwise — and can be held open on
+    /// a [`Condvar`] until a case lets it go.
+    /// What the fake answers for each URL a case has told it about.
+    type Answers = Arc<Mutex<std::collections::HashMap<String, Result<Vec<u8>, String>>>>;
+
+    #[derive(Clone)]
+    struct Fake {
+        calls: Arc<Mutex<Vec<String>>>,
+        answers: Answers,
+        held: Arc<(Mutex<bool>, Condvar)>,
+    }
+
+    impl Fake {
+        fn new() -> Self {
+            Self {
+                calls: Arc::default(),
+                answers: Arc::default(),
+                held: Arc::new((Mutex::new(false), Condvar::new())),
+            }
+        }
+
+        /// The fetch to hand to [`seamed`]. The call is recorded before it
+        /// blocks, so a case can wait for it to have *entered*.
+        fn fetch(&self) -> impl Fn(&str) -> Result<Vec<u8>, String> + Send + Sync + 'static {
+            let fake = self.clone();
+            move |url: &str| {
+                fake.calls
+                    .lock()
+                    .expect("the fake was poisoned")
+                    .push(url.to_string());
+
+                let (held, waking) = &*fake.held;
+                let mut holding = held.lock().expect("the fake was poisoned");
+                while *holding {
+                    holding = waking.wait(holding).expect("the fake was poisoned");
+                }
+                drop(holding);
+
+                fake.answers
+                    .lock()
+                    .expect("the fake was poisoned")
+                    .get(url)
+                    .cloned()
+                    .unwrap_or_else(|| Ok(std::fs::read(fixture("dot.png")).unwrap()))
+            }
+        }
+
+        fn calls(&self) -> Vec<String> {
+            self.calls.lock().expect("the fake was poisoned").clone()
+        }
+
+        fn answer(&self, url: &str, answer: Result<Vec<u8>, String>) {
+            self.answers
+                .lock()
+                .expect("the fake was poisoned")
+                .insert(url.to_string(), answer);
+        }
+
+        fn hold(&self) {
+            *self.held.0.lock().expect("the fake was poisoned") = true;
+        }
+
+        fn release(&self) {
+            *self.held.0.lock().expect("the fake was poisoned") = false;
+            self.held.1.notify_all();
+        }
+
+        /// Wait for this many calls to have entered. [`WIRING`]'s bound.
+        fn entered(&self, count: usize) -> Vec<String> {
+            let deadline = Instant::now() + WIRING + remote::SETTLE;
+            while Instant::now() < deadline {
+                let calls = self.calls();
+                if calls.len() >= count {
+                    return calls;
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            panic!("{count} fetches never entered: {:?}", self.calls());
+        }
+    }
+
+    /// A session over its own Application Support directory, with this fake as
+    /// its fetch and `render` as the worker's render.
+    fn fetching(
+        name: &str,
+        fake: &Fake,
+        render: impl Fn(&Compile) -> Rendered + Send + Sync + 'static,
+    ) -> (Session, PathBuf) {
+        let support = scratch_dir(&format!("support-{name}"));
+        let (session, _) = seamed(document::store_file(&support), fake.fetch(), render);
+        (session, support)
+    }
+
+    /// A single-file document naming these images by URL, the first at line 3.
+    fn web_document_in(dir: &Path, urls: &[&str]) -> PathBuf {
+        let document = dir.join("web.md");
+        let mut text = "# Images from the web\n".to_string();
+        for (n, url) in urls.iter().enumerate() {
+            text.push_str(&format!("\n![figure {n}]({url})\n"));
+        }
+        std::fs::write(&document, text).unwrap();
+        document
+    }
+
+    /// Remember, before any open, that this document's folder allows `site`.
+    fn allow(support: &Path, document: &Path, site: &str) {
+        document::write_sites(
+            &document::sites_file(support),
+            &document::project_root(document),
+            &[site.to_string()].into(),
+        )
+        .unwrap();
+    }
+
+    /// Past the settle, by the suite's usual margin: long enough to prove a
+    /// fetch that should not happen did not.
+    fn past_the_settle() {
+        std::thread::sleep(remote::SETTLE + watch::TYPING_DEBOUNCE * 4);
+    }
+
+    /// Poll the status until it says what a case waits for. [`WIRING`]'s bound,
+    /// plus the settle, which some of these wait out first.
+    fn until(session: &Session, why: &str, done: impl Fn(&Status) -> bool) -> Status {
+        let deadline = Instant::now() + WIRING + remote::SETTLE;
+        loop {
+            let status = session.status();
+            if done(&status) {
+                return status;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "{why}: state {:?}, error {:?}, web {:?}",
+                status.state,
+                status.error,
+                status.web
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    /// The line a case expects, spelled out.
+    fn line(sentence: &str, action: Option<&str>) -> Option<remote::WebLine> {
+        Some(remote::WebLine {
+            sentence: sentence.to_string(),
+            action: action.map(str::to_string),
+        })
+    }
+
+    fn drawn(status: &Status) -> bool {
+        status.state == State::Current && status.error.is_none() && status.web.is_none()
+    }
+
+    /// Case 6. **Nothing is fetched before the press**, however long the window
+    /// is left open: the refusal is `core`'s, and the line offers the button.
+    #[test]
+    fn nothing_is_fetched_before_the_press() {
+        let dir = scratch_dir("web-before-the-press");
+        let document = web_document_in(&dir, &[IMAGE]);
+        let fake = Fake::new();
+        let (mut session, _) = fetching("before-the-press", &fake, Compile::run);
+        session.open(document).unwrap();
+        session.watch = None;
+
+        past_the_settle();
+
+        assert_eq!(fake.calls(), Vec::<String>::new(), "a fetch before the press");
+        let status = session.status();
+        assert_eq!(
+            status.error,
+            Some(format!("no image fetched for '{IMAGE}' at line 3"))
+        );
+        assert_eq!(
+            status.web,
+            line(
+                "1 image on images.example is not fetched.",
+                Some("Fetch images from the web")
+            )
+        );
+    }
+
+    /// Case 7. **The press fetches each URL once, remembers the site under the
+    /// root, and the page goes current.**
+    #[test]
+    fn the_press_fetches_each_url_once_remembers_the_site_and_draws() {
+        let dir = scratch_dir("web-the-press");
+        let second = "http://Images.Example/again.png";
+        let document = web_document_in(&dir, &[IMAGE, second, IMAGE]);
+        let fake = Fake::new();
+        let (mut session, support) = fetching("the-press", &fake, Compile::run);
+        session.open(document.clone()).unwrap();
+        session.watch = None;
+
+        session.fetch_images().unwrap();
+        until(&session, "the press never drew the page", drawn);
+
+        let mut calls = fake.calls();
+        calls.sort_unstable();
+        assert_eq!(calls, [second, IMAGE], "each URL once");
+        assert_eq!(
+            document::read_sites(
+                &document::sites_file(&support),
+                &document::project_root(&document)
+            ),
+            std::collections::BTreeSet::from([SITE.to_string()]),
+            "the site is remembered under the root, lower-cased"
+        );
+
+        past_the_settle();
+        assert_eq!(fake.calls().len(), 2, "a URL already on the page was fetched again");
+    }
+
+    /// Case 8. **Consent carries across launches, and the bytes do not** — and
+    /// in between, a project that never allowed the site does not draw it from
+    /// memory, which is decision 2's "consent and the bytes held apart".
+    #[test]
+    fn consent_carries_across_launches_and_the_bytes_do_not() {
+        let dir = scratch_dir("web-across-launches");
+        let document = web_document_in(&dir, &[IMAGE]);
+        let elsewhere = web_document_in(&scratch_dir("web-never-allowed"), &[IMAGE]);
+
+        let fake = Fake::new();
+        let (mut session, support) = fetching("across-launches", &fake, Compile::run);
+        session.open(document.clone()).unwrap();
+        session.watch = None;
+        session.fetch_images().unwrap();
+        until(&session, "the press never drew the page", drawn);
+        assert_eq!(fake.calls(), [IMAGE]);
+
+        // A second project that never allowed the site: the bytes are in
+        // memory, and it does not draw them.
+        session.open(elsewhere).unwrap();
+        session.watch = None;
+        let never = session.status();
+        assert_eq!(never.state, State::Failed, "a project drew bytes it never allowed");
+        assert_eq!(
+            never.error,
+            Some(format!("no image fetched for '{IMAGE}' at line 3"))
+        );
+        assert_eq!(
+            never.web,
+            line(
+                "1 image on images.example is not fetched.",
+                Some("Fetch images from the web")
+            )
+        );
+
+        // A second open of the allowed one, in the same session: at once.
+        session.open(document.clone()).unwrap();
+        session.watch = None;
+        assert!(drawn(&session.status()), "a second open did not draw at once");
+        assert_eq!(fake.calls(), [IMAGE], "a second open fetched again");
+        drop(session);
+
+        // A fresh session over the same `sites.json`: no press, one fetch, after
+        // the settle.
+        let later = Fake::new();
+        let (relaunched, _) = seamed(document::store_file(&support), later.fetch(), Compile::run);
+        let mut relaunched = relaunched;
+        relaunched.open(document).unwrap();
+        relaunched.watch = None;
+        let opened = relaunched.status();
+        assert_eq!(later.calls(), Vec::<String>::new(), "fetched before the settle");
+        assert_eq!(opened.error, None, "the refusal of an image on its way was shown");
+        assert_eq!(opened.web, None, "a URL waiting out the settle says nothing");
+
+        until(&relaunched, "a relaunch never drew the page", drawn);
+        assert_eq!(later.calls(), [IMAGE]);
+    }
+
+    /// Case 9. **A URL on a site not allowed asks again**, while its neighbour on
+    /// an allowed site is fetched without one.
+    #[test]
+    fn a_site_not_allowed_asks_again_while_its_neighbour_is_fetched() {
+        let dir = scratch_dir("web-asks-again");
+        let first = "http://one.example/dot.png";
+        let neighbour = "http://one.example/second.png";
+        let stranger = "http://two.example/dot.png";
+        let document = web_document_in(&dir, &[first]);
+        let fake = Fake::new();
+        let (mut session, support) = fetching("asks-again", &fake, Compile::run);
+        session.open(document.clone()).unwrap();
+        session.watch = None;
+        session.fetch_images().unwrap();
+        until(&session, "the press never drew the page", drawn);
+
+        {
+            let mut preview = session.preview();
+            preview.edit(format!(
+                "# Images\n\n![a]({first})\n\n![b]({neighbour})\n\n![c]({stranger})\n"
+            ));
+            preview.compile();
+        }
+
+        fake.entered(2);
+        past_the_settle();
+        assert_eq!(fake.calls(), [first, neighbour], "only the allowed site is fetched");
+
+        let status = until(&session, "the neighbour never reached the page", |status| {
+            status.error.as_deref() == Some(&*format!("no image fetched for '{stranger}' at line 7"))
+        });
+        assert_eq!(
+            status.web,
+            line(
+                "1 image on two.example is not fetched.",
+                Some("Fetch images from the web")
+            )
+        );
+        assert_eq!(
+            document::read_sites(
+                &document::sites_file(&support),
+                &document::project_root(&document)
+            ),
+            std::collections::BTreeSet::from(["one.example".to_string()])
+        );
+    }
+
+    /// Case 10. **The watch loop claims too**: an external write to the master
+    /// that names a URL on an allowed site is fetched after the settle, with no
+    /// press — through `Session::on_change_with`, the path the draft forgot.
+    #[test]
+    fn the_watch_loop_claims_too() {
+        let dir = scratch_dir("web-the-watch-loop");
+        let master = multi_file_in(&dir);
+        let fake = Fake::new();
+        let (mut session, support) = fetching("the-watch-loop", &fake, Compile::run);
+        allow(&support, &master, SITE);
+        session.open(master.clone()).unwrap();
+        session.set_edited("sections/introduction.md".to_string()).unwrap();
+        session.watch = None;
+
+        let text = std::fs::read_to_string(&master).unwrap();
+        std::fs::write(&master, format!("{text}\n![from the web]({IMAGE})\n")).unwrap();
+
+        let (root, edited) = {
+            let preview = session.preview();
+            (
+                preview.root().unwrap().to_path_buf(),
+                preview.document().unwrap().to_path_buf(),
+            )
+        };
+        let mut on_change = session.on_change_with(root, edited, Compile::run);
+        on_change(Changed {
+            document: true,
+            ..Changed::default()
+        });
+        assert_eq!(fake.calls(), Vec::<String>::new(), "fetched inside the settle");
+
+        until(&session, "the watch loop's URL never reached the page", drawn);
+        assert_eq!(fake.calls(), [IMAGE]);
+    }
+
+    /// Case 11. **The settle drops a URL the text stopped naming**: two edits
+    /// inside it make one call, for the second.
+    ///
+    /// **Each edit is compiled, and has landed, before the next is made** —
+    /// through `Preview::edit` and `Preview::compile` under the lock rather than
+    /// the typing debounce, which would fold the two into one compile and let
+    /// this case pass with no settle at all. Under the lock, too, the first
+    /// URL's settle cannot end between the second compile's plan and its absorb.
+    #[test]
+    fn the_settle_drops_a_url_the_text_stopped_naming() {
+        let dir = scratch_dir("web-the-settle");
+        let document = web_document_in(&dir, &[]);
+        let (typed, kept) = ("http://images.example/a.png", "http://images.example/b.png");
+        let fake = Fake::new();
+        let (mut session, support) = fetching("the-settle", &fake, Compile::run);
+        allow(&support, &document, SITE);
+        session.open(document).unwrap();
+        session.watch = None;
+
+        for url in [typed, kept] {
+            let mut preview = session.preview();
+            preview.edit(format!("# Images\n\n![figure]({url})\n"));
+            preview.compile();
+            assert_eq!(preview.urls, [url], "the edit's compile has not landed");
+        }
+
+        fake.entered(1);
+        past_the_settle();
+        assert_eq!(fake.calls(), [kept], "a URL the text stopped naming was fetched");
+        assert_eq!(session.preview().web.stage(typed), None);
+    }
+
+    /// Case 12. **While an image is on its way the line says so, and nothing
+    /// contradicts it** — until the compile that read the bytes has landed.
+    #[test]
+    fn the_line_says_fetching_until_the_page_it_was_for_has_landed() {
+        let dir = scratch_dir("web-on-its-way");
+        let document = web_document_in(&dir, &[IMAGE]);
+        let fake = Fake::new();
+        let gate = Gate::new();
+        let (mut session, _) = fetching("on-its-way", &fake, gate.render());
+        session.open(document).unwrap();
+        session.watch = None;
+
+        fake.hold();
+        session.fetch_images().unwrap();
+        // The press's own compile, which reads nothing new.
+        let pressed = gate.entered();
+        gate.release(pressed);
+        wait_landed(&session, pressed);
+        fake.entered(1);
+
+        let fetching = session.status();
+        assert_eq!(
+            fetching.web,
+            line("Fetching 1 image from images.example…", None)
+        );
+        assert_eq!(fetching.error, None, "the refusal was shown beside the line");
+
+        // Back, and the compile that reads it held open.
+        fake.release();
+        let reading = gate.entered();
+        let arrived = session.status();
+        assert_eq!(session.preview().web.stage(IMAGE), Some("arrived"));
+        assert_eq!(arrived.web, line("Fetching 1 image from images.example…", None));
+        assert_eq!(arrived.error, None);
+        assert_ne!(arrived.state, State::Current);
+
+        gate.release(reading);
+        wait_landed(&session, reading);
+        assert!(drawn(&session.status()), "the page never went current");
+    }
+
+    /// Case 13. **A retry's line survives an older plan.** A compile that read
+    /// the failure and absorbs after the retry has landed leaves *"Fetching"* up
+    /// and no error — the failure's own *"cannot fetch"* included.
+    #[test]
+    fn a_retry_survives_an_older_plan_that_read_the_failure() {
+        let dir = scratch_dir("web-a-retry");
+        let document = web_document_in(&dir, &[IMAGE]);
+        let fake = Fake::new();
+        fake.answer(IMAGE, Err("503 Service Unavailable".to_string()));
+        let gate = Gate::new();
+        let (mut session, _) = fetching("a-retry", &fake, gate.render());
+        session.open(document.clone()).unwrap();
+        session.watch = None;
+
+        // The press and the failed fetch each compile; let both land.
+        session.fetch_images().unwrap();
+        let (a, b) = (gate.entered(), gate.entered());
+        gate.release(a);
+        gate.release(b);
+        wait_landed(&session, a.max(b));
+        let failed = session.status();
+        assert_eq!(
+            failed.error,
+            Some(format!(
+                "cannot fetch {IMAGE} for the image at line 3: 503 Service Unavailable"
+            ))
+        );
+        assert_eq!(failed.web, line("1 image could not be fetched.", Some("Try again")));
+
+        // A plan that reads the failure, held open.
+        let older = session.recompile_with(document, gate.render());
+        let running = std::thread::spawn(older);
+        let stale = gate.entered();
+
+        // Try again, and let the retry land, with its compiles held.
+        fake.answer(IMAGE, Ok(std::fs::read(fixture("dot.png")).unwrap()));
+        session.fetch_images().unwrap();
+        let (c, d) = (gate.entered(), gate.entered());
+        assert_eq!(session.preview().web.stage(IMAGE), Some("arrived"));
+
+        gate.release(stale);
+        running.join().expect("the older render panicked");
+        assert_eq!(session.preview().landed, stale, "the older plan was not absorbed");
+        assert!(
+            session
+                .preview()
+                .error()
+                .is_some_and(|error| error.starts_with("cannot fetch")),
+            "the older plan should have written the failure it read"
+        );
+        let retrying = session.status();
+        assert_eq!(retrying.web, line("Fetching 1 image from images.example…", None));
+        assert_eq!(retrying.error, None, "the failure showed beside the retry");
+
+        gate.release(c);
+        gate.release(d);
+        wait_landed(&session, c.max(d));
+        until(&session, "the retry never drew the page", drawn);
+        assert_eq!(fake.calls(), [IMAGE, IMAGE]);
+    }
+
+    /// Case 14. **A master that stops reading while a fetch is out says
+    /// *"cannot read"***: the refused URL is cleared on that write, so the fetch
+    /// on its way does not hide it.
+    #[test]
+    fn a_master_that_stops_reading_while_a_fetch_is_out_says_so() {
+        let dir = scratch_dir("web-cannot-read");
+        let master = multi_file_in(&dir);
+        let text = std::fs::read_to_string(&master).unwrap();
+        std::fs::write(&master, format!("{text}\n![from the web]({IMAGE})\n")).unwrap();
+
+        let fake = Fake::new();
+        fake.hold();
+        let (mut session, support) = fetching("cannot-read", &fake, Compile::run);
+        allow(&support, &master, SITE);
+        session.open(master.clone()).unwrap();
+        session.set_edited("sections/introduction.md".to_string()).unwrap();
+        session.watch = None;
+        fake.entered(1);
+        assert_eq!(session.status().error, None, "the refusal was shown beside the line");
+
+        std::fs::remove_file(&master).unwrap();
+        session.preview().compile();
+
+        let error = session.status().error;
+        assert!(
+            error
+                .as_deref()
+                .is_some_and(|error| error.starts_with("cannot read") && error.contains("multi_file.md")),
+            "{error:?}"
+        );
+        assert_eq!(session.preview().refused, None);
+        fake.release();
+    }
+
+    /// Case 15. **`edit` returns while the fetch is held, and while the fetch's
+    /// own render is held** — `mpdf-003` Phase 22's property, over the new
+    /// source of work. A deadline rather than a join, for
+    /// `a_keystroke_lands_while_a_compile_is_in_flight`'s reason.
+    #[test]
+    fn a_keystroke_lands_while_a_fetch_and_its_render_are_held() {
+        let dir = scratch_dir("web-a-keystroke");
+        let document = web_document_in(&dir, &[IMAGE]);
+        let fake = Fake::new();
+        let gate = Gate::new();
+        let (mut session, _) = fetching("a-keystroke", &fake, gate.render());
+        session.open(document).unwrap();
+        session.watch = None;
+        let session = Arc::new(session);
+
+        fake.hold();
+        session.fetch_images().unwrap();
+        let pressed = gate.entered();
+        gate.release(pressed);
+        fake.entered(1);
+
+        let type_one = |text: &'static str| {
+            let (finished, typed) = mpsc::channel();
+            let typing = Arc::clone(&session);
+            std::thread::spawn(move || {
+                typing.edit(text.to_string());
+                let _ = finished.send(());
+            });
+            typed.recv_timeout(WIRING)
+        };
+
+        let during_the_fetch = type_one("# typed while the fetch was out\n");
+        fake.release();
+        during_the_fetch.expect("the keystroke waited on the fetch");
+
+        let reading = gate.entered();
+        let during_the_render = type_one("# typed while its render was held\n");
+        gate.release(reading);
+        during_the_render.expect("the keystroke waited on the fetch's render");
     }
 }

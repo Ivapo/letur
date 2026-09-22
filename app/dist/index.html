@@ -1897,6 +1897,17 @@
        * @property {string | null} main
        * @property {string | null} edited
        * @property {Appearance} appearance
+       * @property {WebLine | null} web
+       */
+
+      /**
+       * The line about the images the document names by URL, and the button
+       * beside it: `app/src/remote.rs:WebLine`. Every word of both is Rust's,
+       * and `action` is `null` exactly when there is nothing to press.
+       *
+       * @typedef {object} WebLine
+       * @property {string} sentence
+       * @property {string | null} action
        */
 
       /**
