@@ -4,6 +4,8 @@
 #   _site/index.html        the landing page, `web/index.html`, as it is
 #   _site/fonts/            the faces it is set in, `web/fonts/`
 #   _site/hero-*.png        the window it shows, `web/hero.mjs`'s capture
+#   _site/pages/            each row's page, `web/hero.mjs`'s rendering — not
+#                           `pages.json`, which only `web/check.mjs` reads
 #   _site/app/index.html    `app/dist/index.html` with one line inserted
 #   _site/app/pdfjs/        the renderer the window vendors
 #   _site/app/host/         the `__TAURI__` the window answers through
@@ -23,8 +25,9 @@
 #     --unicodes='U+0020-007E,U+00A0-00FF,U+2010-2027,U+2190-2193' \
 #     --output-file=web/fonts/<font>.woff2
 #
-# **The two images are copied when they exist**, so `web/hero.mjs` can make its
-# first capture against a site assembled before them.
+# **The images are copied when they exist** — the two of the window, and each
+# row's page under `pages/` — so `web/hero.mjs` can make its first capture
+# against a site assembled before them.
 #
 # Run from anywhere; it works from the repository root. `web/pkg/` must exist:
 # `cd web && wasm-pack build --target web --release` first.
@@ -52,6 +55,10 @@ cp -R web/fonts _site/fonts
 for scheme in light dark; do
   if [ -f "web/hero-$scheme.png" ]; then cp "web/hero-$scheme.png" _site/; fi
 done
+if compgen -G 'web/pages/*.png' > /dev/null; then
+  mkdir -p _site/pages
+  cp web/pages/*.png _site/pages/
+fi
 awk '/<\/head>/ { print "    <script type=\"module\" src=\"host/host.mjs\"></script>" } { print }' \
   "$page" > _site/app/index.html
 cp -R app/dist/pdfjs _site/app/pdfjs
