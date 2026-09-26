@@ -1,0 +1,9 @@
+{
+  "name": "letur-web-check",
+  "private": true,
+  "description": "The browser driver web/check.mjs runs on — ltr-001 Phase 2's exit gate. Pinned at app/package.json's version.",
+  "type": "module",
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
