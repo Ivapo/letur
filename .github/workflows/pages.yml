@@ -1,20 +1,24 @@
-# Builds the wasm spike in `web/` and publishes it to GitHub Pages.
+# Builds the site and publishes it to GitHub Pages: the landing page at the
+# root, and Letur's own window at `app/` over the session `web/` compiles to
+# WebAssembly — `ltr-001` Phase 2. `web/assemble.sh` says what goes where.
 #
 # **The module is never committed.** It is 25.7 MB, which is ten times this
 # whole repository, and git history is permanent — so it is built here and
 # handed straight to the Pages artifact. Nothing in `web/pkg/` or `web/target/`
 # ever enters a commit.
 #
-# This builds `web/` alone. The workspace — `app` — is not touched, and `web/`
-# is not one of its members, so nothing here can change what a phase's exit gate
-# runs.
+# It builds `web/` and reads two directories beside it: `project/`, which
+# `web/Cargo.toml` takes by path, and `app/dist/`, whose page the site copies.
+# `web/` is not a workspace member, so nothing here changes what a phase's exit
+# gate runs.
 name: pages
 
 on:
   push:
     branches: [main]
-    # The spike is the only thing this publishes, so nothing else needs to
-    # trigger a five-minute wasm build.
+    # What the site is built from, and nothing else, since a push elsewhere
+    # does not need a five-minute wasm build: the module (`web/`, and the rules
+    # it takes by path in `project/`), the window (`app/dist/`), and this file.
     #
     # `core/**` left this list with `mpdf-011` Phase 1: the engine is a
     # dependency of `web/Cargo.toml` rather than a directory beside it, so there
@@ -24,6 +28,8 @@ on:
     # is `md2pdf-core = "0.4"` off the registry since.
     paths:
       - 'web/**'
+      - 'project/**'
+      - 'app/dist/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -62,14 +68,7 @@ jobs:
         run: wasm-pack build --target web --release
 
       - name: Assemble the site
-        run: |
-          mkdir -p _site
-          cp web/index.html _site/
-          cp -r web/pkg _site/pkg
-          # `.gitignore` inside pkg/ would make the upload skip the module.
-          rm -f _site/pkg/.gitignore
-          echo "--- what is being published ---"
-          find _site -type f -exec ls -lh {} \; | awk '{print $5, $9}'
+        run: bash web/assemble.sh
 
       - uses: actions/upload-pages-artifact@v3
         with:

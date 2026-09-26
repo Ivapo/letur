@@ -38,3 +38,7 @@
 # a `bun install` a contributor runs once and are never committed; `app/bun.lock`
 # is.
 node_modules/
+
+# The site `web/assemble.sh` builds, and the browser driver `web/check.mjs` runs on.
+/_site/
+/web/node_modules/
