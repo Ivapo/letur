@@ -130,6 +130,28 @@
   .col > figcaption { margin: 6px 0 0; font-size: 15.2px; font-style: italic; }
 
   /*
+    The right half of an `ok` row: the page Letur sets from the source beside
+    it, captured by `web/hero.mjs` from the PDF the window holds — `mpdf-006`
+    Phase 7. Its `width` and `height` are 4/9 of the PNG's pixels, so 1pt is
+    1.333 CSS px on every row; a crop wider than its column scales down whole.
+    The edge is a shadow rather than a border, so the drawn size is the one
+    written in the attributes, which `web/check.mjs` clause (a) holds.
+  */
+  figure.shot img {
+    display: block; max-width: 100%; height: auto;
+    background: var(--paper); border-radius: 4px; box-shadow: 0 0 0 1px var(--edge);
+  }
+  /*
+    A refusal sets no page, so the panel says so in the page's place: a rule of
+    `--alarm`, not text in it, beside the sentence the compiler says.
+  */
+  .refusal {
+    background: var(--ground); border: 1px solid var(--edge); border-left: 3px solid var(--alarm);
+    border-radius: 4px; padding: 12px 14px;
+  }
+  .refusal > p { margin: 0 0 6px; }
+
+  /*
     A `script` element is `display: none` in every UA stylesheet, and the left
     half of every row below is one. This override is what renders it, so the
     source a reader reads, the source the page will load and the source
@@ -146,14 +168,29 @@
     padding: 12px 14px; margin: 0;
   }
   /*
-    The other column. Its markup is not written here — it is
+    Beneath each row, closed: the same parse as plain HTML, which is what the
+    markers mean to anything but Letur. A `<details>` opens with scripting off.
+    Its own marker is hidden, since the triangles are outside the font subset,
+    and a `+` or an en dash stands in its place.
+  */
+  details.plain { margin: 14px 0 0; }
+  details.plain > summary {
+    list-style: none; cursor: pointer; font-size: 15.2px; font-style: italic;
+  }
+  details.plain > summary::-webkit-details-marker { display: none; }
+  details.plain > summary::before { content: "+ "; font-style: normal; }
+  details.plain[open] > summary::before { content: "– "; }
+  details.plain > .rendered { margin: 8px 0 0; }
+
+  /*
+    The plain-HTML column. Its markup is not written here — it is
     `md2pdf_core::md_to_html` over the row's own source, generated into this file
     and compared against it by `app/tests/page_examples_test.rs`. So a real
     table, a real checkbox, a heading and the page's own diagram all land inside
     this box, and it carries its own type scale rather than inheriting the list's.
     It sits on `--ground`, because it is the comparison and not the product.
   */
-  .col > .rendered {
+  .rendered {
     padding: 12px 14px; border: 1px solid var(--edge); border-radius: 4px;
     font-size: 17px; overflow-x: auto;
   }
@@ -210,9 +247,10 @@ are reading now.</p>
 <section id="adds" class="wrap">
 
 <h2>What the markdown can say</h2>
-<p class="lede">Twelve examples, each set two ways: the source Letur reads, and the same
-text as plain HTML, which has no way to show what it means. Open any of them in Letur to
-see the page it becomes. The
+<p class="lede">Twelve examples. Beside each source is the page Letur sets from it — or,
+for the three it refuses, what it says instead — and beneath, closed, the same text as
+plain HTML, which has no way to show what it means. Open any of them in Letur to change
+it and watch the page follow. The
 <a href="https://github.com/Ivapo/md2pdf#what-the-markdown-may-contain">README</a> lists
 everything the markdown may contain.</p>
 
@@ -259,17 +297,21 @@ block is that block's caption.</p>
 : The measurements.</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:caption-table--><table><thead><tr><th>a</th><th>b</th></tr></thead><tbody>
-<tr><td>1</td><td>2</td></tr>
-</tbody></table>
-<p>: The measurements.</p>
-<!--/html:caption-table--></div>
-  <figcaption>the same parse, as HTML</figcaption>
+  <figure class="col shot">
+    <img src="pages/caption-table.png" width="168" height="94" loading="lazy" alt="Table 1: a two-column table with its caption set beneath">
+  <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
 <p class="does"><b>Table 1</b>, set beneath the table, on a counter tables keep to
 themselves.</p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:caption-table--><table><thead><tr><th>a</th><th>b</th></tr></thead><tbody>
+<tr><td>1</td><td>2</td></tr>
+</tbody></table>
+<p>: The measurements.</p>
+<!--/html:caption-table--></div>
+</details>
 </div>
 
 <div class="row">
@@ -288,16 +330,20 @@ fn main() {}
 : The entry point.</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:caption-listing--><pre><code class="language-rust">fn main() {}
-</code></pre>
-<p>: The entry point.</p>
-<!--/html:caption-listing--></div>
-  <figcaption>the same parse, as HTML</figcaption>
+  <figure class="col shot">
+    <img src="pages/caption-listing.png" width="160" height="60" loading="lazy" alt="Listing 1: a line of Rust set in monospace, indented, with its caption beneath">
+  <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
 <p class="does"><b>Listing 1</b>, captioned beneath and standing 2em off the margin the
 prose stands on, because code is read from where its lines begin.</p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:caption-listing--><pre><code class="language-rust">fn main() {}
+</code></pre>
+<p>: The entry point.</p>
+<!--/html:caption-listing--></div>
+</details>
 </div>
 
 <div class="row">
@@ -314,15 +360,19 @@ so the page carries one: <code>pipeline.svg</code> travels inside this page itse
 : The conversion pipeline, with the *emitter* in the middle.</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:caption-image--><p><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20320%2072%22%20width%3D%22320%22%20height%3D%2272%22%3E%0A%20%20%3Cg%20fill%3D%22none%22%20stroke%3D%22%231e3c82%22%20stroke-width%3D%223%22%0A%20%20%20%20%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%0A%20%20%20%20%3Crect%20x%3D%224%22%20y%3D%2216%22%20width%3D%2288%22%20height%3D%2240%22%20rx%3D%226%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22116%22%20y%3D%2216%22%20width%3D%2288%22%20height%3D%2240%22%20rx%3D%226%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22228%22%20y%3D%2216%22%20width%3D%2288%22%20height%3D%2240%22%20rx%3D%226%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M96%2036%20H112%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M104%2030%20L112%2036%20L104%2042%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M208%2036%20H224%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M216%2030%20L224%2036%20L216%2042%22%2F%3E%0A%20%20%3C%2Fg%3E%0A%3C%2Fsvg%3E" alt="The three steps, drawn as boxes" /></p>
-<p>: The conversion pipeline, with the <em>emitter</em> in the middle.</p>
-<!--/html:caption-image--></div>
-  <figcaption>the same parse, as HTML</figcaption>
+  <figure class="col shot">
+    <img src="pages/caption-image.png" width="349" height="109" loading="lazy" alt="Figure 1: the diagram of three boxes joined by arrows, with its caption beneath">
+  <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
 <p class="does"><b>Figure 1</b>, the caption set beneath the image, on a counter the tables
 and the listings above do not touch.</p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:caption-image--><p><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20320%2072%22%20width%3D%22320%22%20height%3D%2272%22%3E%0A%20%20%3Cg%20fill%3D%22none%22%20stroke%3D%22%231e3c82%22%20stroke-width%3D%223%22%0A%20%20%20%20%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%0A%20%20%20%20%3Crect%20x%3D%224%22%20y%3D%2216%22%20width%3D%2288%22%20height%3D%2240%22%20rx%3D%226%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22116%22%20y%3D%2216%22%20width%3D%2288%22%20height%3D%2240%22%20rx%3D%226%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22228%22%20y%3D%2216%22%20width%3D%2288%22%20height%3D%2240%22%20rx%3D%226%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M96%2036%20H112%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M104%2030%20L112%2036%20L104%2042%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M208%2036%20H224%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M216%2030%20L224%2036%20L216%2042%22%2F%3E%0A%20%20%3C%2Fg%3E%0A%3C%2Fsvg%3E" alt="The three steps, drawn as boxes" /></p>
+<p>: The conversion pipeline, with the <em>emitter</em> in the middle.</p>
+<!--/html:caption-image--></div>
+</details>
 </div>
 
 <!--
@@ -376,8 +426,16 @@ the <code>: </code> marker alone can say that.</p>
 :::</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:figure-group--><p>:::</p>
+  <figure class="col shot">
+    <img src="pages/figure-group.png" width="224" height="96" loading="lazy" alt="Table 1: two small tables side by side, under one caption">
+  <figcaption>the page Letur sets</figcaption>
+  </figure>
+</div>
+<p class="does">One <b>Table 1</b> with both members side by side, taking a single number
+between them.</p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:figure-group--><p>:::</p>
 <table><thead><tr><th>step</th><th>what</th></tr></thead><tbody>
 <tr><td>1</td><td>parse</td></tr>
 </tbody></table>
@@ -387,11 +445,7 @@ the <code>: </code> marker alone can say that.</p>
 <p>: The two halves of the pipeline.</p>
 <p>:::</p>
 <!--/html:figure-group--></div>
-  <figcaption>the same parse, as HTML</figcaption>
-  </figure>
-</div>
-<p class="does">One <b>Table 1</b> with both members side by side, taking a single number
-between them.</p>
+</details>
 </div>
 
 <div class="row">
@@ -412,18 +466,22 @@ between them.</p>
 As [](#tab:m) shows, the two columns agree.</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:name-and-reference--><table><thead><tr><th>a</th><th>b</th></tr></thead><tbody>
+  <figure class="col shot">
+    <img src="pages/name-and-reference.png" width="404" height="124" loading="lazy" alt="Table 1 with its caption, and beneath it the sentence “As Table 1 shows, the two columns agree.”">
+  <figcaption>the page Letur sets</figcaption>
+  </figure>
+</div>
+<p class="does">“As <b>Table 1</b> shows…”, and it stays true — insert another table above
+it and the sentence reads <i>Table 2</i> without your touching it.</p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:name-and-reference--><table><thead><tr><th>a</th><th>b</th></tr></thead><tbody>
 <tr><td>1</td><td>2</td></tr>
 </tbody></table>
 <p>: The measurements. {#tab:m}</p>
 <p>As <a href="#tab:m"></a> shows, the two columns agree.</p>
 <!--/html:name-and-reference--></div>
-  <figcaption>the same parse, as HTML</figcaption>
-  </figure>
-</div>
-<p class="does">“As <b>Table 1</b> shows…”, and it stays true — insert another table above
-it and the sentence reads <i>Table 2</i> without your touching it.</p>
+</details>
 </div>
 
 <div class="row">
@@ -440,16 +498,20 @@ block of its own, converted in the browser rather than by a service.</p>
 $$</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:display-math--><p><span class="math math-display">
-\sqrt{x^2 + y^2} \leq |x| + |y|
-</span></p>
-<!--/html:display-math--></div>
-  <figcaption>the same parse, as HTML</figcaption>
+  <figure class="col shot">
+    <img src="pages/display-math.png" width="167" height="49" loading="lazy" alt="The formula set as a display block: a square root over x squared plus y squared, at most the sum of the absolute values of x and y">
+  <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
 <p class="does">The formula typeset as a display block, with the radical, the relation
 and the bars set as math rather than as characters that resemble it.</p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:display-math--><p><span class="math math-display">
+\sqrt{x^2 + y^2} \leq |x| + |y|
+</span></p>
+<!--/html:display-math--></div>
+</details>
 </div>
 </div>
 
@@ -488,15 +550,19 @@ equations: numbered
 Body text under a title block the markdown itself asked for.</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:frontmatter--><h1>Introduction</h1>
-<p>Body text under a title block the markdown itself asked for.</p>
-<!--/html:frontmatter--></div>
-  <figcaption>the same parse, as HTML</figcaption>
+  <figure class="col shot">
+    <img src="pages/frontmatter.png" width="437" height="204" loading="lazy" alt="A centred title, two authors marked 1 and 2, their affiliations and the date, then the heading Introduction and a line of body text">
+  <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
 <p class="does">A centred title block, the body in one column, and every
 <code>$$…$$</code> numbered <code>(1)</code>, <code>(2)</code> down the page.</p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:frontmatter--><h1>Introduction</h1>
+<p>Body text under a title block the markdown itself asked for.</p>
+<!--/html:frontmatter--></div>
+</details>
 </div>
 
 <div class="row">
@@ -513,17 +579,21 @@ that cites it.</p>
 [^src]: The note itself, which may hold *emphasis* and `code`.</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:footnote--><p>A claim that needs a source<sup class="footnote-reference"><a href="#src">1</a></sup>.</p>
-<div class="footnote-definition" id="src"><sup class="footnote-definition-label">1</sup>
-<p>The note itself, which may hold <em>emphasis</em> and <code>code</code>.</p>
-</div>
-<!--/html:footnote--></div>
-  <figcaption>the same parse, as HTML</figcaption>
+  <figure class="col shot">
+    <img src="pages/footnote.png" width="294" height="970" loading="lazy" alt="A page with one sentence at the top marked with note 1, and the note itself set under a rule at the foot">
+  <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
 <p class="does">The note at the foot of the column that carries the reference, where a
 reader's eye already is.</p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:footnote--><p>A claim that needs a source<sup class="footnote-reference"><a href="#src">1</a></sup>.</p>
+<div class="footnote-definition" id="src"><sup class="footnote-definition-label">1</sup>
+<p>The note itself, which may hold <em>emphasis</em> and <code>code</code>.</p>
+</div>
+<!--/html:footnote--></div>
+</details>
 </div>
 
 <div class="row">
@@ -544,14 +614,18 @@ bibliography: refs.yml
 Typesetting was rethought from the ground up [@knuth1986].</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:citation--><p>Typesetting was rethought from the ground up <a href="@knuth1986">@knuth1986</a>.</p>
-<!--/html:citation--></div>
-  <figcaption>the same parse, as HTML</figcaption>
+  <figure class="col shot">
+    <img src="pages/citation.png" width="529" height="94" loading="lazy" alt="A sentence ending in the mark [1], and beneath it a References list giving Knuth’s The TeXbook, Addison-Wesley, 1986">
+  <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
 <p class="does">A numbered mark where you cited, and the reference list set at the end of
 the document under the label the look draws.</p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:citation--><p>Typesetting was rethought from the ground up <a href="@knuth1986">@knuth1986</a>.</p>
+<!--/html:citation--></div>
+</details>
 </div>
 
 <!--
@@ -592,13 +666,16 @@ is how a converter starts lying.</p>
 <div>a raw HTML block</div></script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:raw-html--><p>A paragraph the emitter accepts.</p>
-<div>a raw HTML block</div><!--/html:raw-html--></div>
-  <figcaption>the same parse, as HTML</figcaption>
-  </figure>
+  <div class="col refusal">
+    <p>Letur sets no page, and says:</p>
+    <code data-error-for="raw-html">unsupported markdown construct 'raw HTML block' at line 3</code>
+  </div>
 </div>
-<p class="does"><code data-error-for="raw-html">unsupported markdown construct 'raw HTML block' at line 3</code></p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:raw-html--><p>A paragraph the emitter accepts.</p>
+<div>a raw HTML block</div><!--/html:raw-html--></div>
+</details>
 </div>
 
 <div class="row">
@@ -615,18 +692,21 @@ compiler names the line rather than choosing one.</p>
 2. [x] and a second</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:ordered-task-list--><ol>
+  <div class="col refusal">
+    <p>Letur sets no page, and says:</p>
+    <code data-error-for="ordered-task-list">unsupported markdown construct 'task list marker in an ordered list' at line 1</code>
+  </div>
+</div>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:ordered-task-list--><ol>
 <li><input disabled="" type="checkbox"/>
 a numbered task</li>
 <li><input disabled="" type="checkbox" checked=""/>
 and a second</li>
 </ol>
 <!--/html:ordered-task-list--></div>
-  <figcaption>the same parse, as HTML</figcaption>
-  </figure>
-</div>
-<p class="does"><code data-error-for="ordered-task-list">unsupported markdown construct 'task list marker in an ordered list' at line 1</code></p>
+</details>
 </div>
 
 <div class="row">
@@ -642,13 +722,16 @@ sums and integrals, <code>\frac</code>, <code>\sqrt</code>, the accents, the mat
 <script type="text/markdown" data-example="math-refusal" data-expect="error">A formula $\includegraphics{fig.png}$ names a command outside the dialect.</script>
   <figcaption>md2pdf</figcaption>
   </figure>
-  <figure class="col">
-    <div class="rendered"><!--html:math-refusal--><p>A formula <span class="math math-inline">\includegraphics{fig.png}</span> names a command outside the dialect.</p>
-<!--/html:math-refusal--></div>
-  <figcaption>the same parse, as HTML</figcaption>
-  </figure>
+  <div class="col refusal">
+    <p>Letur sets no page, and says:</p>
+    <code data-error-for="math-refusal">math error at line 1: unsupported command '\includegraphics'</code>
+  </div>
 </div>
-<p class="does"><code data-error-for="math-refusal">math error at line 1: unsupported command '\includegraphics'</code></p>
+<details class="plain">
+<summary>Without Letur: the same parse, as plain HTML</summary>
+<div class="rendered"><!--html:math-refusal--><p>A formula <span class="math math-inline">\includegraphics{fig.png}</span> names a command outside the dialect.</p>
+<!--/html:math-refusal--></div>
+</details>
 </div>
 </div>
 
