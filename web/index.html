@@ -125,7 +125,7 @@
   */
   .open { white-space: nowrap; }
 
-  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
   .col { margin: 0; min-width: 0; }
   .col > figcaption { margin: 6px 0 0; font-size: 15.2px; font-style: italic; }
 
@@ -133,21 +133,25 @@
     The right half of an `ok` row: the page Letur sets from the source beside
     it, captured by `web/hero.mjs` from the PDF the window holds — `mpdf-006`
     Phase 7. Its `width` and `height` are 4/9 of the PNG's pixels, so 1pt is
-    1.333 CSS px on every row; a crop wider than its column scales down whole.
-    The edge is a shadow rather than a border, so the drawn size is the one
-    written in the attributes, which `web/check.mjs` clause (a) holds.
+    1.333 CSS px on every row; a crop wider than its column scales down whole,
+    and none is scaled up. It sits centred on a sheet of `--paper` that
+    stretches to the source's box, so the two halves of a row are one size
+    while the picture keeps the page's own. Clause (a) holds the attributes.
   */
-  figure.shot img {
-    display: block; max-width: 100%; height: auto;
-    background: var(--paper); border-radius: 4px; box-shadow: 0 0 0 1px var(--edge);
+  .cols > figure.col { display: flex; flex-direction: column; }
+  .cols > figure.col > script[data-example], .shot > .paper { flex: 1 0 auto; }
+  .shot > .paper {
+    display: flex; align-items: center; justify-content: center; min-width: 0;
+    background: var(--paper); border: 1px solid var(--edge); border-radius: 4px;
   }
+  .shot img { display: block; max-width: 100%; height: auto; }
   /*
     A refusal sets no page, so the panel says so in the page's place: a rule of
     `--alarm`, not text in it, beside the sentence the compiler says.
   */
   .refusal {
     background: var(--ground); border: 1px solid var(--edge); border-left: 3px solid var(--alarm);
-    border-radius: 4px; padding: 12px 14px;
+    border-radius: 4px; padding: 12px 14px; align-self: start;
   }
   .refusal > p { margin: 0 0 6px; }
 
@@ -298,7 +302,7 @@ block is that block's caption.</p>
   <figcaption>md2pdf</figcaption>
   </figure>
   <figure class="col shot">
-    <img src="pages/caption-table.png" width="168" height="94" loading="lazy" alt="Table 1: a two-column table with its caption set beneath">
+    <div class="paper"><img src="pages/caption-table.png" width="168" height="94" loading="lazy" alt="Table 1: a two-column table with its caption set beneath"></div>
   <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
@@ -331,7 +335,7 @@ fn main() {}
   <figcaption>md2pdf</figcaption>
   </figure>
   <figure class="col shot">
-    <img src="pages/caption-listing.png" width="160" height="60" loading="lazy" alt="Listing 1: a line of Rust set in monospace, indented, with its caption beneath">
+    <div class="paper"><img src="pages/caption-listing.png" width="160" height="60" loading="lazy" alt="Listing 1: a line of Rust set in monospace, indented, with its caption beneath"></div>
   <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
@@ -361,7 +365,7 @@ so the page carries one: <code>pipeline.svg</code> travels inside this page itse
   <figcaption>md2pdf</figcaption>
   </figure>
   <figure class="col shot">
-    <img src="pages/caption-image.png" width="349" height="109" loading="lazy" alt="Figure 1: the diagram of three boxes joined by arrows, with its caption beneath">
+    <div class="paper"><img src="pages/caption-image.png" width="349" height="109" loading="lazy" alt="Figure 1: the diagram of three boxes joined by arrows, with its caption beneath"></div>
   <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
@@ -427,7 +431,7 @@ the <code>: </code> marker alone can say that.</p>
   <figcaption>md2pdf</figcaption>
   </figure>
   <figure class="col shot">
-    <img src="pages/figure-group.png" width="224" height="96" loading="lazy" alt="Table 1: two small tables side by side, under one caption">
+    <div class="paper"><img src="pages/figure-group.png" width="224" height="96" loading="lazy" alt="Table 1: two small tables side by side, under one caption"></div>
   <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
@@ -467,7 +471,7 @@ As [](#tab:m) shows, the two columns agree.</script>
   <figcaption>md2pdf</figcaption>
   </figure>
   <figure class="col shot">
-    <img src="pages/name-and-reference.png" width="404" height="124" loading="lazy" alt="Table 1 with its caption, and beneath it the sentence “As Table 1 shows, the two columns agree.”">
+    <div class="paper"><img src="pages/name-and-reference.png" width="404" height="124" loading="lazy" alt="Table 1 with its caption, and beneath it the sentence “As Table 1 shows, the two columns agree.”"></div>
   <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
@@ -499,7 +503,7 @@ $$</script>
   <figcaption>md2pdf</figcaption>
   </figure>
   <figure class="col shot">
-    <img src="pages/display-math.png" width="167" height="49" loading="lazy" alt="The formula set as a display block: a square root over x squared plus y squared, at most the sum of the absolute values of x and y">
+    <div class="paper"><img src="pages/display-math.png" width="167" height="49" loading="lazy" alt="The formula set as a display block: a square root over x squared plus y squared, at most the sum of the absolute values of x and y"></div>
   <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
@@ -551,7 +555,7 @@ Body text under a title block the markdown itself asked for.</script>
   <figcaption>md2pdf</figcaption>
   </figure>
   <figure class="col shot">
-    <img src="pages/frontmatter.png" width="437" height="204" loading="lazy" alt="A centred title, two authors marked 1 and 2, their affiliations and the date, then the heading Introduction and a line of body text">
+    <div class="paper"><img src="pages/frontmatter.png" width="437" height="204" loading="lazy" alt="A centred title, two authors marked 1 and 2, their affiliations and the date, then the heading Introduction and a line of body text"></div>
   <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
@@ -580,7 +584,7 @@ that cites it.</p>
   <figcaption>md2pdf</figcaption>
   </figure>
   <figure class="col shot">
-    <img src="pages/footnote.png" width="294" height="970" loading="lazy" alt="A page with one sentence at the top marked with note 1, and the note itself set under a rule at the foot">
+    <div class="paper"><img src="pages/footnote.png" width="294" height="103" loading="lazy" alt="The top of a page, one sentence marked with note 1; a dashed cut where the empty page is left out; then the foot, the note set under a rule"></div>
   <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
@@ -615,7 +619,7 @@ Typesetting was rethought from the ground up [@knuth1986].</script>
   <figcaption>md2pdf</figcaption>
   </figure>
   <figure class="col shot">
-    <img src="pages/citation.png" width="529" height="94" loading="lazy" alt="A sentence ending in the mark [1], and beneath it a References list giving Knuth’s The TeXbook, Addison-Wesley, 1986">
+    <div class="paper"><img src="pages/citation.png" width="529" height="94" loading="lazy" alt="A sentence ending in the mark [1], and beneath it a References list giving Knuth’s The TeXbook, Addison-Wesley, 1986"></div>
   <figcaption>the page Letur sets</figcaption>
   </figure>
 </div>
