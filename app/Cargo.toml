@@ -68,6 +68,13 @@ tauri-build = { version = "2.6.3", features = [] }
 # these two manifests for that literal and requires nothing back, and a comment
 # is not worth blunting the check that proves the dependency left.
 md2pdf-core = "0.4"
+# **The rules this window answers through, by path.** `ltr-001` Phase 1 moved
+# them out of this crate so the web session answers the same window through the
+# same code: every refusal, receipt and counter the page reads is decided there,
+# over a `Files` this crate implements on the disk. It is a workspace member, so
+# this adds no crate from the registry — `http` is the one it declares, and that
+# is `ureq`'s own.
+letur-project = { path = "../project" }
 notify = "8.2.0"
 objc2-foundation = { version = "0.3.2", features = [
   "NSError",

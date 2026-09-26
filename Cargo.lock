@@ -2852,6 +2852,7 @@ checksum = "884f3e747ed2dcee867cda1b0c31a048f9e20de2d916a248949319921a2e666e"
 name = "letur"
 version = "0.1.0"
 dependencies = [
+ "letur-project",
  "md2pdf-core",
  "notify",
  "objc2-foundation",

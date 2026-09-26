@@ -1,948 +1,121 @@
-//! What the pane is showing, and what keeps it current.
+//! The pane kept current: the watch, the keyboard and the fetch worker.
 //!
-//! [`Preview`] is the state the loop writes: the text the pane holds, the last
-//! good PDF bytes, how long they took, the asset list the filter needs,
-//! whether the page still belongs to that text, and the error when there is
-//! one. [`Session`] is that state plus the two loops that keep it up to date —
-//! the watch, and the keyboard. Neither needs a window, so both are tested by
-//! ordinary tests rather than by a screenshot.
+//! [`Session`] is one open document's state plus the loops that keep it up to
+//! date — the watch, the keyboard, and since `mpdf-003` Phase 25 a worker that
+//! fetches images named by URL. None of them needs a window, so all are tested
+//! by ordinary tests rather than by a screenshot.
 //!
-//! **The buffer is what compiles.** The file beside it need never have held
-//! that text, and the two are compared rather than conflated: [`external_change`]
-//! is the whole of what an event naming the open document now means.
-//!
-//! **A third source of work arrived with `mpdf-003` Phase 25**: an image named
-//! by URL, fetched by a worker [`Session::new`] starts, for a site the author
-//! allowed. It compiles through the same three steps the two loops use, so a
-//! keystroke waits on neither the network nor the render it causes.
+//! **The state and every rule about it are `letur-project`'s since `ltr-001`
+//! Phase 1.** [`Preview`] is `letur_project::preview::Preview` over [`Disk`],
+//! and each command here asks it first — it decides, refuses and composes the
+//! receipt — then does what only this crate can: take the lock, announce, arm
+//! the loops, write Application Support, and time a compile. So what a refusal
+//! says, and what a counter reads, are decided once, for this window and the
+//! browser's alike.
 
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, Weak};
 use std::time::{Duration, Instant};
 
-use serde::{Deserialize, Serialize};
+pub use letur_project::preview::{Appearance, Asked, External, Status, Trashed};
 
-use crate::document;
-use crate::remote::{self, Web};
+use crate::document::{self, Disk};
+use crate::remote;
 use crate::watch::{self, Change, Changed, Watch};
 
-/// What the window says about the last compile.
-///
-/// Four states, and the app held one bit until this became four. What separates
-/// *stale* from *failed* is whether there are bytes to keep, because
-/// [`Preview::compile`] sets the stale mark on **every** failure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum State {
-    /// No document has been opened. The app launches into this and holds it
-    /// until the first Open.
-    Empty,
-    /// The last compile succeeded, and the page belongs to it.
-    Current,
-    /// The last compile failed, and an older page is still drawn.
-    Stale,
-    /// The last compile failed with no page to keep — the open that never
-    /// compiled.
-    Failed,
+/// The pane's state, over the disk.
+pub type Preview = letur_project::preview::Preview<Disk>;
+
+/// What the desktop asks of a [`Preview`] that only a disk can answer: where
+/// the project is, and where its files are, as absolute paths.
+pub trait OnDisk {
+    /// The project the panel is listing, if one is open.
+    fn root(&self) -> Option<&Path>;
+    /// The file the pane is showing, if one is open.
+    fn document(&self) -> Option<PathBuf>;
+    /// Where a Save-a-copy dialog opens, or why it does not open at all: the
+    /// crate's `export_path`, joined onto the root.
+    fn export_file(&self) -> Result<PathBuf, String>;
+    /// Write the page's own bytes where the user asked.
+    ///
+    /// **Nothing here compiles.** The export writes what the pane is already
+    /// showing, so the file and the page cannot disagree.
+    fn export(&self, path: &Path) -> Result<(), String>;
 }
 
-/// Which palette the window wears, as the author asked for it.
-///
-/// **Three states, and [`Appearance::System`] is one of them rather than the
-/// absence of the other two.** Following the system is what this app did before
-/// there was a choice, and a control that could not get back to it would be a
-/// regression on a machine that switches at sunset.
-///
-/// It is spelled the way [`State`] is, so the page reads one convention off the
-/// status and not two. **Nothing about the document is here**: the page Typst
-/// compiles is white in either palette, which is why `--paper` does not move,
-/// and `specs/desktop_app_spec.md` §1.1 draws that line.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Appearance {
-    /// Follow `prefers-color-scheme`, which is what the page does with no
-    /// `data-theme` attribute on it at all.
-    #[default]
-    System,
-    /// Light, whatever the system says.
-    Light,
-    /// Dark, whatever the system says.
-    Dark,
-}
+impl OnDisk for Preview {
+    fn root(&self) -> Option<&Path> {
+        self.files().map(Disk::root)
+    }
 
-/// What an external change to the open document did.
-///
-/// The three are exhaustive over three strings, and they need no dirty flag:
-/// the file equal to the buffer is decided first, whatever the last-saved text
-/// is, and the rest splits on whether the buffer holds unsaved edits.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum External {
-    /// The file already says what the buffer says — the app's own save
-    /// arriving back, or a change that changed nothing.
-    Unchanged,
-    /// The buffer was clean, so nothing could be lost. The disk copy is the
-    /// pane's text now. **This is the loop the app has shipped since Phase 2.**
-    Taken,
-    /// The buffer held unsaved edits and the disk moved under them. The work
-    /// is kept and the divergence is named.
-    Diverged,
-}
+    fn document(&self) -> Option<PathBuf> {
+        Some(self.root()?.join(self.edited()?))
+    }
 
-/// The report a refused external change leaves for the author.
-///
-/// It names both ways out and takes neither: saving overwrites the disk,
-/// reopening takes it. **The app does not merge** — a three-way merge is an
-/// editor project, and this one is not that.
-const DIVERGED: &str = "this file changed on disk, and the pane holds unsaved edits. \
-    Save to write the pane over the file, or open the file again to take it.";
+    fn export_file(&self) -> Result<PathBuf, String> {
+        let name = self.export_path()?;
+        self.root()
+            .map(|root| root.join(name))
+            .ok_or_else(|| "no document is open".to_string())
+    }
 
-/// The report a refused *switch* leaves for the author.
-///
-/// **Its own sentence, and not [`DIVERGED`]'s.** That one opens *"this file
-/// changed on disk"*, which is false on this occasion — nothing moved, the
-/// author asked to put another file in the pane — so reusing the constant would
-/// put a lie in the window. The shape is the same and deliberately so: name both
-/// ways out, and take neither.
-///
-/// Both ride `Preview::divergence`, whose meaning is therefore *a refused
-/// change* rather than *a refused external change*. **One field means one
-/// occasion at a time**: a switch refused while a real divergence stands
-/// overwrites this sentence and is overwritten by the next, which costs nothing
-/// — the two name the same two exits, and both are cleared by the same two
-/// actions.
-const SWITCHING: &str = "the pane holds unsaved edits, so it is still holding this file. \
-    Save to keep them, or discard them to open the other file.";
-
-/// The report a refused *delete* leaves for the author.
-///
-/// **Its own sentence, and not [`SWITCHING`]'s.** That one closes *"discard
-/// them to open the other file"*, and **nothing is being opened by a delete** —
-/// so reusing it would put a lie in the window, verbatim the argument that made
-/// `SWITCHING` not [`DIVERGED`]. The shape is the same for the third time: name
-/// both ways out, and take neither.
-///
-/// It rides `Preview::divergence` with the other two, so one refusal does not
-/// arrive in the window twice.
-const TRASHING: &str = "the pane holds unsaved edits, and this is the file it is holding. \
-    Save to keep them, or discard them to move it to the Trash.";
-
-/// The receipt a plain save leaves in the bar.
-///
-/// **No path, because the bar already carries one.** `⌘S` writes the file
-/// `Status::edited` names two cells to the left, so a receipt spelling it again
-/// would repeat its neighbour. [`Session::save_as`] composes the other sentence,
-/// which does carry a path, because that gesture's whole question is *where*.
-///
-/// **Transient, and it rides the command's return rather than [`Status`].** It
-/// is an event and not state: a field would re-arrive on every render, need
-/// clearing, and cost the page's typedef block a property null in almost every
-/// status. `app/dist/index.html` owns the timer and nothing else.
-///
-/// **It is composed here and not in the command**, which is forced rather than
-/// stylistic: `app/src/main.rs` has no test module — the crate is bin-only and
-/// `tauri::State` has a private field and no public constructor — so a sentence
-/// written in the command is a sentence no test in this repository can reach,
-/// which `crate::document::asset_bytes`'s own comment records for a different
-/// rule. `mpdf-003` Phase 19.
-const SAVED: &str = "saved";
-
-/// OQ-5's rule: what an event naming the open document means.
-///
-/// Three strings and two comparisons. `file` is what the disk holds now,
-/// `buffer` is what the pane holds, and `saved` is the text as it stood at the
-/// last open or save.
-///
-/// **Refusing every external change would have been the wrong answer**, and
-/// the condition is what makes this one rule rather than a compromise: an
-/// author who is not typing has a clean buffer, so a save in another editor
-/// still redraws the page with no action taken in the window, which is the
-/// loop Phase 2 shipped and the README documents.
-///
-/// Two limits it accepts. An author who keeps typing between a save and that
-/// save's event lands in [`External::Diverged`], so the app can name a
-/// divergence that was really its own write — it loses nothing, and the next
-/// save clears it. And an external writer that happens to write exactly the
-/// author's unsaved text takes [`External::Unchanged`], which leaves the
-/// last-saved text unrefreshed. Both err toward keeping work.
-pub fn external_change(file: &str, buffer: &str, saved: &str) -> External {
-    if file == buffer {
-        External::Unchanged
-    } else if buffer == saved {
-        External::Taken
-    } else {
-        External::Diverged
+    fn export(&self, path: &Path) -> Result<(), String> {
+        let pdf = self.exportable()?;
+        std::fs::write(path, pdf).map_err(|e| format!("cannot write {}: {e}", path.display()))
     }
 }
 
-/// The status line, as a value rather than as chrome.
-///
-/// Every word in it is chosen here and the page only places it. A window that
-/// worded its own status would be checkable by eye alone, and the spec keeps
-/// that list to the one claim no test can hold.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Status {
-    /// Which of the four states the pane is in.
-    pub state: State,
-    /// How long the compile that produced the drawn page took, worded for the
-    /// window: `"28 ms"`. `None` when no page is drawn.
-    pub time: Option<String>,
-    /// The message from the last compile, if it failed.
-    pub error: Option<String>,
-    /// Is a page drawn under the message?
-    pub page: bool,
-    /// The report a refused external change left, if there is one.
-    ///
-    /// **A divergence is not [`State::Stale`]**: nothing failed to compile,
-    /// and the page on screen belongs to the text in the pane. It is the file
-    /// that has gone elsewhere.
-    pub divergence: Option<String>,
-    /// How many times a compile has succeeded, so the page can tell new bytes
-    /// from a status that merely arrived.
-    ///
-    /// It is what stops a signal carrying no new page from redrawing the frame
-    /// and throwing the reader back to page 1 — which the app's own save now
-    /// does, since its event compiles nothing.
-    pub revision: u64,
-    /// How many times the buffer has been replaced from disk.
-    ///
-    /// The page re-reads the text on this and on nothing else, so a keystroke
-    /// in flight can never lose a race with a fetch of text it just sent.
-    pub reloaded: u64,
-    /// Where each heading landed in the page the pane is showing.
-    ///
-    /// The page picks the last one at or above its caret and opens the frame
-    /// there. It rides the status because the status is already fetched on the
-    /// path that draws, so this needs no command of its own.
-    pub anchors: Vec<document::Anchor>,
-    /// The project's files, in the order the panel draws them.
-    ///
-    /// It rides the status for the reason the anchors do: the status is already
-    /// fetched on the path that draws, so the panel needs no command of its own.
-    /// Empty exactly when no document is open.
-    pub entries: Vec<document::Entry>,
-    /// Which of them compiles, root-relative with `/` separators.
-    ///
-    /// **Spelled the way an entry is**, and not as the bare file *name* this
-    /// field carried while the panel listed one document's parts — the page has
-    /// to match it against a row to mark it, and two files of that name in
-    /// different folders must not both light up.
-    pub main: Option<String>,
-    /// Which of them the pane is holding, spelled the same way.
-    ///
-    /// It rides beside [`Status::main`] because **the page cannot derive one
-    /// from the other**: they are equal at every open and differ the moment a
-    /// row is clicked, and the panel draws a mark for each. Equal to `main`
-    /// exactly while the pane holds the file that compiles.
-    pub edited: Option<String>,
-    /// Which palette the window is wearing.
-    ///
-    /// **It is not about the last compile, and it rides here anyway** — as
-    /// [`Status::entries`], [`Status::main`] and [`Status::edited`] do, and for
-    /// their reason: the status is already fetched on the path that draws, so a
-    /// field the footer places needs no command of its own to arrive on.
-    ///
-    /// **[`Preview`] does not know it.** Only [`Session::status`] fills this
-    /// with the value the author chose; [`Preview::status`] fills
-    /// [`Appearance::System`] and says so where it does it.
-    pub appearance: Appearance,
-    /// What the page says about the images the document names by URL, and
-    /// the button beside it. `None` when there is nothing to say, which
-    /// includes a URL only waiting out [`remote::SETTLE`].
-    ///
-    /// **Worded in Rust and only placed by the page**, as the status line is.
-    /// `mpdf-003` Phase 25.
-    pub web: Option<remote::WebLine>,
+/// How this app times the compiles a [`Preview`] runs itself.
+fn timed(run: &mut dyn FnMut()) -> Duration {
+    let started = Instant::now();
+    run();
+    started.elapsed()
 }
 
-/// One compile's three inputs, owned, the order it started in, and the images
-/// fetched by URL that it may read.
+/// One compile, planned under the lock, with the disk it reads.
 ///
-/// **Nothing that runs it borrows a [`Preview`]**, and that is the structural
-/// half of `mpdf-003` Phase 22: [`Compile::run`] cannot hold the state lock
-/// because it cannot reach the state the lock guards. [`Preview::plan`] builds
-/// one under the lock, the lock is dropped, the render runs, and
-/// [`Preview::absorb`] takes the answer back under it — so a keystroke arriving
-/// mid-compile waits on nothing.
-///
-/// **No derived `PartialEq`.** Two of these fields are compared and two are not:
-/// [`Preview::current`] tests the three inputs and the serial answers a
-/// different question entirely. A derive would invite `self.plan() == Some(plan)`,
-/// which clones the buffer a second time to answer a question about three fields.
-///
-/// **Public, with every field private**, for one reason: `crate::main` hands
-/// [`Compile::run`] to [`Session::new`] as the fetch worker's render, the seam
-/// a test replaces. Nothing outside this file can build one.
+/// **The crate's `Compile` carries no files**, since the browser's runs over a
+/// map it must not copy per compile; this one carries a clone of the root, so
+/// the render can run with no lock held. **Public, with every field private**,
+/// for one reason: `crate::main` hands [`Compile::run`] to [`Session::new`] as
+/// the fetch worker's render, the seam a test replaces.
 pub struct Compile {
-    /// The file that compiles, resolved — [`Preview::main_path`]'s answer.
-    main: PathBuf,
-    /// The file the pane holds, whose text the buffer below stands in for.
-    edited: PathBuf,
-    /// The pane's text as it stood when this compile was planned.
-    buffer: String,
-    /// Which compile of this [`Preview`] this is, from [`Preview::started`].
-    serial: u64,
-    /// The fetches that came back, on sites the open project allows. The bytes
-    /// are shared, so a plan copies no image.
-    fetched: remote::Fetched,
-    /// Which landing of each of those this compile read, for
-    /// [`Preview::absorb`] to promote exactly those and no newer one.
-    read: Vec<(String, u64)>,
+    plan: letur_project::preview::Compile,
+    disk: Disk,
 }
 
 impl Compile {
     /// Compile, and time it. **This is the whole of what runs outside the lock.**
     ///
-    /// The duration is measured around the failed path too, where
-    /// [`Preview::compile`] used to take it only on the way to a success. It
-    /// costs one `Instant` on a path that had none and changes nothing
-    /// observable: [`Preview::absorb`] reads it in the success arm alone.
-    pub fn run(&self) -> (Result<document::Render, String>, Duration) {
+    /// The duration is measured around the failed path too, which costs one
+    /// `Instant` and changes nothing observable: `Preview::absorb` reads it in
+    /// the success arm alone.
+    pub fn run(&self) -> Rendered {
         let started = Instant::now();
-        let outcome =
-            document::render_project(&self.main, &self.edited, &self.buffer, &self.fetched);
+        let outcome = self.plan.render(&self.disk);
         (outcome, started.elapsed())
     }
+
+    /// Which compile this is, in the order they started — for the suite's
+    /// gate, which releases a render by serial rather than by arrival.
+    #[cfg(test)]
+    pub fn serial(&self) -> u64 {
+        self.plan.serial()
+    }
 }
 
-/// The pane's state, as Rust holds it.
-///
-/// The bytes live here rather than only in the page, because the loop is what
-/// compiled them and the export has to write the same bytes the pane is
-/// showing — a file and a page that disagree would be worse than neither.
-///
-/// **The text lives here too**, for the same kind of reason: the rule that
-/// decides what an external change does is three comparisons over strings, and
-/// a buffer that lived only in the page would put that rule in the window,
-/// where no test could reach it.
-#[derive(Default)]
-pub struct Preview {
-    /// What the panel lists, and what the watch is rooted at.
-    ///
-    /// **It does not move when a row is clicked.** [`Session::open`] re-roots
-    /// the watch on every open, so a click that re-rooted would strand the
-    /// author below their own project with no way back up. The root changes on
-    /// an explicit Open and at no other time.
-    root: Option<PathBuf>,
-    /// Which file under the root compiles, root-relative with `/` separators.
-    main: Option<String>,
-    /// Which file the pane holds and `⌘S` writes.
-    ///
-    /// Equal to [`Preview::main`] resolved against the root at every open, and
-    /// free to differ from it from the first row click on. **`main` is what
-    /// compiles and this is what is edited**: [`Preview::compile`] reads the
-    /// first and [`Preview::save`], [`Preview::load`] and [`Preview::reload`]
-    /// the second.
-    edited: Option<PathBuf>,
-    /// The files under the root, as the last walk of the disk found them.
-    ///
-    /// **Refreshed on two occasions only** — an open, and a `Change::Tree`
-    /// event — and never recomputed in [`Preview::status`], which the page calls
-    /// on every render and which would then walk the disk on every keystroke.
-    /// The marked-missing rows are not in here: they come off the text in
-    /// [`Preview::status`], which is why the disk half of the panel is stable
-    /// and only the missing half moves while a marker is half-typed.
-    tree: Vec<document::Entry>,
-    buffer: String,
-    saved: String,
-    assets: Vec<String>,
-    sections: Vec<String>,
-    pdf: Option<Vec<u8>>,
-    anchors: Vec<document::Anchor>,
-    elapsed: Option<Duration>,
-    revision: u64,
-    reloaded: u64,
-    /// How many compiles have been planned, and how many have landed.
-    ///
-    /// **[`Preview::plan`] stamps the first onto a [`Compile`] and
-    /// [`Preview::absorb`] advances the second**, and together they are what
-    /// decides between two renders in flight: the newest-*started* one wins, and
-    /// an answer older than the one already written is dropped. Start order is
-    /// the right order because every change to a file a compile reads is
-    /// followed by its own filesystem event, and that event schedules a render
-    /// which starts *after* the change — so the newest-started render that lands
-    /// is never the one missing a change that preceded it.
-    ///
-    /// **They are the one pair [`Session::open_at`] must carry across the
-    /// `Preview` it replaces**, where `revision` and `reloaded` are deliberately
-    /// reset: an Open drops both loops without joining their threads, so a render
-    /// planned before it can still be waiting on the lock, and zeroing these
-    /// would let that orphan win. `mpdf-003` Phase 22.
-    started: u64,
-    landed: u64,
-    stale: bool,
-    error: Option<String>,
-    divergence: Option<String>,
-    /// The images the document names by URL, off the last walk that answered.
-    urls: Vec<String>,
-    /// The URL the last compile was refused on, if it was one.
-    ///
-    /// **Cleared on every error written that did not come from a render** —
-    /// [`Preview::absorb`]'s early `Err` arm and [`Preview::load`]'s — or a stale
-    /// one would hide a *"cannot read"* about the master behind a fetch.
-    refused: Option<String>,
-    /// The sites the open project allows, and every URL asked about since
-    /// launch. **Carried across [`Session::open_at`]'s rebuild**, with only the
-    /// sites replaced: the bytes are the process's, consent is the folder's.
-    web: Web,
-    /// Where a claim goes: the fetch worker [`Session::new`] starts.
-    ///
-    /// **The channel's only sender**, carried across the rebuild as `web` is, so
-    /// a dropped [`Session`] drops it with the `Preview` and the worker's `recv`
-    /// ends. A `Preview` built bare, as a test builds one, has none and claims
-    /// nothing.
-    claims: Option<mpsc::Sender<Claim>>,
+/// `Preview::plan`, with the disk cloned out beside it.
+fn plan(preview: &mut Preview) -> Option<Compile> {
+    let plan = preview.plan()?;
+    let disk = preview.files()?.clone();
+    Some(Compile { plan, disk })
 }
 
-impl Preview {
-    /// The last good bytes, whether or not they are still current.
-    pub fn pdf(&self) -> Option<&[u8]> {
-        self.pdf.as_deref()
-    }
-
-    /// The document the pane is showing, if one is open.
-    pub fn document(&self) -> Option<&Path> {
-        self.edited.as_deref()
-    }
-
-    /// The project the panel is listing, if one is open.
-    pub fn root(&self) -> Option<&Path> {
-        self.root.as_deref()
-    }
-
-    /// The file that compiles, as a path.
-    ///
-    /// [`Preview::main`] is root-relative because that is the spelling the
-    /// panel needs; every reader inside this file wants it joined back on.
-    fn main_path(&self) -> Option<PathBuf> {
-        Some(self.root.as_ref()?.join(self.main.as_ref()?))
-    }
-
-    /// The file the pane holds, spelled the way [`Preview::main`] is.
-    ///
-    /// **Textual, off no disk.** Both paths were built here by joining onto one
-    /// root, so there is nothing to canonicalize, and [`Preview::status`] calls
-    /// this on every render.
-    ///
-    /// **`document::spell` cannot decline, and the fallback that covered the
-    /// case it could is gone.** `mpdf-003` Phase 18 made a pane outside the root
-    /// reachable and this returned the absolute path there rather than letting
-    /// `Status::edited` go null; Phase 19 removed the state instead. Every path
-    /// that moves the pane now keeps it under the root: [`Session::set_edited`]
-    /// confines, [`Session::open_at`] sets root and edited together,
-    /// [`Session::trash`] falls back to the main, and [`Preview::save_as`] moves
-    /// it only where this same function succeeds. **A fallback for a state that
-    /// cannot occur is one nothing can test**, so it is not kept as insurance.
-    ///
-    /// Its second reader is [`Session::trash`]'s `held`, which tests it against
-    /// a root-relative row path — a comparison that depends silently on this
-    /// spelling and is why the spelling is stated here rather than assumed.
-    fn edited_relative(&self) -> Option<String> {
-        document::spell(self.root.as_deref()?, self.edited.as_deref()?)
-    }
-
-    /// The text the pane holds, which is the text that compiles.
-    pub fn text(&self) -> &str {
-        &self.buffer
-    }
-
-    /// Does the page belong to older text than the file on disk?
-    pub fn is_stale(&self) -> bool {
-        self.stale
-    }
-
-    /// The message from the last compile, if it failed.
-    pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
-    }
-
-    /// Which of the four states the pane is in.
-    ///
-    /// *Empty* is exactly "no document has been opened", and that is the right
-    /// boundary rather than one more condition: [`Preview::compile`] returns
-    /// early with no document, and [`Session::open`] sets the document and
-    /// compiles inside one lock scope, so no observable state sits between
-    /// [`Preview::default`] and the first outcome.
-    ///
-    /// The last arm also absorbs the pair that enumeration leaves — a document
-    /// set with no bytes and no failure — and calling it *failed* is the safe
-    /// direction, because a *failed* pane refuses an export.
-    pub fn state(&self) -> State {
-        match (self.edited.is_some(), self.stale, self.pdf.is_some()) {
-            (false, _, _) => State::Empty,
-            (true, false, true) => State::Current,
-            (true, true, true) => State::Stale,
-            (true, _, false) => State::Failed,
-        }
-    }
-
-    /// Everything the window says about the last compile, in one value.
-    ///
-    /// **The panel's two halves are put together here and nothing is read off
-    /// the disk.** [`Preview::tree`] is the walk, taken at an open and at a
-    /// `Change::Tree` event; the marked-missing rows come off `sections`, which
-    /// every compile assigns from the master's own text. So a keystroke that
-    /// half-types a marker moves one row and walks no directory, which is what
-    /// makes this cheap enough to call on every render.
-    ///
-    /// **The error is left out exactly while it is `core`'s refusal of an image
-    /// that is on its way** — waiting, being fetched, or back and not yet
-    /// compiled, on a site the open project allows. The line says so, and
-    /// *"no image fetched"* beside *"Fetching"* would be two sentences
-    /// contradicting each other. Every other error shows as it always has: a
-    /// URL on a site not allowed, which is the refusal the button sits beside;
-    /// a fetch that landed and failed; and a URL left on its way by a project
-    /// that has since closed. `mpdf-003` Phase 25.
-    pub fn status(&self) -> Status {
-        let hidden = self
-            .refused
-            .as_deref()
-            .is_some_and(|url| self.web.on_its_way(url));
-        Status {
-            state: self.state(),
-            time: self.elapsed.map(|took| format!("{} ms", took.as_millis())),
-            error: if hidden { None } else { self.error.clone() },
-            page: self.pdf.is_some(),
-            divergence: self.divergence.clone(),
-            revision: self.revision,
-            reloaded: self.reloaded,
-            anchors: self.anchors.clone(),
-            entries: self.entries(),
-            main: self.main.clone(),
-            edited: self.edited_relative(),
-            // **A `Preview` does not know the appearance**, which is held on
-            // `Session` beside the store because it is global and this struct
-            // is per-document — `Session::open_at` rebuilds it whole, so a
-            // preference kept here would go back to `System` on every `⌘O`.
-            // `Session::status` is what fills this with the author's choice.
-            appearance: Appearance::System,
-            web: self.web.line(&self.urls),
-        }
-    }
-
-    /// The panel's rows: the disk walk, plus the sections the master names that
-    /// the walk did not find.
-    fn entries(&self) -> Vec<document::Entry> {
-        let Some(main) = self.main.as_deref() else {
-            return Vec::new();
-        };
-        let named: Vec<String> = self
-            .sections
-            .iter()
-            .map(|section| document::beside(main, section))
-            .collect();
-        document::merge(self.tree.clone(), &named)
-    }
-
-    /// The bytes an export may write, or why it may not.
-    ///
-    /// Only a *current* pane has them. **The two refusals are two sentences
-    /// because they are two problems**: an *empty* pane holds no bytes at all,
-    /// where a *stale* or *failed* one holds bytes that are known to belong to
-    /// older text. A caller that reported one for the other would send the
-    /// reader looking for the wrong thing.
-    fn exportable(&self) -> Result<&[u8], String> {
-        match (self.state(), self.pdf.as_deref()) {
-            (State::Current, Some(pdf)) => Ok(pdf),
-            (State::Empty, _) => Err("no document is open".to_string()),
-            _ => Err("the last compile failed, so the page is out of date".to_string()),
-        }
-    }
-
-    /// Where a Save-a-copy dialog opens, or why it does not open at all.
-    ///
-    /// It refuses before the dialog rather than after it, so a pane that cannot
-    /// be exported never asks the user for a path it will not use.
-    ///
-    /// **It names the file that compiles and not the file in the pane**, which
-    /// are two different files since `mpdf-010` Phase 2. The bytes it offers to
-    /// write are the master's, so `showcase.pdf` is the honest default where
-    /// `mathematics.pdf` would name a section for a PDF holding the whole book.
-    pub fn export_path(&self) -> Result<PathBuf, String> {
-        self.exportable()?;
-        self.main_path()
-            .map(|main| document::default_output(&main))
-            .ok_or_else(|| "no document is open".to_string())
-    }
-
-    /// Write the page's own bytes where the user asked.
-    ///
-    /// **Nothing here compiles.** The export writes what the pane is already
-    /// showing, so the file and the page cannot disagree.
-    pub fn export(&self, path: &Path) -> Result<(), String> {
-        let pdf = self.exportable()?;
-        std::fs::write(path, pdf).map_err(|e| format!("cannot write {}: {e}", path.display()))
-    }
-
-    /// Take the pane's text.
-    ///
-    /// It compiles nothing. The typing debounce decides when a compile falls
-    /// due, because one keystroke is not a document.
-    pub fn edit(&mut self, text: String) {
-        if self.edited.is_some() {
-            self.buffer = text;
-        }
-    }
-
-    /// Read the document from disk into the buffer, and compile it.
-    ///
-    /// A file that will not read leaves the same message and the same *failed*
-    /// state a compile failure leaves, because that is what the author needs
-    /// to see either way and it is the sentence the terminal prints.
-    pub fn load(&mut self) {
-        let Some(document) = self.edited.clone() else {
-            return;
-        };
-
-        match document::read_document(&document) {
-            Ok(text) => {
-                self.take(text);
-                self.compile();
-            }
-            Err(message) => {
-                self.stale = true;
-                self.error = Some(message);
-                self.refused = None;
-            }
-        }
-    }
-
-    /// Write the buffer to the open document's path.
-    ///
-    /// The last-saved text moves with it, which is what makes the buffer clean
-    /// again — and what makes this save's own filesystem event take
-    /// [`External::Unchanged`] a moment later, with no second compile and no
-    /// suppression that would have to win a race.
-    pub fn save(&mut self) -> Result<(), String> {
-        let document = self
-            .edited
-            .clone()
-            .ok_or_else(|| "no document is open".to_string())?;
-
-        std::fs::write(&document, &self.buffer)
-            .map_err(|e| format!("cannot write {}: {e}", document.display()))?;
-
-        self.saved = self.buffer.clone();
-        self.divergence = None;
-        Ok(())
-    }
-
-    /// Write the buffer to a path the author picked, and hold that file if it is
-    /// one of the project's.
-    ///
-    /// It answers **where the write landed, and whether the pane followed it
-    /// there** — the second half being what [`Session::save_as`] decides its
-    /// compile and its re-arm on.
-    ///
-    /// **The pane follows a save inside the project and does not follow one
-    /// outside it**, `mpdf-003` Phase 19. A save outside is a copy: the write
-    /// still goes wherever the author pointed it, which Phase 18 settled, but
-    /// `edited` never leaves the root. That removes the state Phase 18 could
-    /// only mitigate — a pane holding a file with no row and no watch — rather
-    /// than living with it.
-    ///
-    /// **The predicate wants both halves, which is `document::trash_file`'s
-    /// recorded shape**: *the name is under the root, and something is at it*.
-    /// [`document::spell`] alone is **not** it — it is a component-wise
-    /// `strip_prefix`, so `root.join("../escape.md")` strips to `../escape.md`,
-    /// answers `Some` and would be judged inside. [`document::confined`] alone
-    /// is not it either: under a symlinked root it resolves both sides and says
-    /// inside where `spell` cannot produce a spelling at all. So a canonicalized
-    /// comparison decides the confinement and `spell` decides the spelling, and
-    /// keying the move to `spell` succeeding is what makes
-    /// [`Preview::edited_relative`]'s missing fallback unreachable.
-    ///
-    /// **`confined` is asked *after* the write and that order is forced**: it
-    /// opens on `is_file`, so asked before it would answer `None` for every
-    /// save-as to a name that does not exist yet. This is a command taking the
-    /// page's `path` verbatim, so the standard is [`Session::set_main`]'s and
-    /// not the dialog's.
-    ///
-    /// **Inside, this is unchanged from Phase 17, and the order is the
-    /// load-bearing part.** `saved` moves to the buffer *before* `edited` does,
-    /// for two reasons that both bite: it is what makes the buffer clean, so
-    /// this write's own filesystem event takes [`External::Unchanged`] a moment
-    /// later with no second compile; and it is why [`Session::save_as`] cannot
-    /// be `save` followed by [`Session::set_edited`], which would meet
-    /// `refused_while_dirty` and answer `Ok(())` having moved nothing — a silent
-    /// success, on the one gesture an author makes *because* they have unsaved
-    /// work.
-    ///
-    /// **Outside, none of those three moves, and that is the dangerous half.**
-    /// Leaving `saved == buffer` while the pane keeps a file whose disk copy is
-    /// older would make [`Session::refused_while_dirty`] answer *clean*: the next
-    /// row click, `set_main` or trash would [`Preview::load`] over the author's
-    /// text with no divergence sentence — and [`external_change`] would fall to
-    /// its `buffer == saved` arm and answer [`External::Taken`], taking the disk
-    /// copy over that work on any event touching the file. So an outside save
-    /// leaves `saved`, `divergence` and `edited` exactly as it found them: the
-    /// buffer is still dirty against the file the pane holds, which is the truth.
-    ///
-    /// **It does not `load`**, where `set_edited` does: the file was just
-    /// written from this buffer, so a read would answer the text already held.
-    ///
-    /// `main` does not follow. The file that compiles and the file that is
-    /// edited are two — `mpdf-010` Phase 2 — and a Save-as of a section is not a
-    /// claim about which master compiles.
-    ///
-    /// `mpdf-003` Phase 17, narrowed by Phase 19.
-    pub fn save_as(&mut self, path: &str) -> Result<(PathBuf, bool), String> {
-        if self.edited.is_none() {
-            return Err("no document is open".to_string());
-        }
-
-        let landed = document::save_file(path, self.buffer.as_bytes())?;
-
-        // **A relative `path` cannot move the pane, and that is stated rather
-        // than left to be discovered.** `document::save_file` writes it as given
-        // — against the process working directory — where `confined` joins it
-        // onto the root; and even where those name the same file, `spell` strips
-        // a prefix off a relative path and declines. The write still happens and
-        // the pane stays, which is the safe direction. No live caller sends one:
-        // the dialog answers absolute.
-        //
-        // A `None` root answers the same way, and cannot occur: the guard above
-        // requires `edited`, and `Session::open_at` sets the two together.
-        let inside = self.root.as_deref().is_some_and(|root| {
-            document::confined(root, path).is_some() && document::spell(root, &landed).is_some()
-        });
-        if !inside {
-            return Ok((landed, false));
-        }
-
-        self.saved = self.buffer.clone();
-        self.divergence = None;
-        self.edited = Some(landed.clone());
-        Ok((landed, true))
-    }
-
-    /// The disk moved under the open document: decide what that means.
-    ///
-    /// This is [`external_change`] with the file read for it and its answer
-    /// carried out. A document that will not read at this instant — one caught
-    /// mid-write — counts as [`External::Unchanged`]: the app keeps what it
-    /// has, and the write's next event decides.
-    pub fn reload(&mut self) -> External {
-        let Some(document) = self.edited.clone() else {
-            return External::Unchanged;
-        };
-        let Ok(file) = document::read_document(&document) else {
-            return External::Unchanged;
-        };
-
-        let outcome = external_change(&file, &self.buffer, &self.saved);
-        match outcome {
-            External::Unchanged => {}
-            External::Taken => {
-                self.take(file);
-                self.compile();
-            }
-            External::Diverged => self.divergence = Some(DIVERGED.to_string()),
-        }
-        outcome
-    }
-
-    /// Take a text from disk as both the buffer and the last-saved text.
-    ///
-    /// The count it bumps is how the page knows to re-read: it replaces its
-    /// own text on this and on nothing else, so text the author is typing is
-    /// never overwritten by a fetch that raced it.
-    fn take(&mut self, text: String) {
-        self.saved = text.clone();
-        self.buffer = text;
-        self.reloaded += 1;
-        self.divergence = None;
-    }
-
-    /// Compile the pane's text and take in what came back.
-    ///
-    /// The three steps are [`Preview::plan`], [`Compile::run`] and
-    /// [`Preview::absorb`], and what each writes is argued where it is written.
-    ///
-    /// **It compiles [`Preview::main`], not the file in the pane.** The pane's
-    /// text reaches it through the closure `document::render_project` builds,
-    /// which answers `edited` from this buffer and everything else from the
-    /// disk — so the page shows the whole document while the author edits one
-    /// file of it, and shows exactly what the pane says while the two are the
-    /// same file. A `main` this app cannot read at all leaves the message and
-    /// the *failed* state [`Preview::load`] leaves, which is where a document
-    /// that will not read has always landed.
-    ///
-    /// **Split into three since `mpdf-003` Phase 22**, and it stays whole for
-    /// its three synchronous callers — [`Preview::load`], [`Preview::reload`]
-    /// and [`Session::save_as`] — each of which is one user action that has just
-    /// moved the document wholesale, already holds `crate::main`'s own
-    /// `Mutex<Session>` for its duration, and may as well hold this one too. The
-    /// two closures that fire while a hand is on the keys take the three steps
-    /// apart instead, and so does the fetch worker, which fires on the network's
-    /// time rather than the author's.
-    pub fn compile(&mut self) {
-        let Some(plan) = self.plan() else {
-            return;
-        };
-        let (outcome, took) = plan.run();
-        self.absorb(&plan, outcome, took);
-    }
-
-    /// What the next compile would read, and the number that orders it.
-    ///
-    /// `None` on the two absences [`Preview::compile`] has always returned early
-    /// on. **`&mut` because it stamps the serial**: the count of compiles ever
-    /// started is bumped here and nowhere else, and the plan carries the number
-    /// out to whichever thread runs it.
-    ///
-    /// The buffer is cloned, which is this phase's whole per-compile cost: a
-    /// copy of the document, four to five orders below the compile it is handed
-    /// to. The fetched images are not: their bytes are shared.
-    fn plan(&mut self) -> Option<Compile> {
-        let (main, edited) = (self.main_path()?, self.edited.clone()?);
-        let (fetched, read) = self.web.finished();
-
-        self.started += 1;
-        Some(Compile {
-            main,
-            edited,
-            buffer: self.buffer.clone(),
-            serial: self.started,
-            fetched,
-            read,
-        })
-    }
-
-    /// Would this plan still read what it read, if it were made now?
-    ///
-    /// **Derived and not maintained, deliberately.** The alternative was a
-    /// serial bumped on every write to `main`, `edited` or `buffer` — cheaper
-    /// per compile and wrong by construction, because those inputs are written
-    /// in six places ([`Preview::edit`], [`Preview::take`], [`Preview::save_as`],
-    /// [`Session::set_edited`] and [`Session::trash`] reaching through this
-    /// guard, and [`Session::open_at`] assigning a fresh `Preview`). A counter
-    /// over writers is a bump a future author must remember; a comparison is one
-    /// they cannot forget.
-    ///
-    /// It builds no second [`Compile`]: the cost is one `String` equality, and
-    /// it stops at the first differing byte.
-    fn current(&self, plan: &Compile) -> bool {
-        self.main_path().as_deref() == Some(plan.main.as_path())
-            && self.edited.as_deref() == Some(plan.edited.as_path())
-            && self.buffer == plan.buffer
-    }
-
-    /// Take in what a compile came back with — if it is still wanted.
-    ///
-    /// A success replaces the bytes and clears both the error and the stale
-    /// mark. **A failure keeps the bytes**, records the message and sets the
-    /// mark: an author mid-edit passes through broken states constantly, and
-    /// blanking the pane on each one would lose their place and make the loop
-    /// worse than the command it replaces. The mark is what stops the kept
-    /// page from silently claiming to be the current text.
-    ///
-    /// **The duration and the anchors travel with the bytes**, replaced on a
-    /// success and kept on a failure exactly as they are, so the time the window
-    /// shows and the page the pane opens on always describe the page on screen
-    /// rather than the last attempt at one.
-    ///
-    /// **Two things decide whether any of that happens, and the order is the
-    /// cheap test first.** The serial: a render older than the one already
-    /// written is dropped, because start order is the order a filesystem event
-    /// puts its own render in. Then the inputs: text that has moved on since the
-    /// plan was made is a page of something the author has since changed.
-    ///
-    /// **Dropping an answer is safe because a fresher one is always already
-    /// coming.** Each of the six writers [`Preview::current`] lists is followed
-    /// by a compile — [`Preview::edit`] by the typing channel's own nudge, which
-    /// a `settle` thread mid-compile buffers and re-touches afterwards;
-    /// [`Preview::take`] by the `compile` on the next line of both its callers;
-    /// [`Session::set_edited`], [`Session::trash`] and [`Session::discard`] by
-    /// [`Preview::load`]; [`Session::open_at`] by replacing this struct whole.
-    /// So the page is never left holding bytes with nothing on the way.
-    ///
-    /// **The guard stands in front of every write, the failed arm included.** A
-    /// stale render also carries an asset list and a section list, so a dropped
-    /// compile that wrote only its shopping lists would re-arm the watch against
-    /// a document that has moved on; and a render that read a file mid-write
-    /// returns `Err`, which absorbed out of order would set the mark and the
-    /// message over a newer good page. One guard, one `return`, no partial
-    /// absorb — and `landed` advances before the outcome is looked at, so an
-    /// older answer cannot overwrite a newer failure either.
-    ///
-    /// `mpdf-003` Phase 22.
-    ///
-    /// **Since Phase 25 it is also the one place a fetch is claimed.** Every
-    /// compile path reaches it — the typing loop, the watch loop, an open, a
-    /// reload, a save-as, the fetch worker's own compile — so none of them can
-    /// strand a URL the text newly names on an allowed site. And past the guard
-    /// it marks what the plan read as on the page, **at the landing it read**,
-    /// whatever the outcome: a plan that read a failure and lands after a retry
-    /// has landed newer bytes leaves those bytes on their way.
-    fn absorb(
-        &mut self,
-        plan: &Compile,
-        outcome: Result<document::Render, String>,
-        took: Duration,
-    ) {
-        if plan.serial <= self.landed || !self.current(plan) {
-            return;
-        }
-        self.landed = plan.serial;
-        self.web.promote(&plan.read);
-
-        let render = match outcome {
-            Ok(render) => render,
-            Err(message) => {
-                self.stale = true;
-                self.error = Some(message);
-                self.refused = None;
-                return;
-            }
-        };
-
-        if let Some(assets) = render.assets {
-            self.assets = assets;
-        }
-        self.refused = render.refused;
-        if let Some(urls) = render.urls {
-            self.urls = urls;
-            self.claim();
-        }
-
-        // Taken whether or not the compile succeeded, as the asset list above
-        // is and for the same reason: it is read off the text rather than the
-        // page, so a document that will not compile still names its sections.
-        self.sections = render.sections;
-
-        match render.pdf {
-            Ok(pdf) => {
-                self.pdf = Some(pdf);
-                self.anchors = render.anchors;
-                self.elapsed = Some(took);
-                self.revision += 1;
-                self.stale = false;
-                self.error = None;
-            }
-            Err(message) => {
-                self.stale = true;
-                self.error = Some(message);
-            }
-        }
-    }
-
-    /// Hand the fetch worker every URL the text names on an allowed site that
-    /// nothing has asked about yet. Each waits out [`remote::SETTLE`] first,
-    /// which is what makes a URL edited in place one request and not one per
-    /// compile.
-    ///
-    /// **A `Preview` with no worker claims nothing**, and marks nothing either:
-    /// a URL marked waiting with nobody to take it would hide its refusal for
-    /// good.
-    fn claim(&mut self) {
-        let Some(claims) = &self.claims else {
-            return;
-        };
-        for url in self.web.claim(&self.urls, false) {
-            let _ = claims.send(Claim::Fetch { url, settle: true });
-        }
-    }
+/// `Preview::absorb`, for a plan made by [`plan`].
+fn absorb(preview: &mut Preview, compile: &Compile, rendered: Rendered) {
+    let (outcome, took) = rendered;
+    preview.absorb(&compile.plan, outcome, took);
 }
 
 /// One open document: its preview, and the two loops that keep it current.
@@ -987,6 +160,13 @@ pub struct Session {
     appearance: Appearance,
     watch: Option<Watch>,
     typing: Option<mpsc::Sender<()>>,
+    /// The fetch worker's channel, for the press to send on.
+    ///
+    /// **The second sender, beside the one the [`Preview`]'s claim callback
+    /// owns**, since `ltr-001` Phase 1 moved that struct into a crate with no
+    /// channels. Both drop with this `Session`, so the worker's `recv` still
+    /// ends when it does.
+    claims: mpsc::Sender<Claim>,
 }
 
 impl Session {
@@ -1001,8 +181,8 @@ impl Session {
     /// [`Compile::run`], and a test passes fakes, so no case in the suite
     /// touches the network and a case can hold a compile open. The worker
     /// holds a [`Weak`] to the state, and the new [`Preview`] holds the
-    /// channel's only sender — so a dropped `Session` takes its `Preview` with
-    /// it, the worker's `recv` ends, and the thread exits. The suite builds
+    /// channel's senders, one in its claim callback and one here — so a dropped
+    /// `Session` takes both, the worker's `recv` ends, and the thread exits. The suite builds
     /// hundreds of these.
     pub fn new(
         store: PathBuf,
@@ -1014,10 +194,13 @@ impl Session {
         on_render: impl Fn() + Send + Sync + 'static,
     ) -> Self {
         let (claims, claimed) = mpsc::channel();
-        let state = Arc::new(Mutex::new(Preview {
-            claims: Some(claims),
-            ..Preview::default()
-        }));
+        let claiming = claims.clone();
+        let state = Arc::new(Mutex::new(Preview::new(
+            timed,
+            Some(Box::new(move |url| {
+                let _ = claiming.send(Claim::Fetch { url, settle: true });
+            })),
+        )));
         let on_render: Announce = Arc::new(on_render);
 
         let worker = Worker {
@@ -1042,6 +225,7 @@ impl Session {
             appearance,
             watch: None,
             typing: None,
+            claims,
         }
     }
 
@@ -1122,49 +306,20 @@ impl Session {
     /// Shared with [`Session::set_main`], so the store and the window can never
     /// disagree about which file compiles: there is one path that puts a
     /// document in the pane, and both callers take it.
+    ///
+    /// **What survives the replacement is the crate's to keep** —
+    /// `letur_project::preview::Preview::open` carries the serials, the fetches
+    /// and the claim across it, and says why each one must. The sites are read
+    /// here and handed in, since `sites.json` is this app's.
     fn open_at(&mut self, root: PathBuf, main: String) -> Result<(), String> {
-        let document = root.join(&main);
-
         {
             let mut preview = self.preview();
-            // **The one pair that survives the replacement, and the sentence it
-            // states is "an Open discards every answer in flight".** This drops
-            // the old `Watch` and typing sender without joining their threads —
-            // the premise the `edited` re-check already exists for — so a render
-            // planned before this open can still be waiting on the lock.
-            // `..Preview::default()`'s zeroes would let it win on
-            // `plan.serial > landed`, and `Preview::current` would not save us:
-            // `edited` is set to `root.join(main)` here, so any open inside the
-            // same project with a clean buffer matches all three inputs. Worse,
-            // it would leave `landed` hundreds of compiles above `started`, after
-            // which every later compile of the newly opened document is silently
-            // dropped — the render runs, nothing is written, no redraw and no
-            // error. `revision` and `reloaded` are still reset; those the page
-            // resets alongside, in `clear()`.
-            let started = preview.started;
-            // **The fetches and the worker's channel survive it too**, and the
-            // sites are replaced *before* `load` compiles: that compile's
-            // `absorb` claims and its plan reads against them, so installing
-            // them after would let the previous project's consent decide the
-            // first page of this one. `mpdf-003` Phase 25.
-            let mut web = std::mem::take(&mut preview.web);
-            web.install(document::read_sites(&self.sites, &root));
-            let claims = preview.claims.take();
-            *preview = Preview {
-                root: Some(root.clone()),
-                main: Some(main),
-                edited: Some(document.clone()),
-                tree: document::files_under(&root),
-                started,
-                landed: started,
-                web,
-                claims,
-                ..Preview::default()
-            };
+            let allowed = document::read_sites(&self.sites, &root);
+            preview.open(Disk::new(&root), main.clone(), main.clone(), allowed);
             preview.load();
         }
         (self.on_render)();
-        self.arm(root, document.clone(), document)
+        self.arm(root, &main, &main)
     }
 
     /// Point both loops at these two files, dropping whatever they held.
@@ -1181,16 +336,22 @@ impl Session {
     ///
     /// The old loops go before the new ones start, so no two of them ever hold
     /// the same document.
-    fn arm(&mut self, root: PathBuf, main: PathBuf, edited: PathBuf) -> Result<(), String> {
+    ///
+    /// `main` and `edited` are root-relative, as the [`Preview`] holds them; the
+    /// loops are handed them joined onto the root, and guard on that absolute
+    /// path — so a loop left over from another project cannot pass for this
+    /// one's on a file of the same name.
+    fn arm(&mut self, root: PathBuf, main: &str, edited: &str) -> Result<(), String> {
         self.watch = None;
         self.typing = None;
 
+        let edited = root.join(edited);
         self.typing = Some(watch::debounced(
             watch::TYPING_DEBOUNCE,
             self.recompile(edited.clone()),
         ));
-        let classify = self.classifier(root.clone(), main, edited.clone());
-        let on_change = self.on_change(root.clone(), edited);
+        let classify = self.classifier(root.clone(), root.join(main), edited.clone());
+        let on_change = self.on_change(edited);
         self.watch = Some(watch::start(&root, watch::DEBOUNCE, classify, on_change)?);
 
         Ok(())
@@ -1201,26 +362,22 @@ impl Session {
     /// The store is written *before* the open, so a window that opened and then
     /// failed to remember cannot happen: the fact is on disk or the author is
     /// told why it is not.
+    ///
+    /// **The confinement and the refusal are the crate's**, in
+    /// `letur_project::preview::Preview::ask_main`; the store and the open are
+    /// this app's.
     pub fn set_main(&mut self, main: String) -> Result<(), String> {
+        let asked = self.preview().ask_main(&main)?;
+        if asked == Asked::Refused {
+            (self.on_render)();
+            return Ok(());
+        }
+
         let root = self
             .preview()
             .root()
             .map(Path::to_path_buf)
             .ok_or_else(|| "no document is open".to_string())?;
-
-        // **Confined, and not merely checked for existence.** The path comes
-        // from the panel, which got it from this app's own listing — but a
-        // command is a command, and `root.join("../../secrets.md")` names a
-        // real file on plenty of machines. `document::confined` is the walk's
-        // own test, shared with `set_edited` and with the figure read.
-        if document::confined(&root, &main).is_none() {
-            return Err(format!("{main} is not a file in this project"));
-        }
-
-        if self.refused_while_dirty(SWITCHING) {
-            return Ok(());
-        }
-
         document::write_override(&self.store, &root, &main)?;
         self.open_at(root, main)
     }
@@ -1239,74 +396,34 @@ impl Session {
     /// It confines the path as [`Session::set_main`] does, and refuses on the
     /// same terms while the buffer diverges from the last-saved text.
     pub fn set_edited(&mut self, path: String) -> Result<(), String> {
-        let (root, main) = {
-            let preview = self.preview();
-            match (preview.root.clone(), preview.main.clone()) {
-                (Some(root), Some(main)) => (root, main),
-                _ => return Err("no document is open".to_string()),
-            }
+        let (asked, root, main) = {
+            let mut preview = self.preview();
+            let asked = preview.set_edited(&path)?;
+            let root = preview.root().map(Path::to_path_buf);
+            (asked, root, preview.main().map(str::to_string))
         };
-
-        let Some(landed) = document::confined(&root, &path) else {
-            return Err(format!("{path} is not a file in this project"));
-        };
-
-        if self.refused_while_dirty(SWITCHING) {
+        (self.on_render)();
+        if asked == Asked::Refused {
             return Ok(());
         }
 
-        {
-            let mut preview = self.preview();
-            preview.edited = Some(landed.clone());
-            preview.load();
+        match (root, main) {
+            (Some(root), Some(main)) => self.arm(root, &main, &path),
+            _ => Err("no document is open".to_string()),
         }
-        (self.on_render)();
-
-        self.arm(root.clone(), root.join(main), landed)
     }
 
-    /// Move one of the project's files to the Trash.
-    ///
-    /// **The template is [`Session::set_edited`]'s and not a command's**, and
-    /// the compiler forces it eventually: a delete has to refuse on the main,
-    /// set `Preview::divergence`, call [`Session::arm`] and write
-    /// `Preview::tree`, and all four are private to this file. So the
-    /// confinement and the OS call are `crate::document::trash_file` and this
-    /// is everything that touches the session.
-    ///
-    /// **Three refusals, and they do not arrive the same way.** The main and the
-    /// two `crate::document::trash_file` makes come back as `Err`, which the
-    /// page draws in the error bar exactly as it draws [`Session::set_edited`]'s
-    /// — and none of the three is reachable from a row: the main row draws no
-    /// button, and every other row came out of this app's own listing. The
-    /// dirty-buffer one rides `Preview::divergence` and returns `Ok(())`, as
-    /// [`Session::refused_while_dirty`] does, so one refusal does not arrive in
-    /// the window two ways.
-    ///
-    /// **That one is asked only of the file the pane is holding**, which is the
-    /// difference from [`Session::set_edited`] and [`Session::set_main`], where
-    /// it is unconditional: deleting some *other* file throws no unsaved work
-    /// away, so refusing there would be a refusal with nothing behind it.
-    ///
-    /// **The panel is refreshed here and not by the watch, and that is forced.**
-    /// `crate::watch::classify` answers the **first** match and a section the
-    /// master names is already in the asset list `crate::document::render_with`
-    /// builds — so deleting one answers `Change::Asset`, never `Change::Tree`,
-    /// and [`Session::on_change`] refreshes the listing only under
-    /// `changed.tree`. The panel would keep an ordinary unmarked row for a file
-    /// that is gone. **The asymmetry with the create is real rather than an
-    /// inconsistency**: a *created* file is not in the asset list, so the watch
-    /// classifies that one correctly. This app made the change and knows it; the
-    /// watch is for changes it did not make. `crate::document::merge` then puts
-    /// the path back as `missing: true`, because the master still names it.
-    ///
-    /// `mpdf-010` Phase 4.
     /// Write the pane to a path the author picked, and hold that file after.
     ///
     /// **Three duties the watch will not do for this command**, which is what
     /// separates it from every other write in this file.
     ///
-    /// **It compiles.** `document::render_project` substitutes the buffer for
+    /// **Since `ltr-001` Phase 1 the write, the three moves, the listing, the
+    /// compile and the receipt are `letur_project::preview::Preview::save_as`'s**,
+    /// and what stays here is the announce and the re-arm. What follows is why
+    /// each duty is one.
+    ///
+    /// **It compiles.** The compile substitutes the buffer for
     /// `edited` alone and reads every other path off the disk, so moving
     /// `edited` changes what the next compile reads — onto a file the master
     /// names, or *away* from one, which is the case an author hits by default:
@@ -1370,94 +487,87 @@ impl Session {
     ///
     /// `mpdf-003` Phase 17, narrowed by Phase 19.
     pub fn save_as(&mut self, path: String) -> Result<String, String> {
-        let (root, main) = {
-            let preview = self.preview();
-            match (preview.root.clone(), preview.main.clone()) {
-                (Some(root), Some(main)) => (root, main),
-                _ => return Err("no document is open".to_string()),
-            }
-        };
-
-        let (landed, moved) = {
+        let (saved, root, main, edited) = {
             let mut preview = self.preview();
-            preview.save_as(&path)?
+            let saved = preview.save_as(&path)?;
+            (
+                saved,
+                preview.root().map(Path::to_path_buf),
+                preview.main().map(str::to_string),
+                preview.edited().map(str::to_string),
+            )
         };
-
-        {
-            let mut preview = self.preview();
-            preview.tree = document::files_under(&root);
-            if moved {
-                preview.compile();
-            }
-        }
         (self.on_render)();
 
-        if moved {
-            self.arm(root.clone(), root.join(main), landed.clone())?;
+        if saved.moved
+            && let (Some(root), Some(main), Some(edited)) = (root, main, edited)
+        {
+            self.arm(root, &main, &edited)?;
         }
 
-        Ok(format!(
-            "saved as {} in {}",
-            landed.file_name().unwrap_or_default().to_string_lossy(),
-            landed.parent().unwrap_or(Path::new("")).to_string_lossy()
-        ))
+        Ok(saved.receipt)
     }
 
+    /// Move one of the project's files to the Trash.
+    ///
+    /// **Every decision is `letur_project::preview::Preview::trash`'s** — the
+    /// main refused, the pane's own unsaved work refused on `TRASHING`, the
+    /// listing refreshed, and the pane falling back to the main — and this is
+    /// what only a session has: the lock, the announce, and [`Session::arm`].
+    /// The delete itself is `crate::document::trash_file`, handed the call that
+    /// moves the file, which is a parameter so the suite can hand in a double.
+    ///
+    /// **Three refusals, and they do not arrive the same way.** The main and the
+    /// two `crate::document::trash_file` makes come back as `Err`, which the
+    /// page draws in the error bar exactly as it draws [`Session::set_edited`]'s
+    /// — and none of the three is reachable from a row: the main row draws no
+    /// button, and every other row came out of this app's own listing. The
+    /// dirty-buffer one rides the divergence and returns `Ok(())`, so one
+    /// refusal does not arrive in the window two ways.
+    ///
+    /// **That one is asked only of the file the pane is holding**, which is the
+    /// difference from [`Session::set_edited`] and [`Session::set_main`], where
+    /// it is unconditional: deleting some *other* file throws no unsaved work
+    /// away, so refusing there would be a refusal with nothing behind it.
+    ///
+    /// **The panel is refreshed by the crate and not by the watch, and that is
+    /// forced.** `crate::watch::classify` answers the **first** match and a
+    /// section the master names is already in the asset list the compile builds
+    /// — so deleting one answers `Change::Asset`, never `Change::Tree`, and
+    /// [`Session::on_change`] refreshes the listing only under `changed.tree`.
+    /// **The asymmetry with the create is real rather than an inconsistency**: a
+    /// *created* file is not in the asset list, so the watch classifies that one
+    /// correctly. This app made the change and knows it; the watch is for
+    /// changes it did not make.
+    ///
+    /// `mpdf-010` Phase 4.
     pub fn trash(
         &mut self,
         path: String,
         trash: impl FnOnce(&Path) -> Result<(), String>,
     ) -> Result<(), String> {
-        let (root, main, held) = {
-            let preview = self.preview();
-            match (preview.root.clone(), preview.main.clone()) {
-                (Some(root), Some(main)) => (root, main, preview.edited_relative()),
-                _ => return Err("no document is open".to_string()),
-            }
+        let (trashed, root, main) = {
+            let mut preview = self.preview();
+            let trashed = preview.trash(&path, |disk, path| {
+                document::trash_file(disk.root(), path, trash)
+            })?;
+            (
+                trashed,
+                preview.root().map(Path::to_path_buf),
+                preview.main().map(str::to_string),
+            )
         };
-
-        if path == main {
-            return Err(format!(
-                "{path} is the file this project compiles. Set another file as main first."
-            ));
-        }
-
-        // Only the pane's own file can cost the author anything.
-        let holding = held.as_deref() == Some(path.as_str());
-        if holding && self.refused_while_dirty(TRASHING) {
-            return Ok(());
-        }
-
-        document::trash_file(&root, &path, trash)?;
-
-        {
-            let mut preview = self.preview();
-            preview.tree = document::files_under(&root);
-        }
-
-        if !holding {
-            (self.on_render)();
-            return Ok(());
-        }
-
-        // **[`Session::set_edited`]'s own body, and both halves are
-        // load-bearing.** `arm` is what keeps the loops alive, since both guard
-        // on a path captured when they were started. But **arming without
-        // loading is worse than not arming**: the buffer would still hold the
-        // *trashed* file's text while `edited` names the main, so
-        // `Preview::save` would write a deleted section over the master and
-        // `crate::document::render_project`'s closure would answer the main from
-        // that same buffer once the two paths are equal — and nothing would
-        // announce either.
-        let document = root.join(&main);
-        {
-            let mut preview = self.preview();
-            preview.edited = Some(document.clone());
-            preview.load();
-        }
         (self.on_render)();
 
-        self.arm(root, document.clone(), document)
+        // **Arming is load-bearing where the pane held the file**: both loops
+        // guard on a path captured when they were started, and the crate has
+        // just moved the pane back to the main and loaded it.
+        match (trashed, root, main) {
+            (Trashed::Removed { holding: true }, Some(root), Some(main)) => {
+                self.arm(root, &main, &main)
+            }
+            _ => Ok(()),
+        }
     }
 
     /// The author pressed the button beside the line: fetch the document's
@@ -1483,22 +593,19 @@ impl Session {
     pub fn fetch_images(&self) -> Result<(), String> {
         let mut preview = self.preview();
         let root = preview
-            .root
-            .clone()
+            .root()
+            .map(Path::to_path_buf)
             .ok_or_else(|| "no document is open".to_string())?;
 
-        let allowed = preview.web.widened(&preview.urls);
+        let urls = preview.urls().to_vec();
+        let allowed = preview.web().widened(&urls);
         document::write_sites(&self.sites, &root, &allowed)?;
-        preview.web.install(allowed);
+        preview.web_mut().install(allowed);
 
-        let urls = preview.urls.clone();
-        let claimed = preview.web.claim(&urls, true);
-        if let Some(claims) = &preview.claims {
-            for url in claimed {
-                let _ = claims.send(Claim::Fetch { url, settle: false });
-            }
-            let _ = claims.send(Claim::Compile);
+        for url in preview.web_mut().claim(&urls, true) {
+            let _ = self.claims.send(Claim::Fetch { url, settle: false });
         }
+        let _ = self.claims.send(Claim::Compile);
         Ok(())
     }
 
@@ -1510,36 +617,8 @@ impl Session {
     /// divergence through `Preview::take`, so one action answers a refused
     /// switch and a refused external change alike.
     pub fn discard(&self) {
-        self.preview().load();
+        self.preview().discard();
         (self.on_render)();
-    }
-
-    /// Is there unsaved work this gesture would throw away? Then say so and stop.
-    ///
-    /// **It reports through `Preview::divergence` and not through an `Err`.**
-    /// The caller's `Err` is where a path outside the project goes, and the
-    /// window draws that in the error bar; a refusal that arrived both ways
-    /// would be one problem in two places. This is a status, and the page places
-    /// it exactly as it places every other status sentence.
-    ///
-    /// **The sentence is the caller's**, because the three occasions are three
-    /// different claims and each of the others would be false on the other two:
-    /// [`SWITCHING`] names an open, [`TRASHING`] names the Trash. The field they
-    /// share carries one at a time, which costs nothing — all three name the
-    /// same two exits.
-    ///
-    /// It announces, because nothing else will: no compile ran, so the page
-    /// would otherwise never fetch the status carrying the sentence.
-    fn refused_while_dirty(&self, sentence: &str) -> bool {
-        {
-            let mut preview = self.preview();
-            if preview.buffer == preview.saved {
-                return false;
-            }
-            preview.divergence = Some(sentence.to_string());
-        }
-        (self.on_render)();
-        true
     }
 
     /// Take the pane's text, and start the clock on the compile it will want.
@@ -1555,11 +634,10 @@ impl Session {
 
     /// Write the pane's text to the document's own path, and say so.
     ///
-    /// The receipt is [`SAVED`], which carries no path: the file is the one the
+    /// The receipt is `letur_project::preview`'s `SAVED`, which carries no path: the file is the one the
     /// bar already names.
     pub fn save(&self) -> Result<String, String> {
-        self.preview().save()?;
-        Ok(SAVED.to_string())
+        self.preview().save()
     }
 
     /// The filter, closed over the asset list the last successful parse left.
@@ -1578,8 +656,8 @@ impl Session {
             let assets = state
                 .lock()
                 .expect("the preview lock was poisoned")
-                .assets
-                .clone();
+                .assets()
+                .to_vec();
             watch::classify(path, &root, &main, &edited, &assets)
         }
     }
@@ -1600,8 +678,8 @@ impl Session {
     /// window. And nothing is announced when nothing happened: the app's own
     /// save arrives here, changes nothing, and must not redraw a frame the
     /// reader has scrolled.
-    fn on_change(&self, root: PathBuf, edited: PathBuf) -> impl FnMut(Changed) + Send + 'static {
-        self.on_change_with(root, edited, Compile::run)
+    fn on_change(&self, edited: PathBuf) -> impl FnMut(Changed) + Send + 'static {
+        self.on_change_with(edited, Compile::run)
     }
 
     /// The same, with the render handed in.
@@ -1647,9 +725,8 @@ impl Session {
     /// document is open, and its own open has already announced.
     fn on_change_with(
         &self,
-        root: PathBuf,
         edited: PathBuf,
-        render: impl Fn(&Compile) -> (Result<document::Render, String>, Duration) + Send + 'static,
+        render: impl Fn(&Compile) -> Rendered + Send + 'static,
     ) -> impl FnMut(Changed) + Send + 'static {
         let state = Arc::clone(&self.state);
         let on_render = Arc::clone(&self.on_render);
@@ -1658,7 +735,7 @@ impl Session {
             let mut announce = false;
             let planned = {
                 let mut preview = state.lock().expect("the preview lock was poisoned");
-                if preview.edited.as_deref() != Some(edited.as_path()) {
+                if preview.document().as_deref() != Some(edited.as_path()) {
                     return;
                 }
 
@@ -1672,7 +749,7 @@ impl Session {
 
                 let planned = if (changed.document || changed.assets) && !taken {
                     announce = true;
-                    preview.plan()
+                    plan(&mut preview)
                 } else {
                     None
                 };
@@ -1683,7 +760,7 @@ impl Session {
                 // nothing again. It is announced all the same, because the
                 // panel is drawn off the status the announcement fetches.
                 if changed.tree {
-                    preview.tree = document::files_under(&root);
+                    preview.refresh_tree();
                     announce = true;
                 }
 
@@ -1691,13 +768,13 @@ impl Session {
             };
 
             if let Some(plan) = planned {
-                let (outcome, took) = render(&plan);
+                let rendered = render(&plan);
 
                 let mut preview = state.lock().expect("the preview lock was poisoned");
-                if preview.edited.as_deref() != Some(edited.as_path()) {
+                if preview.document().as_deref() != Some(edited.as_path()) {
                     return;
                 }
-                preview.absorb(&plan, outcome, took);
+                absorb(&mut preview, &plan, rendered);
             }
 
             if announce {
@@ -1736,7 +813,7 @@ impl Session {
     fn recompile_with(
         &self,
         document: PathBuf,
-        render: impl Fn(&Compile) -> (Result<document::Render, String>, Duration) + Send + 'static,
+        render: impl Fn(&Compile) -> Rendered + Send + 'static,
     ) -> impl FnMut() + Send + 'static {
         let state = Arc::clone(&self.state);
         let on_render = Arc::clone(&self.on_render);
@@ -1744,20 +821,20 @@ impl Session {
         move || {
             let planned = {
                 let mut preview = state.lock().expect("the preview lock was poisoned");
-                if preview.edited.as_deref() != Some(document.as_path()) {
+                if preview.document().as_deref() != Some(document.as_path()) {
                     return;
                 }
-                preview.plan()
+                plan(&mut preview)
             };
 
             if let Some(plan) = planned {
-                let (outcome, took) = render(&plan);
+                let rendered = render(&plan);
 
                 let mut preview = state.lock().expect("the preview lock was poisoned");
-                if preview.edited.as_deref() != Some(document.as_path()) {
+                if preview.document().as_deref() != Some(document.as_path()) {
                     return;
                 }
-                preview.absorb(&plan, outcome, took);
+                absorb(&mut preview, &plan, rendered);
             }
 
             on_render();
@@ -1766,7 +843,7 @@ impl Session {
 }
 
 /// What a render answers, and how long it took.
-type Rendered = (Result<document::Render, String>, Duration);
+pub type Rendered = (Result<letur_project::document::Render, String>, Duration);
 
 /// The signal after a compile. It carries nothing; the page asks for the rest.
 type Announce = Arc<dyn Fn() + Send + Sync>;
@@ -1826,8 +903,8 @@ impl Worker {
             };
             let begun = {
                 let mut preview = state.lock().expect("the preview lock was poisoned");
-                let named = preview.urls.contains(&url);
-                preview.web.begin(&url, named)
+                let named = preview.urls().contains(&url);
+                preview.web_mut().begin(&url, named)
             };
             drop(state);
             (self.on_render)();
@@ -1843,7 +920,7 @@ impl Worker {
             state
                 .lock()
                 .expect("the preview lock was poisoned")
-                .web
+                .web_mut()
                 .land(&url, result);
             drop(state);
             (self.on_render)();
@@ -1852,13 +929,14 @@ impl Worker {
         let Some(state) = self.state.upgrade() else {
             return;
         };
-        let planned = state.lock().expect("the preview lock was poisoned").plan();
+        let planned = plan(&mut state.lock().expect("the preview lock was poisoned"));
         if let Some(plan) = planned {
-            let (outcome, took) = (self.render)(&plan);
-            state
-                .lock()
-                .expect("the preview lock was poisoned")
-                .absorb(&plan, outcome, took);
+            let rendered = (self.render)(&plan);
+            absorb(
+                &mut state.lock().expect("the preview lock was poisoned"),
+                &plan,
+                rendered,
+            );
         }
         drop(state);
         (self.on_render)();
@@ -1868,6 +946,9 @@ impl Worker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use letur_project::preview::{SAVED, State};
+    use letur_project::remote::WebLine;
+    use std::collections::BTreeSet;
     use std::sync::Condvar;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, Instant};
@@ -2055,13 +1136,8 @@ mod tests {
     fn compiled(document: &Path) -> Preview {
         let root = watch::root(document);
         let name = document::title(document);
-        let mut preview = Preview {
-            root: Some(root.clone()),
-            main: Some(name),
-            edited: Some(document.to_path_buf()),
-            tree: document::files_under(&root),
-            ..Preview::default()
-        };
+        let mut preview = Preview::default();
+        preview.open(Disk::new(root), name.clone(), name, BTreeSet::new());
         preview.load();
         preview
     }
@@ -2412,7 +1488,7 @@ mod tests {
             "the file is written where it was asked for"
         );
         assert_eq!(
-            session.preview().document(),
+            session.preview().document().as_deref(),
             Some(document.as_path()),
             "the pane keeps the file it was holding: a save outside the project is a copy"
         );
@@ -2570,7 +1646,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            session.preview().document(),
+            session.preview().document().as_deref(),
             Some(document.as_path()),
             "the switch met the dirty buffer and was refused"
         );
@@ -2742,7 +1818,7 @@ mod tests {
 
         assert!(dest.is_file(), "the file is written where it was asked for");
         assert_eq!(
-            session.preview().document(),
+            session.preview().document().as_deref(),
             Some(document.as_path()),
             "so the pane stays"
         );
@@ -2784,7 +1860,7 @@ mod tests {
             "the write resolves the `..`, so the file lands above the root"
         );
         assert_eq!(
-            session.preview().document(),
+            session.preview().document().as_deref(),
             Some(document.as_path()),
             "so the pane stays"
         );
@@ -2825,7 +1901,7 @@ mod tests {
             "the write followed the link, so the bytes are outside the project"
         );
         assert_eq!(
-            session.preview().document(),
+            session.preview().document().as_deref(),
             Some(document.as_path()),
             "and the pane did not follow them"
         );
@@ -2887,7 +1963,7 @@ mod tests {
             format!("saved as draft.md in {}", dir.display())
         );
         assert_eq!(
-            session.preview().document(),
+            session.preview().document().as_deref(),
             Some(beside.as_path()),
             "an inside save still moves the pane"
         );
@@ -2904,7 +1980,7 @@ mod tests {
             )
         );
         assert_eq!(
-            session.preview().document(),
+            session.preview().document().as_deref(),
             Some(beside.as_path()),
             "and the outside one leaves it where the inside one put it"
         );
@@ -2933,7 +2009,7 @@ mod tests {
             .save_as(onto.to_string_lossy().into_owned())
             .unwrap();
 
-        assert_eq!(session.preview().document(), Some(onto.as_path()));
+        assert_eq!(session.preview().document().as_deref(), Some(onto.as_path()));
         assert!(
             session.preview().status().divergence.is_none(),
             "no divergence"
@@ -3376,7 +2452,7 @@ mod tests {
 
         // The default path is `cli/src/main.rs:default_output`'s rule.
         let output = document.with_extension("pdf");
-        assert_eq!(session.preview().export_path().unwrap(), output);
+        assert_eq!(session.preview().export_file().unwrap(), output);
 
         session.preview().export(&output).unwrap();
         let written = std::fs::read(&output).unwrap();
@@ -3627,7 +2703,7 @@ mod tests {
             let preview = session.preview();
             (
                 preview.status().main,
-                preview.document().map(Path::to_path_buf),
+                preview.document(),
                 preview.pdf().map(<[u8]>::to_vec),
             )
         };
@@ -3814,19 +2890,19 @@ mod tests {
     /// derives the main from the document, which is the conflation this phase
     /// ends.
     fn project(root: &Path, main: &str, edited: &str) -> Preview {
-        let mut preview = Preview {
-            root: Some(root.to_path_buf()),
-            main: Some(main.to_string()),
-            edited: Some(root.join(edited)),
-            tree: document::files_under(root),
-            ..Preview::default()
-        };
+        let mut preview = Preview::default();
+        preview.open(
+            Disk::new(root),
+            main.to_string(),
+            edited.to_string(),
+            BTreeSet::new(),
+        );
         preview.load();
         preview
     }
 
     fn lines_of(preview: &Preview) -> Vec<usize> {
-        preview.anchors.iter().map(|anchor| anchor.line).collect()
+        preview.anchors().iter().map(|anchor| anchor.line).collect()
     }
 
     /// **Clause 1, and the phase's whole observable.** The page is the master's,
@@ -4243,7 +3319,7 @@ mod tests {
             "the buffer still holds the trashed file's text"
         );
         assert_eq!(
-            session.preview().saved,
+            session.preview().saved(),
             master,
             "the last-saved text still belongs to the trashed file"
         );
@@ -4427,7 +3503,7 @@ mod tests {
             main: Some("report.md".to_string()),
             edited: Some("sections/method.md".to_string()),
             appearance: Appearance::Dark,
-            web: Some(remote::WebLine {
+            web: Some(WebLine {
                 sentence: "1 image on images.example is not fetched.".to_string(),
                 action: Some("Fetch images from the web".to_string()),
             }),
@@ -4696,11 +3772,11 @@ mod tests {
             let cleared = Arc::clone(&self.cleared);
 
             move |plan: &Compile| {
-                let _ = reporting.send(plan.serial);
+                let _ = reporting.send(plan.serial());
 
                 let (serials, waking) = &*cleared;
                 let mut serials = serials.lock().expect("the gate was poisoned");
-                while !serials.contains(&plan.serial) {
+                while !serials.contains(&plan.serial()) {
                     serials = waking.wait(serials).expect("the gate was poisoned");
                 }
                 drop(serials);
@@ -4729,7 +3805,7 @@ mod tests {
     fn wait_landed(session: &Session, serial: u64) {
         let deadline = Instant::now() + WIRING;
         while Instant::now() < deadline {
-            if session.preview().landed >= serial {
+            if session.preview().landed() >= serial {
                 return;
             }
             std::thread::sleep(Duration::from_millis(5));
@@ -4741,10 +3817,10 @@ mod tests {
     fn written(session: &Session) -> (u64, Option<Vec<u8>>, Vec<String>, Vec<String>) {
         let preview = session.preview();
         (
-            preview.revision,
-            preview.pdf.clone(),
-            preview.assets.clone(),
-            preview.sections.clone(),
+            preview.revision(),
+            preview.pdf().map(<[u8]>::to_vec),
+            preview.assets().to_vec(),
+            preview.sections().to_vec(),
         )
     }
 
@@ -4798,7 +3874,7 @@ mod tests {
         session.watch = None;
 
         let before = written(&session);
-        let error = session.preview().error.clone();
+        let error = session.preview().error().map(str::to_string);
 
         let gate = Gate::new();
         let recompile = session.recompile_with(document, gate.render());
@@ -4823,7 +3899,7 @@ mod tests {
             "an answer to text the author had already moved on from was absorbed"
         );
         assert_eq!(
-            session.preview().error,
+            session.preview().error().map(str::to_string),
             error,
             "a dropped answer wrote its message anyway"
         );
@@ -4832,11 +3908,11 @@ mod tests {
         // interval inside a case that calls its own interval a bound.
         session.preview().compile();
         assert!(
-            session.preview().revision > before.0,
+            session.preview().revision() > before.0,
             "the text that replaced it never reached the page"
         );
         assert!(
-            session.preview().assets.is_empty(),
+            session.preview().assets().is_empty(),
             "the new text names no figure, so the asset list should have emptied"
         );
     }
@@ -4890,19 +3966,19 @@ mod tests {
 
         gate.release(earlier);
         wait_landed(&session, earlier);
-        let after_the_earlier = session.preview().revision;
+        let after_the_earlier = session.preview().revision();
 
         gate.release(later);
         three.join().expect("a render thread panicked");
         four.join().expect("a render thread panicked");
 
         assert_eq!(
-            session.preview().landed,
+            session.preview().landed(),
             later,
             "the later-started render did not land behind the earlier one"
         );
         assert_eq!(
-            session.preview().revision,
+            session.preview().revision(),
             after_the_earlier + 1,
             "the later-started render was dropped when it arrived in start order"
         );
@@ -4929,7 +4005,7 @@ mod tests {
         std::fs::write(root.join("notes.md"), "# notes\n").unwrap();
 
         let gate = Gate::new();
-        let mut on_change = session.on_change_with(root.clone(), document, gate.render());
+        let mut on_change = session.on_change_with(document, gate.render());
         let running = std::thread::spawn(move || {
             on_change(Changed {
                 assets: true,
@@ -4942,24 +4018,25 @@ mod tests {
         assert!(
             session
                 .preview()
-                .tree
+                .status()
+                .entries
                 .iter()
                 .any(|entry| entry.path == "notes.md"),
             "the listing was not refreshed until after the render"
         );
 
-        let before = session.preview().revision;
+        let before = session.preview().revision();
         let announced = announcements.load(Ordering::SeqCst);
 
         // **By the field, and not through `Session::set_edited`**, whose `load`
         // would compile and bump the revision this case requires unmoved.
-        session.preview().edited = Some(root.join("sections/introduction.md"));
+        session.preview().hold("sections/introduction.md");
 
         gate.release(serial);
         running.join().expect("the change thread panicked");
 
         assert_eq!(
-            session.preview().revision,
+            session.preview().revision(),
             before,
             "a render whose pane had moved on was absorbed"
         );
@@ -5010,7 +4087,7 @@ mod tests {
 
         session.preview().compile();
         assert!(
-            session.preview().revision > after_open.0,
+            session.preview().revision() > after_open.0,
             "the newly opened document stopped compiling: `landed` was left above `started`"
         );
     }
@@ -5170,8 +4247,8 @@ mod tests {
     }
 
     /// The line a case expects, spelled out.
-    fn line(sentence: &str, action: Option<&str>) -> Option<remote::WebLine> {
-        Some(remote::WebLine {
+    fn line(sentence: &str, action: Option<&str>) -> Option<WebLine> {
+        Some(WebLine {
             sentence: sentence.to_string(),
             action: action.map(str::to_string),
         })
@@ -5362,14 +4439,8 @@ mod tests {
         let text = std::fs::read_to_string(&master).unwrap();
         std::fs::write(&master, format!("{text}\n![from the web]({IMAGE})\n")).unwrap();
 
-        let (root, edited) = {
-            let preview = session.preview();
-            (
-                preview.root().unwrap().to_path_buf(),
-                preview.document().unwrap().to_path_buf(),
-            )
-        };
-        let mut on_change = session.on_change_with(root, edited, Compile::run);
+        let edited = session.preview().document().unwrap();
+        let mut on_change = session.on_change_with(edited, Compile::run);
         on_change(Changed {
             document: true,
             ..Changed::default()
@@ -5403,13 +4474,13 @@ mod tests {
             let mut preview = session.preview();
             preview.edit(format!("# Images\n\n![figure]({url})\n"));
             preview.compile();
-            assert_eq!(preview.urls, [url], "the edit's compile has not landed");
+            assert_eq!(preview.urls(), [url], "the edit's compile has not landed");
         }
 
         fake.entered(1);
         past_the_settle();
         assert_eq!(fake.calls(), [kept], "a URL the text stopped naming was fetched");
-        assert_eq!(session.preview().web.stage(typed), None);
+        assert_eq!(session.preview().web().stage(typed), None);
     }
 
     /// Case 12. **While an image is on its way the line says so, and nothing
@@ -5443,7 +4514,7 @@ mod tests {
         fake.release();
         let reading = gate.entered();
         let arrived = session.status();
-        assert_eq!(session.preview().web.stage(IMAGE), Some("arrived"));
+        assert_eq!(session.preview().web().stage(IMAGE), Some("arrived"));
         assert_eq!(arrived.web, line("Fetching 1 image from images.example…", None));
         assert_eq!(arrived.error, None);
         assert_ne!(arrived.state, State::Current);
@@ -5491,11 +4562,11 @@ mod tests {
         fake.answer(IMAGE, Ok(std::fs::read(fixture("dot.png")).unwrap()));
         session.fetch_images().unwrap();
         let (c, d) = (gate.entered(), gate.entered());
-        assert_eq!(session.preview().web.stage(IMAGE), Some("arrived"));
+        assert_eq!(session.preview().web().stage(IMAGE), Some("arrived"));
 
         gate.release(stale);
         running.join().expect("the older render panicked");
-        assert_eq!(session.preview().landed, stale, "the older plan was not absorbed");
+        assert_eq!(session.preview().landed(), stale, "the older plan was not absorbed");
         assert!(
             session
                 .preview()
@@ -5544,7 +4615,7 @@ mod tests {
                 .is_some_and(|error| error.starts_with("cannot read") && error.contains("multi_file.md")),
             "{error:?}"
         );
-        assert_eq!(session.preview().refused, None);
+        assert_eq!(session.preview().refused(), None);
         fake.release();
     }
 

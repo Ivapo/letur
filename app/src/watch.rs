@@ -44,7 +44,7 @@ pub const DEBOUNCE: Duration = Duration::from_millis(100);
 ///
 /// Twenty compiles of each document through the pane's own path — in process,
 /// release build, no spawn — on this machine on 2026-08-10, through the call
-/// `mpdf-008` has since split into [`crate::document::render_project`]:
+/// `mpdf-008` has since split into `letur_project::document::render_project`:
 ///
 /// | document                     | first compile of the process | median of the twenty |
 /// |------------------------------|------------------------------|----------------------|

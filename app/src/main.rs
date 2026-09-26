@@ -19,7 +19,7 @@ use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
-use preview::{Appearance, Compile, Session, Status};
+use preview::{Appearance, Compile, OnDisk, Session, Status};
 
 /// The label of the one window, which `tauri.conf.json` names too.
 const MAIN: &str = "main";
@@ -294,7 +294,7 @@ async fn open_document(
     let opened = {
         let mut session = session.lock().expect("the session lock was poisoned");
         session.open(document)?;
-        session.preview().document().map(document::title)
+        session.preview().document().map(|path| document::title(&path))
     };
 
     if let Some(name) = opened {
@@ -316,7 +316,7 @@ async fn set_main(
     let opened = {
         let mut session = session.lock().expect("the session lock was poisoned");
         session.set_main(path)?;
-        session.preview().document().map(document::title)
+        session.preview().document().map(|path| document::title(&path))
     };
 
     if let Some(name) = opened {
@@ -334,7 +334,7 @@ async fn set_main(
 /// **A refusal does not come back through this `Err`.** A path outside the
 /// project does; a pane holding unsaved edits does not, because that is a
 /// status the page places in the divergence bar rather than an error — see
-/// `preview::Session::refused_while_dirty`.
+/// `letur_project::preview::Preview::refused_while_dirty`.
 #[tauri::command]
 async fn set_edited(
     window: tauri::Window,
@@ -344,7 +344,7 @@ async fn set_edited(
     let opened = {
         let mut session = session.lock().expect("the session lock was poisoned");
         session.set_edited(path)?;
-        session.preview().document().map(document::title)
+        session.preview().document().map(|path| document::title(&path))
     };
 
     if let Some(name) = opened {
@@ -595,7 +595,7 @@ async fn save_as(
     let (receipt, opened) = {
         let mut session = session.lock().expect("the session lock was poisoned");
         let receipt = session.save_as(path)?;
-        (receipt, session.preview().document().map(document::title))
+        (receipt, session.preview().document().map(|path| document::title(&path)))
     };
 
     if let Some(name) = opened {
@@ -703,7 +703,7 @@ fn export_path(session: tauri::State<'_, Mutex<Session>>) -> Result<String, Stri
         .lock()
         .expect("the session lock was poisoned")
         .preview()
-        .export_path()
+        .export_file()
         .map(|path| path.to_string_lossy().into_owned())
 }
 
