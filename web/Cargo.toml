@@ -30,7 +30,7 @@ crate-type = ["cdylib"]
 # dependency `app/Cargo.toml` takes, spelled the same way, and a git revision in
 # both until that phase. A registry dependency builds for `wasm32` exactly as
 # the git one did, and as the path one before it did.
-md2pdf-core = "0.3"
+md2pdf-core = "0.4"
 wasm-bindgen = "0.2.104"
 console_error_panic_hook = "0.1.7"
 

@@ -51,7 +51,11 @@ tauri-build = { version = "2.6.3", features = [] }
 # one.** `"0.1"` stopped at 0.1.3; 0.2.0 added the diagram fence and 0.3.0 the
 # URL image, each with an `Error` variant, and this line took both at once —
 # 0.3.0's showcase PDF and Typst source are byte-identical to 0.1.3's, so the
-# condition above is still unspent. **The diagram renderer has a cost, and it
+# condition above is still unspent. 0.4.0 took task lists into the dialect and
+# made an article one column unless it says `columns: 2`, with no new variant —
+# its two new refusals are `Error::UnsupportedConstruct`'s. The showcase says
+# `columns: 1` itself, and its PDF is still byte-identical to 0.1.3's: 138,441
+# bytes under both, measured 2026-09-25 by `mpdf-006` Phase 5. **The diagram renderer has a cost, and it
 # is stated**: `merman` declares Rust 1.95 as its floor, and it links three
 # MPL-2.0 crates into this binary (`cssparser`, `dtoa-short`, `selectors`) beside
 # the one Tauri already brought, `option-ext`. The README's licence section says
@@ -63,7 +67,7 @@ tauri-build = { version = "2.6.3", features = [] }
 # wait for. **Spelled without the `=` on purpose** — Phase 3's gate 3 greps
 # these two manifests for that literal and requires nothing back, and a comment
 # is not worth blunting the check that proves the dependency left.
-md2pdf-core = "0.3"
+md2pdf-core = "0.4"
 notify = "8.2.0"
 objc2-foundation = { version = "0.3.2", features = [
   "NSError",

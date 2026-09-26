@@ -632,7 +632,7 @@ fn every_generated_block_is_the_parsers_own_html() {
             stored_html(example.name),
             generated(example.content, &image),
             "the '{}' row's other column is not what the parser writes for its source \u{2014} \
-             regenerate with `cargo test -p md2pdf-core --test page_examples_test -- \
+             regenerate with `cargo test -p letur --test page_examples_test -- \
              --ignored bless`",
             example.name
         );
@@ -701,7 +701,7 @@ fn no_generated_block_carries_a_marker_of_its_own() {
 /// file is what triggers.
 ///
 /// ```console
-/// $ cargo test -p md2pdf-core --test page_examples_test -- --ignored bless
+/// $ cargo test -p letur --test page_examples_test -- --ignored bless
 /// $ cargo test --workspace
 /// ```
 #[test]

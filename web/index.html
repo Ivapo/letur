@@ -67,7 +67,7 @@
     A `script` element is `display: none` in every UA stylesheet, and the left
     half of every row below is one. This override is what renders it, so the
     source a reader reads, the source the page will load and the source
-    `core/tests/page_examples_test.rs` compiles are one copy of one thing. A
+    `app/tests/page_examples_test.rs` compiles are one copy of one thing. A
     visible duplicate beside it would be two copies that can differ, which is
     the whole failure this page is built to avoid.
   */
@@ -80,7 +80,7 @@
   /*
     The other column. Its markup is not written here — it is
     `md2pdf_core::md_to_html` over the row's own source, generated into this file
-    and compared against it by `core/tests/page_examples_test.rs`. So a real
+    and compared against it by `app/tests/page_examples_test.rs`. So a real
     table, a real checkbox, a heading and the page's own diagram all land inside
     this box, and it carries its own type scale rather than inheriting the list's.
   */
@@ -179,7 +179,7 @@ ways out. And <b>load it</b> puts the source in the box at the foot of the page 
 compiles it here, the three refusals included.</p>
 
 <!--
-  Every `data-example` element below is compiled by `core/tests/page_examples_test.rs`,
+  Every `data-example` element below is compiled by `app/tests/page_examples_test.rs`,
   which reads this file and holds the page to the compiler. Its content is load-bearing
   bytes: flush left, no leading or trailing newline, and no line starting with a space or
   a tab. An indented example is a different document — and one that still compiles, so
@@ -193,7 +193,7 @@ compiles it here, the three refusals included.</p>
   end, and one of the twelve ends without a trailing newline. To change one, change the
   source above it and run:
 
-      cargo test -p md2pdf-core --test page_examples_test -- --ignored bless
+      cargo test -p letur --test page_examples_test -- --ignored bless
 -->
 
 <div class="group">
@@ -287,7 +287,7 @@ and the listings above do not touch.</p>
   them would be a 404 on the published page while a locally served directory showed the
   row above working. The attribute's value IS the path the compiler is handed, and the
   row names the same one — a mismatch comes back `no image file supplied for …` and fails
-  `core/tests/page_examples_test.rs`. No leading and no trailing newline, so the page and
+  `app/tests/page_examples_test.rs`. No leading and no trailing newline, so the page and
   that test read the same bytes; the indentation inside is free, these bytes reaching
   Typst's image loader rather than a markdown parser whose parse depends on them.
 
@@ -502,7 +502,7 @@ the document under the label the look draws.</p>
   The second file this page can read, carried inline exactly as the image above is. One
   attribute names both — `data-asset`'s value IS the path `md2pdf_core::Asset` is given,
   which is as true of a `.yml` as of an `.svg` — and the `type` is what tells them apart,
-  for the page's module and for `core/tests/page_examples_test.rs` alike. No leading and
+  for the page's module and for `app/tests/page_examples_test.rs` alike. No leading and
   no trailing newline, so the page and that test read the same bytes.
 
   **Unlike the SVG above, the indentation inside here is load-bearing.** Those bytes reach
@@ -546,27 +546,28 @@ is how a converter starts lying.</p>
 
 <div class="row">
 <div class="head">
-<h3>A task list</h3>
+<h3>A task marker in a numbered list</h3>
 <button type="button" class="load" disabled>load it ▸</button>
 </div>
-<p class="says">Not refused forever — refused until there is a decision about what a
-checkbox looks like in print. Support arrives construct by construct.</p>
+<p class="says">A bullet list of <code>- [ ]</code> items compiles, the box drawn where the
+bullet was. In a numbered list the number and the box would both claim that place, so the
+compiler names the line rather than choosing one.</p>
 <div class="cols">
   <div class="col"><span class="cap">md2pdf</span>
-<script type="text/markdown" data-example="task-list" data-expect="error">- [ ] an unchecked task
-- [x] a checked task</script>
+<script type="text/markdown" data-example="ordered-task-list" data-expect="error">1. [ ] a numbered task
+2. [x] and a second</script>
   </div>
   <div class="col"><span class="cap">the same parse, as HTML</span>
-    <div class="rendered"><!--html:task-list--><ul>
+    <div class="rendered"><!--html:ordered-task-list--><ol>
 <li><input disabled="" type="checkbox"/>
-an unchecked task</li>
+a numbered task</li>
 <li><input disabled="" type="checkbox" checked=""/>
-a checked task</li>
-</ul>
-<!--/html:task-list--></div>
+and a second</li>
+</ol>
+<!--/html:ordered-task-list--></div>
   </div>
 </div>
-<p class="does"><code data-error-for="task-list">unsupported markdown construct 'task list marker' at line 1</code></p>
+<p class="does"><code data-error-for="ordered-task-list">unsupported markdown construct 'task list marker in an ordered list' at line 1</code></p>
 </div>
 
 <div class="row">
