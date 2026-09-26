@@ -2,131 +2,46 @@
 title: web-demo
 sources:
   - web/index.html
-  - web/src/lib.rs
   - app/tests/page_examples_test.rs
-  - .github/workflows/pages.yml
 covers: >
-  the published browser demo: the one page and what it costs, the two exports
-  that cross into WebAssembly, the list of what the dialect adds and the marked
-  examples that carry it, the byte rule those examples obey and the test that
-  enforces it, the CSS that renders a script element, the other column generated
-  from the same parse and the markers and substitution that carry it, the button
-  every row carries and the readiness it holds, the status line the compile owns, the
-  height model and the panes beneath the list, the two files the page carries
-  down one attribute and the limit that remains, the engines the page has been
-  run in, and the build and deploy that publish it
-max_lines: 265
-generated: 2026-08-23
+  the landing page: the one page and the module it no longer loads, the list of
+  what the dialect adds and the marked examples that carry it, the byte rule
+  those examples obey and the test that enforces it, the CSS that renders a
+  script element, the other column generated from the same parse and the
+  markers and substitution that carry it, the link every row carries into the
+  app, and the two files the page carries down one attribute and the fourth
+  reader of them
+max_lines: 200
+generated: 2026-09-26
 ---
 
 # Web demo
 
-Letur's page: `md2pdf-core` compiled to `wasm32-unknown-unknown` and called from one
-page, published to GitHub Pages at `https://ivapo.github.io/letur/`. A third front end
-beside the engine's CLI and this desktop app, sharing `md2pdf-core`'s API with them and
-nothing else. `mpdf-006` owns the directory; `mpdf-003` §1.1 named this a later spec
-rather than a phase of its own, and it is that spec.
+Letur's landing page, `web/index.html`, published at `https://ivapo.github.io/letur/`:
+the argument for the dialect, twelve examples long, each one a snippet the workspace
+suite compiles. `mpdf-006` owns the page; `ltr-001` Phase 2 took its panes away and put
+Letur itself one link further on, at `app/`, which `rules/web-app.md` covers.
 
 **It came here with `mpdf-011` Phase 1**, which split the engine off into
 `Ivapo/md2pdf`. Two things moved with it: the URL above, and the test compiling the
-page's claims, `app/tests/page_examples_test.rs`, which was `core/tests/`'s. What the
-page *says* did not move — rewriting it into Letur's landing site is a later spec. Every
+page's claims, `app/tests/page_examples_test.rs`, which was `core/tests/`'s. Every
 `core/…` citation below points into the engine's repository deliberately: that is where
 the code went, and a reader wants the pointer, not its absence.
 
-**The PDF a visitor sees is the PDF the CLI writes.** `web/src/lib.rs:render` calls
-`md2pdf_core::md_to_pdf` with both of the page's files in hand, and maps a failure through
-`JsError` over the error's own `Display` — the same sentence `cli/src/main.rs` prints after
-its `error: ` prefix, so a construct outside the dialect is refused in the words it is
-refused at the terminal.
-`web/src/lib.rs:anchors` is the second export, `mpdf-003` Phase 6's `line:page` pairs
-answered in a browser; **the page no longer calls it**, and it stays because it is that
-phase's export rather than this page's.
+## The page, and the module it no longer loads
 
-**Both take the two files as four scalars**, `(path, bytes)` twice, over one private
-`web/src/lib.rs:assets` so the pair cannot disagree about which scalar is which path. Not
-an array: `web/Cargo.toml` carries `wasm-bindgen` and `console_error_panic_hook` and
-nothing else, so a `Vec<Vec<u8>>` across that boundary is a new dependency on a page whose
-whole cost is its module — and the set is closed at two, `mpdf-006` §1.2 parking a
-reader's own files permanently. `anchors` passed `&[]` until `mpdf-007` Phase 4, which
-meant it could answer for neither of the page's own rows.
-`web/src/lib.rs:start` routes a panic to the console.
+**One page of text, and it loads no module** (`ltr-001` §2). It was one page doing two
+jobs until that phase: the argument, and a textarea and a PDF pane beneath it, which
+needed the module and made **9,900,913 bytes** of brotli'd wasm the price of reading about
+the dialect. The HTML column was already inlined as bytes (`mpdf-006` Phase 4), so every
+row rendered without the module; the module was on the page only to serve the panes, and
+with the panes gone it is not requested at all — `web/check.mjs` clause (a) holds that.
 
-## The page
-
-One page, not a landing page plus a player. The text is first in the document and renders
-without the module; `<script type="module">` is async by definition, so the module lands
-while the reader reads. Two URLs would turn the click that settles the argument into a
-navigation that re-pays the download.
-
-**The module is the whole cost and it is large.** Measured 2026-08-15: 25.7 MB raw, 7.8 MB
-brotli, of which `core/assets/fonts` is 2.5 MB; nothing in the design is keyed to either
-figure. `web/Cargo.toml`'s release profile is tuned for size over speed — `opt-level = "s"`,
-`lto`, one codegen unit, `panic = "abort"`.
-
-`web/pkg/md2pdf_web_spike_bg.wasm` is **33,165,169 bytes** at `md2pdf-core` 0.4.0 and
-**9,900,913** under `brotli -q 11`, measured 2026-09-25 against 0.3.0 rebuilt that day, which
-reproduced its own record exactly: **+4,731 raw, −5,472 over the wire**. 0.4.0 brought task
-lists. 0.3.0's record was taken 2026-09-21 against **25,415,506** and **7,912,959** at 0.1.3,
-on the same day, toolchain and profile: **+7,744,932 raw, +1,993,426 over the wire**, all
-of it the engine's — the diagram renderer from 0.2.0 (`merman`, `lol_html`, `cssparser`,
-`selectors`) and 0.3.0's URL image, always refused in a browser. The record is the
-requirement, never a ceiling; 25,362,143 on 2026-08-23 was the one before those.
-
-The panes sit beneath the list, so the page scrolls and `main` takes a slice of the
-viewport — `clamp(360px, 70svh, 720px)`, in `svh` rather than `dvh` so browser chrome
-hiding mid-scroll does not resize the frame and lose the reader's place in the PDF. Below
-720px the two panes stack and take the viewport. One `<noscript>` paragraph says what
-needs scripting: every example is on the page either way, compiling one is not.
-
-## One click, one PDF
-
-**Every row carries a `load it` button, and the button is where readiness lives.** All
-twelve carry `disabled` in the markup — inert with scripting off rather than promising a
-compile the page cannot run — and `await mod.default()` resolving enables them. Nothing
-else reports readiness. The button carries no `data-example` attribute of its own:
-`app/tests/page_examples_test.rs` asserts the page holds exactly twelve of those.
-
-A click reads its own row's element — `button.closest('.row')`, then
-`querySelector('script[data-example]')` — writes that source into the textarea and calls
-`compile` itself, because **writing `value` fires no `input` event** and the typing path's
-300 ms debounce would never run. Then it scrolls to the panes, which sit below the rows.
-
-**A click empties the pane before it compiles; typing does not**, and the two acts get
-different answers deliberately. An author mid-edit passes through broken states constantly
-and keeps the last good page — `mpdf-003`'s behaviour, living in `compile`'s catch branch.
-A reader who clicks a row captioned *what it refuses, on purpose* has asked to be shown a
-refusal, and the previous row's PDF would be the page asserting something false about its
-own output. So the **button** owns the clearing, not `compile`: the iframe is hidden and
-its blob revoked, and a refusal reached that way leaves it that way.
-
-**The status line is the compile's alone.** `#status` sits inside `main` above both panes,
-carrying the sentence a refusal names and nothing when the compile succeeded;
-`#status:empty { display: none }`, so a page that compiles shows no strip. The spike's
-instrument panel is gone, elapsed time and anchor list with it — but the wire measurement,
-read from `performance.getEntriesByType` rather than asserted, **moved to `console.log`**:
-it answers one of the three questions the spike exists to ask, and the person asking that
-question opens a console where a reader does not.
-
-**Run in two engines on 2026-08-22**, headless over `http://127.0.0.1`: **Chromium
-151.0.7922.34 and WebKit 26.5**, identical results — every button inert before the module
-resolved and live after, each accepted row drawing a PDF, each refusal emptying the pane
-and printing its exact sentence, and a typed refusal keeping the last good page. The asset
-channel was checked the same day in **Chromium alone**, a byte array crossing an existing
-`wasm-bindgen` boundary being nothing two engines can disagree about; the image row's PDF
-came back byte-identical to the one the CLI writes for the same source and file. **The page
-states no browser support and carries no row for it** (`mpdf-006` OQ-5, resolved
-2026-08-22): a browser that cannot run the module already says so itself, the module
-script's `catch` writing `failed to start: …` into `#status`.
-
-**The second file was checked the same way on 2026-08-23**, Chromium 151 alone on that
-same argument: all twelve buttons live, the citation row's PDF **byte-identical** to the
-CLI's for the source and the bibliography extracted from the page itself
-(`0bfa9cb3…`, 18,419 bytes, a `[1]` in the body over a *References* list), the image row
-unchanged and a refusal still printing its exact sentence. **The typed path was checked
-separately**, on a document naming *both* files at once — that is the hazard the single
-call site exists against, and a channel open to the button alone would pass every other
-check here.
+**Every row carries a link into the app**: `<a class="open" href="app/#example=NAME">`,
+where `NAME` is the row's own `data-example` value. It carries no `data-example`
+attribute of its own, so `app/tests/page_examples_test.rs`'s count of twelve still holds.
+The link is a navigation and works with scripting off; the header, the lede and every
+sentence that promised a compile in this page say so rather than that.
 
 ## What the page claims, and the test that holds it to the compiler
 
@@ -140,7 +55,7 @@ page is a chosen few and links out to the README for the rest. The middle refusa
 task list until `md2pdf-core` 0.4.0 accepted one (`mpdf-006` Phase 5).
 
 **The page's own lede is five behind that**, and the gap is logged rather than half-fixed
-here: `web/index.html:172`'s `<p class="lede">` reads "Twenty-three constructs are supported
+here: the page's `<p class="lede">` reads "Twenty-three constructs are supported
 and twelve are shown here", which was one behind before `mpdf-005` Phase 10, two behind
 after it, three behind after that spec's Phase 11, four at 0.3.0 — which this rule missed,
 still saying twenty-six — and five once 0.4.0 took task lists. Correcting the number alone would
@@ -151,10 +66,11 @@ so the count, an `::: abstract` row and a `::: keywords` row all belong to a pha
 itself the finding**: a logged gap that keeps growing is a phase of this spec waiting to be
 drafted rather than a note to re-write a third time.
 
-**Each example is one element, and three consumers read it.** A
+**Each example is one element, and four consumers read it.** A
 `<script type="text/markdown" data-example="…" data-expect="ok|error">` holds the source;
-the reader sees it, the row's button loads it, and `app/tests/page_examples_test.rs` reads
-it through `include_str!`. A `<script>` holds raw text, so markdown inside one needs no
+the reader sees it, `app/tests/page_examples_test.rs` reads it through `include_str!`, the
+generated column is made from it, and the app's seed (`web/host/host.mjs`) fetches this
+page and opens it as `document.md`. **The page stays the one copy of every example.** A `<script>` holds raw text, so markdown inside one needs no
 escaping and a block of a non-JavaScript type is never executed.
 
 **The content is load-bearing bytes: flush left, no leading and no trailing newline.** Not
@@ -167,8 +83,8 @@ normalising differently.
 
 `app/tests/page_examples_test.rs` asserts that rule, a count of exactly twelve, a mark of
 `ok` or `error` on each, unique names, two asset elements, and message elements matching the
-refusals; then that each `ok` example compiles — **each handed the page's image**, as the
-page hands it to every compile — and that each `error` example's `to_string()` equals its
+refusals; then that each `ok` example compiles — **each handed the page's two files**, as the
+app opens them beside every example — and that each `error` example's `to_string()` equals its
 row's visible `<code data-error-for="…">` text, character for character. **The checked
 sentence is the one the reader sees** — an attribute copy would prove agreement with a
 string nobody reads. The `<code>` scan is weaker than the `<script>` scan, parsed markup
@@ -242,42 +158,21 @@ suite.
 **The `type` is the discriminator, and it was already one.** The image is a
 `<script type="image/svg+xml" data-asset="…">` and the bibliography a
 `<script type="application/yaml" data-asset="…">` — non-JavaScript types, so neither is
-executed and neither needs escaping. The page's module selects on the pair and
-`app/tests/page_examples_test.rs` scans for it, so neither depends on document order, and
-it is what keeps the `data:` URI substitution keyed to the image alone. Both obey the
+executed and neither needs escaping. `app/tests/page_examples_test.rs` scans for
+the pair and the app's seed takes every `data-asset` element under its own name, so
+neither depends on document order, and the type is what keeps the `data:` URI
+substitution keyed to the image alone. Both obey the
 examples' byte rule at the ends — no leading and no trailing newline — but only the
 bibliography's *inner* indentation is load-bearing: the SVG's bytes reach Typst's image
 loader, which does not read them as structure, where a YAML reader does.
 
-`render` hands **both** to **every** compile, typed and clicked alike: `md_to_pdf` ignores
-an asset the document never names, and a channel open to the button alone would draw
-Figure 1 on a click and refuse it on the next keystroke.
+**The app opens both beside every example**, under their `data-asset` names, whatever the
+example names: `md_to_pdf` ignores an asset the document never names, and a project that
+carried them for some rows only would draw Figure 1 in one example and refuse it in the
+next. The bytes are the elements' text, encoded — the bytes the test compiles.
 
-**A reader's own files stay parked.** A browser has no filesystem, so
-`core/src/lib.rs:image_paths`' shopping list and `core/src/lib.rs:bibliography_path`'s
-second half both have nowhere to be read from — an `![…](their-file.svg)` comes back
-`Error::MissingImage` from `core/src/lib.rs:collect` and a `bibliography:` of their own
-comes back `Error::MissingBibliography` from the same place. A line above the textarea
-names the two readable files and that first sentence, so a visitor meets it before the
-compiler says it. The page is not an editor and never gains accounts, persistence or a
-share link: `mpdf-001` §1.1 refuses servers permanently, and Pages serves static files.
-
-## The build and the deploy
-
-`.github/workflows/pages.yml` builds `web/` alone with `wasm-pack build --target web
---release`, on a push to `main` touching `web/**` or the workflow. **`core/**` left that
-trigger with `mpdf-011` Phase 1**: the engine is a dependency of `web/Cargo.toml` rather
-than a directory beside it, so there is no `core/` here to watch and a new version of it
-reaches the page through a commit to that manifest or its lockfile, both of which `web/**`
-covers. It was a git revision until `mpdf-011` Phase 3 and is `md2pdf-core = "0.4"` off
-the registry since. It assembles
-`_site` from **`web/index.html` and `web/pkg/` only**, so anything the page needs must be
-inline in that file or added to that step — which is why both of the page's files are. `wasm-pack`'s
-own `.gitignore` inside `pkg/` is deleted before upload, or the artifact would skip the
-module.
-
-**The module is never committed** — ten times the size of this repository, and git history
-is permanent, so it is built in the job and handed straight to the Pages artifact. The
-workspace is untouched and `web/` is not one of its members, so nothing here changes what a
-phase's exit gate runs; nor does anything here run it. `cargo test --workspace` is a local
-check before a push, not the publish path.
+**What the page reads is still these two files and none of the reader's.** Their own
+markdown reaches the compiler through the app's Open…; their images and bibliographies do
+not until `ltr-001` Phase 3's import — an `![…](their-file.svg)` comes back
+`Error::MissingImage` from `core/src/lib.rs:collect`. The page is not an editor: the app
+is, and `mpdf-001` §1.1 still refuses servers permanently.

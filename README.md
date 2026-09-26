@@ -14,6 +14,26 @@ button that says so.
 
 **What the markdown may contain** is the engine's to say, and its README says it.
 
+## In a browser
+
+Letur also runs in a tab, with nothing to install:
+
+- **<https://ivapo.github.io/letur/>** — what the dialect adds to markdown, twelve
+  examples long, each beside the same parse set down as HTML. The page loads no module.
+- **<https://ivapo.github.io/letur/app/>** — Letur's own window: the file panel, the text
+  pane and the drawn pages, redrawn as you type. Every example on the page above has an
+  **open in Letur** link that opens it here as `document.md`, beside the page's
+  `pipeline.svg` and `refs.yml`.
+
+It is the same window as the desktop app, and the same rules decide what it shows, but
+the files are different. A project lives in the tab, and it is gone when the tab closes.
+**Save** keeps your edits for as long as the tab is open. **Save as…** (⇧⌘S) downloads
+the text. ⇧⌘E downloads the PDF. **Open…** (⌘O) reads one markdown file of your own; your
+images and bibliographies cannot reach it yet. Deleting a file in the panel is permanent,
+whatever the button says. Images named by a URL are not fetched in a browser. The
+compiler is `md2pdf-core` compiled to WebAssembly, and it runs in your browser: no server
+sees your text.
+
 ## Install
 
 ```console
@@ -244,6 +264,21 @@ $ bun harness/checks.mjs
 `app/harness/serve.mjs` serves a copy of the front end with a stub in its head, so the
 real page can be driven outside a window; `bun harness/checks.mjs --falsify` breaks the
 page twenty-four ways and checks that each break fails the one clause that owns it.
+
+**The web app's check needs the pinned CLI.** `web/check.mjs` compares the PDFs the tab
+draws with what `md2pdf` writes, byte for byte, so it refuses to run unless `md2pdf`
+is the version of `md2pdf-core` that `web/Cargo.lock` resolves. It builds the site
+itself, but not the module:
+
+```console
+$ cargo install --locked md2pdf-cli --version 0.4.0
+$ cd web && bun install && wasm-pack build --target web --release && cd ..
+$ bun web/check.mjs            # Chromium
+$ bun web/check.mjs --webkit   # WebKit
+```
+
+`bash web/assemble.sh` builds the published site into `_site/` on its own, if you want
+to serve it by hand.
 
 ## Licence
 

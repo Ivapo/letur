@@ -17,8 +17,8 @@ phases:
   - name: "Phase 2 — every example is one click from a PDF"
     reviewed: 2026-08-21
     shipped: 2026-08-22
-    cut: null
-    by: null
+    cut: 2026-09-26
+    by: ltr-001
   - name: "Phase 3 — a page-owned image, so the figure examples show one"
     reviewed: 2026-08-22
     shipped: 2026-08-22
@@ -79,7 +79,7 @@ to prefer it to any other thing that makes PDFs.
 
 **The observable is unchanged — the typeset PDF that Typst compiles from the user's
 markdown — and this spec builds no new one.** What it builds is the first place a reader
-meets that observable without installing anything: `web/src/lib.rs:render` already calls
+meets that observable without installing anything: `render` already calls
 `core/src/lib.rs:md_to_pdf`, so the PDF a visitor sees here is the PDF the CLI writes,
 from the same crate, byte for byte. §4 holds each phase to that claim rather than to a
 page that merely describes it.
@@ -176,10 +176,24 @@ and the prose is the easy half.
 - **No editor.** The textarea stays a textarea. Syntax highlighting, a file tree, a
   share link and anything that would make this a hosted editor are out; `mpdf-003` is
   where authoring lives.
+
+  > **CORRECTED 2026-09-26, by `ltr-001` Phase 2.** The textarea is gone, and the page
+  > has an editor one link away: `app/` is Letur's own window, `mpdf-003`'s front end
+  > unedited, answered in the tab by a host over a project in memory. What this bullet
+  > protected survives — *this* page is still not an editor, and still carries no share
+  > link or account — but authoring now lives in a browser as well as on the desktop,
+  > and `ltr-001` is where it does.
 - **The user's own image files stay parked.** Phase 3 bundles *one page-owned* image so
   the figure examples can show the flagship case. A browser has no filesystem, and the
   file story `mpdf-001` §1.1 named — a user's own images reaching the compiler — is not
   opened here. §2 records the line between the two.
+
+  > **CORRECTED 2026-09-26, by `ltr-001` Phase 2 — narrowly.** A reader's own
+  > *markdown* now reaches the compiler: the app's Open… reads a `.md` of theirs into a
+  > project in the tab. Their images and bibliographies still do not, until `ltr-001`
+  > Phase 3's import; an `![…](their-figure.svg)` is still refused in
+  > `Error::MissingImage`'s words. The page-owned image and bibliography stay what this
+  > page carries, and the app opens them beside every example.
 - **The page is not the documentation.** The README stays the reference a reader is sent
   to; the page carries a chosen few of the dialect's constructs and links out. The count —
   **twenty-two supported constructs** — is `rules/pipeline.md`'s, which enumerates them.
@@ -221,6 +235,15 @@ compile succeeded — with readiness carried by the buttons instead, which is wh
 reader will look for it. *(Which phase owns that, and what becomes of the measurement it
 stops printing, is settled below under "A refusal clicked is not a refusal typed": it is
 Phase 2's, and Phase 1 left the line alone.)*
+
+> **CORRECTED 2026-09-26, by `ltr-001` Phase 2, which cut this spec's Phase 2.** The page
+> is two URLs now, and the argument above against them was right while the page needed
+> the module and no longer holds. Phase 4 inlined the HTML column as bytes, so every row
+> renders without the module; it was on the page only to serve the panes. With the panes
+> gone the landing page loads no module at all, and the download is the price of
+> choosing to write rather than of reading about the dialect. **The promise survives and
+> the mechanism does not**: every example is still one click from a PDF, and the click is
+> a link into `app/#example=NAME`. `ltr-001` §2 records the decision.
 
 ### What the page claims is what the compiler does, and one test holds them together (decision, recorded)
 
@@ -466,7 +489,7 @@ and a flat list would imply they are.
 3. **What it refuses, on purpose.** Raw HTML and a task list, named with their line by
    `core/src/emit.rs:describe`; a LaTeX command off the list, named by `Error::Math`. A
    showcase that hides its refusals is selling something, and the refusal *is* the
-   feature — `web/src/lib.rs:render` maps the error through the same `Display` the CLI
+   feature — `render` maps the error through the same `Display` the CLI
    prints, so the sentence in the page is the sentence at the terminal. This is the group
    the test in §2 checks hardest, because its rows assert an exact message.
 
@@ -526,7 +549,7 @@ acts apart in the code as well as in the argument.
 
 ### No image crosses the boundary yet, and what that costs the examples (decision, recorded)
 
-`web/src/lib.rs:render` calls `md_to_pdf(markdown, &[])` — **an empty asset slice**, so an
+`render` calls `md_to_pdf(markdown, &[])` — **an empty asset slice**, so an
 `![…](path)` in the textarea today reaches `core/src/lib.rs:collect` and comes back
 `Error::MissingImage`. That is the spike's stated limit, and it lands on this spec
 directly: **the flagship caption example in the README is an image, and the demo cannot
@@ -573,7 +596,7 @@ Three properties follow, and each is the reason for the choice rather than a con
   the test are the same bytes; internal indentation is unconstrained, because these bytes
   reach Typst's image loader rather than a markdown parser whose parse depends on them.
 
-**`web/src/lib.rs:render` takes the asset, rather than a second export landing beside it.**
+**`render` takes the asset, rather than a second export landing beside it.**
 The phase said "a new entry point beside `render`", written before anyone asked which
 caller would use it — and the page has one compile path reached from two places, the typing
 debounce and Phase 2's buttons. A second export wired into the button alone would draw
@@ -703,7 +726,7 @@ refuses. Phase 2 is what makes the page produce the observable, and it is one ph
 ### Phase 2 — every example is one click from a PDF
 
 *Produces the observable: **yes**.* A click sets the example into the textarea and the
-existing pipeline compiles it to a PDF in the pane — `web/src/lib.rs:render` over
+existing pipeline compiles it to a PDF in the pane — `render` over
 `core/src/lib.rs:md_to_pdf`, the same bytes the CLI writes.
 
 - **Scope:** `web/index.html` only, and no Rust. Ten rows, so ten buttons. Each reads its
@@ -727,7 +750,7 @@ existing pipeline compiles it to a PDF in the pane — `web/src/lib.rs:render` o
     the row's heading line, and `.row > h3` has no slot for one today.
   - Two consequences of the status line's new job, both the implementer's to settle and
     neither needing Rust: an empty `#status` still paints its padding and its bottom rule,
-    and the page stops calling `web/src/lib.rs:anchors` — which is `mpdf-003` Phase 6's
+    and the page stops calling `anchors` — which is `mpdf-003` Phase 6's
     export answered in a browser, so **the export stays** whatever the page does with it.
 - **Exit gate:** `cargo test --workspace` still passes — including
   `core/tests/page_examples_test.rs`, which the button markup can break and which is the
@@ -760,7 +783,7 @@ flagship — reaches the pane for the first time. **This phase is cuttable** (OQ
 in Phases 1 or 2 depends on it.
 
 - **Scope:** three files, and §2's block above settles how they fit together.
-  `web/src/lib.rs:render` gains the page's one asset and calls `md_to_pdf` with a
+  `render` gains the page's one asset and calls `md_to_pdf` with a
   one-element slice instead of `&[]` — **`core/src` is untouched**, since `md_to_pdf`
   already takes assets. `web/index.html` carries the `data-asset` element, one new row
   using it, and a sentence beside the textarea naming **the one file the page can read**,

@@ -17,7 +17,7 @@ phases:
     by: null
   - name: "Phase 2 — two URLs, and the app is Letur's own window over a project in memory"
     reviewed: 2026-09-26
-    shipped: null
+    shipped: 2026-09-26
     cut: null
     by: null
   - name: "Phase 3 — the project persists in the browser's own storage"
@@ -32,7 +32,9 @@ phases:
     by: null
 
 extends: null
-supersedes: null
+supersedes:
+  - id: mpdf-006
+    phases: ["Phase 2 — every example is one click from a PDF"]
 superseded_by: null
 related: [mpdf-003, mpdf-009, mpdf-010]
 reference: >
@@ -241,6 +243,18 @@ exactly that.
 | event `opened` | host | emitted when a `hashchange` puts a new seed in the slot `pending_open` reads |
 | events `open`, `save`, `save-as`, `view-files` | host | ⌘/Ctrl+O, ⌘/Ctrl+S, ⇧⌘/Ctrl+S, ⌘/Ctrl+B — the desktop menu's own accelerators; the window keeps "no `keydown` of its own", as its comment requires |
 | events `export`, `view-lines` | — | not bound: `export` has no desktop accelerator, and ⌘L is the browser's address bar. Both have buttons |
+
+> **CORRECTED 2026-09-26 (Phase 2's build):** only `view-lines` has a button. Export is a
+> desktop menu item with no accelerator, and the window draws no button for it —
+> `exportDocument` is reached only through the `export` event
+> (`app/dist/index.html`'s `listen('export', exportDocument)`). A tab has no menu, so
+> unbound it would have been unreachable, and gate (j) would have had nothing to press.
+> **The host binds ⇧⌘E (⇧Ctrl+E elsewhere) to `export`**, the one chord it carries that
+> the desktop menu does not; the window is unchanged. Two smaller facts the build added
+> beside the table: the session gained `unstage`, so a file from Open… is staged alone
+> as the `dialog.open` row says; and the host flushes a waiting compile before
+> `save_as`, `export_path` and `export` as well as before `save`, since each reads what
+> the pane holds.
 
 **The debounce is the host's**, and the session gains the command the desktop keeps
 implicit: `edit` stores the text and compiles nothing, as `project/src/preview.rs:Preview::edit`
@@ -612,7 +626,7 @@ is typed, in a tab.*
   says what `web/check.mjs` needs: the pinned `md2pdf` and `web/`'s `bun install`. The
   published URLs are opened once after the deploy and what they did is recorded in the
   review record; the gate is the local site. **`specs/web_demo_spec.md` cites
-  `web/src/lib.rs:render` six times and `web/src/lib.rs:anchors` once, and this phase
+  `render` six times and `anchors` once, and this phase
   deletes both**, so `spec-lint` would fail with `CIT_SYMBOL_ABSENT` — and Phase 1's
   path-only rewrite does not apply, since nothing moved. The close-out therefore drops
   **the path half and nothing else** from those seven backticked citations, leaving

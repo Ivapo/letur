@@ -429,7 +429,10 @@ method: it answers a root-relative spelling only when both
 opening on `is_file` and so having nothing to answer before the file exists, and
 `project/src/preview.rs:Preview::save_as` moves the pane only on that answer.
 `project/src/document.rs:creatable` is asked first, so a `.txt` is refused wherever
-it is aimed.
+it is aimed. **`project/src/preview.rs:Preview::download` is where the two hosts
+part**: the web session's Save-as is a download, never reaches `Files::save_as`, and
+takes `&self` — the buffer's bytes and `downloaded <name>`, with `saved`, `divergence`
+and `edited` left as a save outside the project leaves them (`rules/web-app.md`).
 
 **`app/src/document.rs:trash_file` is the first *destructive* one, and it moves
 to the Trash rather than unlinking.** There is no undo anywhere in this app —
