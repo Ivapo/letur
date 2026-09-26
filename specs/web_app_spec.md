@@ -7,7 +7,7 @@ note: >
   a browser host over a project held in the browser's own storage, or, in Chromium, a
   folder on the reader's disk.
 status: accepted
-last_updated: 2026-09-25
+last_updated: 2026-09-26
 
 phases:
   - name: "Phase 1 — the rules the window answers through leave the desktop crate"
@@ -16,7 +16,7 @@ phases:
     cut: null
     by: null
   - name: "Phase 2 — two URLs, and the app is Letur's own window over a project in memory"
-    reviewed: null
+    reviewed: 2026-09-26
     shipped: null
     cut: null
     by: null
@@ -124,8 +124,9 @@ edge against its inverse, so the edge cannot precede the cut. Phase 2's close-ou
 PDF"]}]` here and `cut` and `by: ltr-001` on that phase, and writes dated `CORRECTED`
 notes beside `mpdf-006`'s "One page" decision and its §1.2 "No editor" non-goal. The
 §1.2 persistence non-goal is corrected by Phase 3's close-out, the day persistence
-arrives, and the "user's own files stay parked" non-goal by Phase 2's, since a file
-input already brings one in.
+arrives, and the "user's own files stay parked" non-goal by Phase 2's — narrowly: the
+reader's own *markdown* reaches the compiler through the file input, and their images
+and bibliographies still do not until Phase 3's import, which the note says.
 
 ### 1.2 Non-goals
 
@@ -204,21 +205,39 @@ from the `defaultPath` the window passed; the command that receives it produces 
 bytes and the host downloads them. So the refusals stay Rust's and only the delivery is
 the browser's.
 
+**A download is a save outside the project, and it never reaches the crate's
+`save_as`.** `project/src/preview.rs:Preview::save_as` writes through `Files::save_as`,
+and `MemFiles` would take `download:notes.md` for a root-relative name, write a file of
+that name into the project and move the pane to it. So the session recognises the token
+before any crate call, and Phase 2 gives the crate one method for it,
+`Preview::download(name)`: the kind refused in `document::creatable`'s words, the
+buffer's bytes, and the receipt `downloaded <name>` — **and nothing moved**. `saved`,
+`divergence` and `edited` stay exactly as `Preview::save_as` leaves them for a save
+outside the project, and for its reason: marking the buffer saved would make
+`refused_while_dirty` answer *clean*, and the next row click would load the map's older
+copy over the author's text with no `SWITCHING` sentence. The receipt is the crate's, so
+§2's "every sentence the window shows" holds for it too.
+
+**Errors cross as plain strings.** Every session method that can refuse throws the
+sentence itself — a JS string, never an `Error` or a `JsError` — because the window's
+`fail` prints `String(problem)`, and the desktop's `Result<_, String>` reaches it as
+exactly that.
+
 | The window asks | Answered by | What it does in the browser |
 |---|---|---|
-| `open_document(path)` | session | opens the project at `/project` with `path` as the opened file; `discover_main` picks the main |
-| `pending_open` | host | the seed's path once, if a seed is waiting (below), then `null` — never `undefined` |
-| `document_text`, `edit`, `status`, `current_pdf`, `asset_bytes` | session | as desktop; `current_pdf` crosses as an `ArrayBuffer` |
-| `set_main`, `set_edited`, `discard`, `save` | session | as desktop, `SWITCHING` and `SAVED` included; Phase 2's `save` writes the buffer into the map |
+| `open_document(path)` | session | opens the files staged with `stage(path, bytes)` as a fresh `MemFiles` — `path` with its `/project/` prefix stripped, since `MemFiles` refuses an absolute name — `discover_main` picking the main, then `Preview::open` and `load` |
+| `pending_open` | host | the seed's path once, if a seed is waiting (below), then `null` — never `undefined`. It answers after the seed's fetch settles, never while it is in flight |
+| `document_text`, `edit`, `status`, `current_pdf`, `asset_bytes` | session | as desktop. Bytes cross from wasm to the worker to the host as a `Uint8Array`; the host answers the window's `invoke('current_pdf')` with its `ArrayBuffer`, which is what Tauri's `Response` hands the page. A stale `current_pdf` rejects with the crate's own error, as the desktop's does |
+| `set_main`, `set_edited`, `discard`, `save` | session | as desktop, `SWITCHING` and `SAVED` included; Phase 2's `save` writes the buffer into the map. `set_main` is `Preview::ask_main`, then — granted — the same files reopened with that main and loaded, which resets the counters as the desktop's reopen does and as `setMain`'s `clear()` expects |
 | `create_file`, `trash_file` | session | the map gains or loses the file; `TRASHING` as desktop; removal is permanent |
 | `save_as_path`, `export_path` | session | desktop's suggested name, and `exportable`'s refusals, unchanged |
-| `save_as(download:…)` | session, then host | the session returns the buffer's bytes and marks it saved; the host downloads them and answers the receipt `downloaded <name>`. The pane does not move — a download is not in the project |
+| `save_as(download:…)` | session, then host | `Preview::download(name)` above: the buffer's bytes and the receipt, nothing moved; the host downloads the bytes and answers the receipt. A `save_as` without the token rejects |
 | `export(download:…)` | session, then host | `exportable`'s bytes, downloaded |
-| `set_appearance` | host | stored in `localStorage`, handed to the session so `Status.appearance` carries it, then `rendered` |
+| `set_appearance` | host, then session | stored in `localStorage` under one global key, and handed to the session's `set_appearance`, which holds it and fills `Status.appearance` as the desktop's `Session::status` does; then `rendered`. At startup the host hands the stored value over before the first `status` |
 | `fetch_images` | host | rejects: `images by URL are not fetched in a browser` |
-| `dialog.open` | host | Phase 2: a file input taking one `.md`, read into a fresh memory project; Phase 3: the project sheet |
-| `dialog.save` | host | the download token above; `null` if the host's name prompt is cancelled |
-| event `rendered` | host | emitted after every compile lands, and after `create_file`, `trash_file`, `set_main`, `set_edited`, `discard`, `save`, `set_appearance` — the desktop's watch loop announced these, and there is no watch loop here |
+| `dialog.open` | host | Phase 2: a hidden `<input type="file" accept=".md">` the host owns; its one file is staged alone and answered as `/project/<name>`; cancel answers `null`. Phase 3: the project sheet |
+| `dialog.save` | host | `window.prompt`, seeded with the file name of the `defaultPath` the window passed; the download token above, or `null` when the prompt is cancelled |
+| event `rendered` | host | emitted after every `compile`, and after every session call except the reads — `document_text`, `status`, `current_pdf`, `asset_bytes`, `save_as_path`, `export_path` — so `open_document`, `set_main`, `set_edited`, `trash_file`, `discard`, `save`, `save_as`, `export`, `create_file` and `set_appearance` all announce. The desktop's watch loop announced some of these; there is no watch loop here |
 | event `opened` | host | emitted when a `hashchange` puts a new seed in the slot `pending_open` reads |
 | events `open`, `save`, `save-as`, `view-files` | host | ⌘/Ctrl+O, ⌘/Ctrl+S, ⇧⌘/Ctrl+S, ⌘/Ctrl+B — the desktop menu's own accelerators; the window keeps "no `keydown` of its own", as its comment requires |
 | events `export`, `view-lines` | — | not bound: `export` has no desktop accelerator, and ⌘L is the browser's address bar. Both have buttons |
@@ -227,8 +246,8 @@ the browser's.
 implicit: `edit` stores the text and compiles nothing, as `project/src/preview.rs:Preview::edit`
 does, and the host sends `compile` 300 ms after the last `edit` — or at once before
 `save`, since `saveDocument` sends `edit` and `save` back to back. **The window's title**,
-which the desktop sets from Rust, the host sets as `document.title` from the `main` and
-`edited` fields of each status.
+which the desktop sets from Rust, the host sets as `document.title` to the file name of
+each status's `edited` — the desktop's `app/src/document.rs:title` of the pane's file.
 
 **The seed** runs in `host.mjs` on the main thread — `DOMParser` exists nowhere else. On
 `#example=NAME` it fetches `new URL('../index.html', location)`, selects
@@ -236,7 +255,8 @@ which the desktop sets from Rust, the host sets as `document.title` from the `ma
 opens a project of `document.md` and the two files under their `data-asset` names,
 `pipeline.svg` and `refs.yml`. The seed's path waits for `pending_open`, which the window
 calls at startup (`takePendingOpen`). With no hash, the seed is the first `ok` example,
-`caption-table`. **The landing page stays the one copy of every example** — a fourth
+`caption-table`. **An unknown name seeds nothing**: `pending_open` answers `null` and
+the window starts empty with Open… offered, as a desktop launch does. **The landing page stays the one copy of every example** — a fourth
 consumer of the element, beside the reader, the test and the HTML column.
 
 ### The rules are Rust, shared, and compiled twice (decision, recorded)
@@ -273,6 +293,12 @@ stand in for one file. Phase 1 widens that seam to the whole state machine:
   project"); and from `app/src/document.rs`, the rule halves of `confined`, `create_file`
   and `asset_bytes` — what they refuse and in what words — over `Files`. From `app/src/remote.rs`, `Fetched`, `WebLine`, and `Web`'s
   state without `fetch` and `agent`.
+
+  > **CORRECTED 2026-09-26 (Phase 2's review, round 2):** the duration is not passed in.
+  > Phase 1 shipped `project/src/preview.rs:Timer`, a function the host hands to
+  > `Preview::new` that runs a compile and answers how long it took, because the
+  > compiles that run *inside* `load`, `set_edited` or `discard` cannot be handed a
+  > duration by anyone. The crate still reads no clock; the host's function does.
 - **What stays in `app`**: `Session`'s threads, the watch (`app/src/watch.rs` whole),
   the typing debounce, the claim channel, `Compile::run`'s clock, the disk `Files`
   implementation, the Trash, Application Support, `ureq`.
@@ -289,7 +315,10 @@ stand in for one file. Phase 1 widens that seam to the whole state machine:
 is the one above — **after Phase 1, every sentence the window shows and every counter it
 reads is produced by `letur-project`**, except the tail an I/O error's own `Display`
 contributes, which is the `Files` implementation's, and Phase 2's web session is `MemFiles`, a
-`Preview` and a clock.
+`Preview` and a clock. **Two literals are the host's on both hosts, and are recorded rather
+than moved**: `app/src/main.rs:save_as_path`'s "no document is open" and
+`app/src/main.rs:current_pdf`'s fallback "the page is out of date" for a stale page with no
+error, which the web session restates word for word.
 
 **One sentence differs, and it is priced rather than hidden.** `read_assets_with`'s
 "cannot read … for the image …" ends with the `io::Error`'s `Display` and the file's
@@ -320,8 +349,12 @@ the web host too**, and Phase 2's gate adds the check the typedef test cannot ma
 A compile is `md2pdf-core` calling Typst; on the main thread that is a frozen caret every
 300 ms of typing. So **the module and the session live in a dedicated worker**,
 `web/host/worker.mjs`; `host.mjs` is the `__TAURI__` surface, the debounce, the seed, the
-keyboard and the downloads, and proxies the rest. The worker times each compile with
-`performance.now()` and hands the duration to the session. It is also where Phase 3's
+keyboard and the downloads, and proxies the rest. **The session times its own
+compiles**: its `project/src/preview.rs:Timer` reads `performance.now()` through a
+`#[wasm_bindgen]` extern, handed in at `Preview::new`, so `Preview::compile` times itself
+exactly as the desktop's `Instant` timer does — including the compiles that run inside
+`open_document`, `set_edited` or `discard`, which a duration passed in by the host could
+never reach. The host's debounce calls `compile()`, which takes no argument. It is also where Phase 3's
 storage lives, because the origin-private file system's fastest write path,
 `createSyncAccessHandle`, exists only in a worker.
 
@@ -478,54 +511,114 @@ is typed, in a tab.*
 
 - **Scope:**
   1. **The web session.** `web/Cargo.toml` is renamed to `letur_web` (OQ-6) and depends
-     on `letur-project` by path and on `serde_json`. `web/src/lib.rs` becomes a
+     on `letur-project` by path and on `serde_json`; its header comments that argue for
+     the old name and for "wasm-bindgen alone" are corrected. `web/src/lib.rs` becomes a
      `#[wasm_bindgen]` `Session` over `MemFiles` and `Preview`, with one method per
-     session row of §2's table plus `compile(elapsed_ms)`, structured answers as JSON
-     strings and bytes as `Uint8Array`. `render` and `anchors` go, with `mpdf-006`'s
-     panes.
+     session row of §2's table, plus `stage(path, bytes)` (a file into the next open),
+     `set_appearance(value)` and `compile()`; structured answers as JSON strings, bytes
+     as `Uint8Array`, refusals thrown as plain strings. `render` and `anchors` go, with
+     `mpdf-006`'s panes. **`letur-project` gains `Preview::download`**, §2's download
+     rule, with a `MemFiles` test that it leaves `saved`, `divergence` and `edited`
+     alone. **`web/Cargo.lock` is seeded from the published `md2pdf-cli` <V>'s
+     `Cargo.lock`** before the new dependencies resolve, so every package the two
+     lockfiles share is at the CLI's version — gate 2 is why.
   2. **The host.** `web/host/host.mjs` and `web/host/worker.mjs`, answering every row of
      §2's table: the proxy, the debounce, the `rendered` and `opened` events, the
-     keyboard, the downloads and their receipts, the title, the seed.
-  3. **The landing page.** `web/index.html` loses its panes, textarea, `#status` and
-     module; each row's button becomes the link §2 names. `app/tests/page_examples_test.rs`
-     is **unchanged** — it asserts nothing about the buttons, and an `<a href>` carries
-     no `data-example="`, so its twelve-element count still holds.
-  4. **The site.** `web/assemble.sh` builds `_site/` — `index.html`; `app/index.html` (a
-     copy of `app/dist/index.html` with `<script type="module" src="host/host.mjs">`
-     inserted as the first child of `<head>`), `app/pdfjs/`, `app/host/`, `app/pkg/` —
-     and `.github/workflows/pages.yml` calls it, with `app/dist/**` and `project/**`
-     added to its trigger paths and its header comments ("This builds `web/` alone", "The
-     workspace … is not touched") corrected, since `web/` now takes `project/` by path.
+     keyboard (a host `keydown` taking `metaKey` on macOS and `ctrlKey` elsewhere), the
+     downloads, the file input, the title, the seed. `web/package.json` pins
+     `playwright` at `app/package.json`'s version for `web/check.mjs`, and
+     `web/node_modules/` and `_site/` are gitignored.
+  3. **The landing page.** `web/index.html` loses its panes and their CSS (the
+     `clamp(360px, 70svh, 720px)` height model), the textarea, `#status`, the module,
+     the `.filenote` sentence, and the sentences the split makes false — the header's
+     "Everything below compiles in this page", the `<noscript>` paragraph and the lede's
+     "load it puts the source in the box"; each row's button becomes the link §2 names.
+     `app/tests/page_examples_test.rs`'s **assertions are unchanged** — it asserts nothing
+     about the buttons, and an `<a href>` carries no `data-example="`, so its
+     twelve-element count still holds — and only its doc comments naming the page's
+     module are corrected.
+  4. **The site.** `web/assemble.sh` builds `_site/` at the repository root —
+     `index.html`; `app/index.html` (a copy of `app/dist/index.html` with
+     `<script type="module" src="host/host.mjs">` inserted immediately before `</head>`,
+     where `app/harness/serve.mjs` injects its stub), `app/pdfjs/`, `app/host/`,
+     `app/pkg/` — and `.github/workflows/pages.yml` calls it, with `app/dist/**` and
+     `project/**` added to its trigger paths and every comment that calls it the spike's
+     build or says it builds `web/` alone ("This builds `web/` alone", "The workspace … is
+     not touched", "Builds the wasm spike", "The spike is the only thing this publishes")
+     corrected, since `web/` now takes `project/` by path.
 - **Exit gate:**
   1. `cargo test --workspace` passes; `app/tests/page_examples_test.rs` passes unchanged.
-  2. **The reference compiler is pinned**: `cargo install --locked md2pdf-cli --version
-     <V>`, where `<V>` is the `md2pdf-core` version `web/Cargo.lock` resolves (0.4.0
-     today), and the driver refuses to compare unless `md2pdf --version` reports `<V>`.
-     The machine this spec was reviewed on carries 0.1.3, which refuses a task list.
+  2. **The reference compiler is pinned, and so is the graph it was built from**:
+     `cargo install --locked md2pdf-cli --version <V>`, where `<V>` is the `md2pdf-core`
+     version `web/Cargo.lock` resolves (0.4.0 today), and `web/check.mjs` refuses to
+     compare unless `md2pdf --version` reports `<V>` **and** every package that
+     `web/Cargo.lock` and the CLI's published `Cargo.lock` (in `$CARGO_HOME/registry/src/
+     */md2pdf-cli-<V>/`) both name resolves in `web/Cargo.lock` to a version the CLI's also
+     holds; the CLI's lockfile is the first match of that glob, `$CARGO_HOME` defaulting to
+     `~/.cargo`. The core version alone is not the graph: measured 2026-09-26, the two
+     lockfiles shared 390 package names and differed on 40, among them every `icu_*` crate
+     (2.2 against 2.3) — and Typst breaks lines with `icu_segmenter`'s compiled data. A
+     `web/Cargo.lock` seeded from the CLI's and re-resolved differs on none. The machine
+     this spec was reviewed on carries 0.1.3, which refuses a task list.
   3. `web/check.mjs` (bun and Playwright, one engine per process, as
      `app/harness/checks.mjs` records a second launch in one process hangs) serves
      `web/assemble.sh`'s `_site` on `127.0.0.1` — redirecting `/app` to `/app/` as Pages
-     does, and serving `.wasm` as `application/wasm` — and in **Chromium and WebKit**
-     checks: (a) the landing page requests no `.wasm`; (b) for each of the twelve
-     examples, the link opens the app with the text pane holding that example's source
-     byte for byte; (c) each `ok` example draws a page, and the bytes `invoke('current_pdf')`
-     returns equal what the pinned `md2pdf` writes for that source with `pipeline.svg`
-     and `refs.yml` beside it under their `data-asset` names; (d) on each `ok` example
-     the error, divergence and web bars are hidden; (e) each `error` example shows the
-     sentence the landing page prints for it; (f) on `caption-table`, appending the line
-     `More text.` bumps `revision` by at least one within two seconds; (g) `create_file`
-     through the panel adds its row, and `trash_file` removes it; (h) ⌘/Ctrl+S on an
-     edited buffer shows the `saved` receipt.
+     does, and serving `.wasm` as `application/wasm` — and in **Chromium and WebKit**,
+     one engine per invocation (`--webkit` selects the second, as `checks.mjs` does), with
+     **each clause on a fresh page**, checks: (a) the landing page requests no `.wasm`;
+     (b) for each of the twelve examples, the link opens the app with the text pane
+     (`#text.value`) holding that example's source byte for byte — and one example,
+     reached by setting `location.hash` on an already-open app page rather than by a
+     navigation, does too, which is the `hashchange` → `opened` path; (c) each `ok` example
+     draws a page, and the bytes `invoke('current_pdf')` returns equal what the pinned
+     `md2pdf` writes for that source with `pipeline.svg` and `refs.yml` beside it under
+     their `data-asset` names; (d) on each `ok` example the error, divergence and web bars
+     are hidden; (e) each `error` example's error bar reads exactly the `textContent` of
+     that row's `code[data-error-for=NAME]` on the landing page; (f) on `caption-table`,
+     typing the line `More text.` into the pane (keystrokes, not a direct `invoke`, so the
+     host's debounce runs) bumps `revision` by at least one within two seconds, and with no
+     typing `revision` stays still for two seconds; (g) `create_file` through the panel
+     adds its row, and `trash_file` removes it; (h) `ControlOrMeta+S` on an edited buffer
+     shows the `saved` receipt; (i) `Shift+ControlOrMeta+S` on an edited buffer, the prompt
+     accepted, downloads a file of the suggested name whose bytes equal `#text.value`,
+     shows `downloaded <name>`, leaves `status().edited` where it was, and a following click
+     on the `refs.yml` row — a bibliography, so it reaches `set_edited` — is refused in
+     `SWITCHING`'s words — the buffer is still unsaved; (j) the export
+     downloads bytes equal to `invoke('current_pdf')`'s; (k) Open… with a `.md` set through
+     `setInputFiles` puts that file's bytes in the pane; (l) with no hash the pane holds
+     `caption-table`'s source and `document.title` is `document.md`; (m) after
+     `set_appearance` to `dark` and a reload, `status().appearance` is `dark`; (n) no
+     clause records an uncaught page error, counted by `error` and `unhandledrejection`
+     listeners the check installs in the page with `addInitScript` — `page.on('pageerror')`
+     alone misses what `app/harness/checks.mjs` records it missing.
   4. `_site/app/index.html` equals `app/dist/index.html` except for the one inserted
-     line, by `diff`.
-  5. `web/pkg/letur_web_bg.wasm`'s raw size and its size under `brotli -q 11` are
-     recorded against 33,165,169 and 9,900,913, the method `rules/web-demo.md` uses.
-- **Close-out:** `rules/web-demo.md` narrows to the landing page, keeping
+     line, by `diff`; and `git diff --exit-code <the commit before the phase> --
+     app/dist/` is empty, so the copy cannot pass by the source having changed for the
+     browser's sake.
+  5. Phase 1's property still holds with `Preview::download` in the crate: `cargo clippy
+     -p letur-project -- -D clippy::disallowed_methods -D clippy::disallowed_types`
+     passes, and `cargo build -p letur-project --target wasm32-unknown-unknown` succeeds.
+- **Close-out:** `rules/desktop.md`, whose sources include `project/src/preview.rs`, gains
+  `Preview::download` beside the Save-as writer it parts from; `rules/web-demo.md` narrows to the landing page, keeping
   `web/index.html` and `app/tests/page_examples_test.rs` as sources; a new
   `rules/web-app.md` covers the session, the host, the worker and the site, with
   `web/src/lib.rs`, `web/host/host.mjs`, `web/host/worker.mjs`, `web/assemble.sh` and
-  `.github/workflows/pages.yml` as sources, and carries gate 5's sizes. The README's web
-  section names both URLs. This spec takes the `supersedes` edge, `mpdf-006` Phase 2
+  `web/Cargo.toml`, `web/package.json`, `web/check.mjs` and `.github/workflows/pages.yml`
+  as sources. **The module's size is recorded there, not gated**: `web/pkg/letur_web_bg.wasm`
+  raw and under `brotli -q 11`, beside the same two figures for the commit before the
+  phase rebuilt the same day on the same toolchain, so the delta is the phase's and not
+  the toolchain's — 33,165,169 and 9,900,913 being `rules/web-demo.md`'s last record, not
+  a baseline. The README gains a web section naming both URLs, and its Developing section
+  says what `web/check.mjs` needs: the pinned `md2pdf` and `web/`'s `bun install`. The
+  published URLs are opened once after the deploy and what they did is recorded in the
+  review record; the gate is the local site. **`specs/web_demo_spec.md` cites
+  `web/src/lib.rs:render` six times and `web/src/lib.rs:anchors` once, and this phase
+  deletes both**, so `spec-lint` would fail with `CIT_SYMBOL_ABSENT` — and Phase 1's
+  path-only rewrite does not apply, since nothing moved. The close-out therefore drops
+  **the path half and nothing else** from those seven backticked citations, leaving
+  `` `render` `` and `` `anchors` ``, which name what the text describes without claiming
+  it is still in a file; the check is `git diff --word-diff` over that spec showing only
+  those seven `web/src/lib.rs:` removals beside the `cut` and the `CORRECTED` notes. This spec takes the `supersedes` edge, `mpdf-006` Phase 2
   takes `cut` and `by: ltr-001`, and the `CORRECTED` notes §1.1 assigns to this phase are
   written. `CLAUDE.md`: none needed.
 
@@ -541,8 +634,8 @@ tomorrow.*
   sheet: the list, New project, Import a folder (`webkitdirectory`, or a drop), and
   per-project Export (the store-only `.zip`). An `#example=` seed becomes a new project
   named after the example, never overwriting one. The 64 MB guard. The main-file
-  override and the appearance, which the desktop app keeps in Application Support, live
-  in `localStorage`, keyed per project.
+  override, which the desktop app keeps in Application Support, lives in `localStorage`
+  keyed per project; the appearance stays the one global key Phase 2 gave it.
 - **Exit gate:** `web/check.mjs` gains, in **Chromium, WebKit and Firefox**: a project
   created, edited, saved and reloaded comes back with the same files and the same main;
   an unsaved edit does not survive a reload; import of a three-file folder then export
