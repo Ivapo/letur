@@ -36,7 +36,7 @@ phases:
     by: null
   - name: "Phase 6 — the landing page is Letur's, and is set in the page's own type"
     reviewed: 2026-09-26
-    shipped: null
+    shipped: 2026-09-26
     cut: null
     by: null
 
@@ -81,6 +81,12 @@ to prefer it to any other thing that makes PDFs.
 > The frontmatter `note:` still reads *"the published browser demo becomes the project's
 > front door"*. That is the index line and cannot hold a note; it is left as the record
 > of what was decided.
+
+> **CORRECTED 2026-09-26, by Phase 6.** The note above left open whose front door the
+> page is, once the dialect's had moved to the engine's README. It is **Letur's**, and
+> now it says so: a header and a hero naming Letur, a captured picture of its window and
+> a call to open it, above the twelve examples, which are unchanged and still compiled.
+> The page is set in the faces the PDF is set in, and states no count of constructs.
 
 **The observable is unchanged — the typeset PDF that Typst compiles from the user's
 markdown — and this spec builds no new one.** What it builds is the first place a reader

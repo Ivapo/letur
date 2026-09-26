@@ -2,6 +2,27 @@
 
 Append-only. One heading per round, newest first.
 
+### Gate 3 — Phase 6 — 2026-09-26 — the author, on the screenshots — **APPROVED**
+
+`bun web/hero.mjs --shots` wrote eight viewport screenshots of the landing page into
+`_shots/`, which were put in front of the author before the push:
+
+- `landing-chromium-1280-light.png`, `landing-chromium-1280-dark.png`
+- `landing-chromium-390-light.png`, `landing-chromium-390-dark.png`
+- `landing-webkit-1280-light.png`, `landing-webkit-1280-dark.png`
+- `landing-webkit-390-light.png`, `landing-webkit-390-dark.png`
+
+The author approved them. They are not committed: `_shots/` is ignored, and one command
+writes them again.
+
+One thing the build found that the spec did not name. **Chromium makes a scrolling
+source block keyboard-focusable**, so `Tab` stops on a `script[data-example]` between
+links. The stop is useful, since it lets a keyboard reader scroll a long line. So the
+outline went onto every `:focus-visible` element rather than links alone, and clause (o)
+walks until every link is reached, asserting an outline at every stop along the way.
+Both breaks were tried against the clause: `--quiet` text failed it at 4.39:1, the ratio
+the spec records, and a removed outline failed it at the first stop.
+
 ### Round 2 — Phase 6 only — 2026-09-26 — the same three reviewers, resumed — **READY (converged)**
 
 Zero blocking, all three lenses, each checking the file rather than the changelog. Every

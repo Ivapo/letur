@@ -8,6 +8,8 @@ sources:
   - web/Cargo.toml
   - web/package.json
   - web/check.mjs
+  - web/serve.mjs
+  - web/hero.mjs
   - .github/workflows/pages.yml
 covers: >
   Letur in a browser tab: the window copied rather than edited and the one line
@@ -18,8 +20,9 @@ covers: >
   events no loop sends, the chords the menu carried and the one it did not, the
   seed that opens an example and the landing page it reads, the site the
   assemble step builds, the lockfile seeded from the CLI's and the check that
-  refuses to compare without it, the module's size, and the build and deploy
-  that publish it
+  refuses to compare without it, the server the check and the capture share,
+  the capture of the window the landing page shows, the module's size, and the
+  build and deploy that publish it
 max_lines: 220
 generated: 2026-09-26
 ---
@@ -137,7 +140,9 @@ name seeds nothing, and the window starts empty with Open… offered.
 
 ## The site, the lockfile and the check
 
-`web/assemble.sh` builds `_site/`: the landing page at the root; at `app/` the copied
+`web/assemble.sh` builds `_site/`: the landing page at the root, with `fonts/` — the four
+Libertinus subsets from `web/fonts/` — and `hero-light.png` and `hero-dark.png` when they
+exist, so the first capture can run against a site built before them; at `app/` the copied
 window, `app/dist/pdfjs/`, `web/host/` and `web/pkg/`, with `pkg/.gitignore` removed so
 the Pages upload keeps the module. It dies unless the window has exactly one `</head>`
 and the module has been built.
@@ -155,17 +160,31 @@ the root workspace's gates are unchanged.
 `md2pdf --version` reports the `md2pdf-core` version `web/Cargo.lock` resolves and the
 two lockfiles agree on every shared package; it checks the copied window is the source
 plus the one line; and it serves `_site` on 127.0.0.1 as Pages does — `/app` redirected,
-`.wasm` as `application/wasm`. Its clauses: the landing page requests no `.wasm`; every
+`.wasm` as `application/wasm`, `.woff2` and `.png` typed — through `web/serve.mjs`, which
+`web/hero.mjs` shares. Its clauses: the landing page requests no `.wasm`, nothing from
+another origin, gets only 2xx answers, carries no `<script>` whose type would run, and is
+no wider than a 390 px viewport; every
 example opens with its source in the pane, one through a `hashchange`; **every `ok`
 example's PDF equals what the pinned `md2pdf` writes, byte for byte**; the three bars
 hidden on an `ok` example; each refusal's exact sentence; the debounce bumping
 `revision` within 2 s of typing and holding still after; create and trash through the
 panel; the `saved` receipt; the download that moves nothing; the export's bytes; Open…;
-the default seed and title; the appearance surviving a reload; and no uncaught page
+the default seed and title; the appearance surviving a reload; (o), in both colour
+schemes, every rendered text on the landing page at 4.5:1 against the first opaque
+background from it up, and the keyboard reaching every link with an outline at every
+stop — `Alt+Tab` in WebKit, whose macOS default skips links; and no uncaught page
 error, counted by listeners installed with `addInitScript`. **Its status reads are
 polled from Node**: `waitForFunction` takes an async predicate's promise for truthy and
 passes at once. **Run 2026-09-26: every clause passes in Chromium and in WebKit**, with
 `md2pdf` 0.4.0.
+
+**`web/hero.mjs` captures the window the landing page shows** (`mpdf-006` Phase 6). It
+assembles and serves the site, opens `app/#example=caption-image` in Chromium at 1280 ×
+800 and device scale factor 2, once per colour scheme, waits for status `current` and a
+first-page canvas holding a pixel that is not white, and writes `web/hero-light.png` and
+`web/hero-dark.png`, which are committed. `--shots` writes the landing page's viewport at
+1280 × 900 and 390 × 844, light and dark, into the ignored `_shots/` — one child process
+per engine, since a second launch in one process hangs — for an author to approve.
 
 ## The module, and what it costs
 

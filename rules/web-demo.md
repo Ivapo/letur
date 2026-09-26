@@ -10,7 +10,9 @@ covers: >
   script element, the other column generated from the same parse and the
   markers and substitution that carry it, the link every row carries into the
   app, and the two files the page carries down one attribute and the fourth
-  reader of them
+  reader of them; and how it looks — the two faces it is set in and why, the
+  window's tokens it copies and the three colour rules with their ratios, the
+  fonts it hosts itself, the hero picture of the window, and what the page weighs
 max_lines: 200
 generated: 2026-09-26
 ---
@@ -18,8 +20,8 @@ generated: 2026-09-26
 # Web demo
 
 Letur's landing page, `web/index.html`, published at `https://ivapo.github.io/letur/`:
-the argument for the dialect, twelve examples long, each one a snippet the workspace
-suite compiles. `mpdf-006` owns the page; `ltr-001` Phase 2 took its panes away and put
+Letur's front door — what it is, a picture of it and the way in — and then what its
+markdown can say, twelve examples long, each one a snippet the workspace suite compiles. `mpdf-006` owns the page; `ltr-001` Phase 2 took its panes away and put
 Letur itself one link further on, at `app/`, which `rules/web-app.md` covers.
 
 **It came here with `mpdf-011` Phase 1**, which split the engine off into
@@ -40,8 +42,9 @@ with the panes gone it is not requested at all — `web/check.mjs` clause (a) ho
 **Every row carries a link into the app**: `<a class="open" href="app/#example=NAME">`,
 where `NAME` is the row's own `data-example` value. It carries no `data-example`
 attribute of its own, so `app/tests/page_examples_test.rs`'s count of twelve still holds.
-The link is a navigation and works with scripting off; the header, the lede and every
-sentence that promised a compile in this page say so rather than that.
+The link is a navigation and works with scripting off. The bar's and the hero's calls
+to open Letur are `a.cta` to `app/`, so `web/check.mjs`'s count of twelve `a.open`
+holds too.
 
 ## What the page claims, and the test that holds it to the compiler
 
@@ -50,21 +53,11 @@ through as text (a caption over a table, over a listing and over an image, a `::
 `{#name}` and the `[](#name)` that points at it, display math), things markdown has no way
 to say (the nine frontmatter keys that decide the look, a footnote, a citation and the
 reference list it earns), and three refusals — raw HTML, a task marker in a numbered list,
-and a LaTeX command off the accepted list. Twenty-eight constructs are supported, so the
-page is a chosen few and links out to the README for the rest. The middle refusal was a
-task list until `md2pdf-core` 0.4.0 accepted one (`mpdf-006` Phase 5).
-
-**The page's own lede is five behind that**, and the gap is logged rather than half-fixed
-here: the page's `<p class="lede">` reads "Twenty-three constructs are supported
-and twelve are shown here", which was one behind before `mpdf-005` Phase 10, two behind
-after it, three behind after that spec's Phase 11, four at 0.3.0 — which this rule missed,
-still saying twenty-six — and five once 0.4.0 took task lists. Correcting the number alone would
-leave the page claiming a count it shows no example of, and an example is real work under
-this spec's own gate — every claim on the page is a snippet the workspace suite compiles —
-so the count, an `::: abstract` row and a `::: keywords` row all belong to a phase of
-`mpdf-006` rather than to another spec's close-out. **That the gap has now widened four times is
-itself the finding**: a logged gap that keeps growing is a phase of this spec waiting to be
-drafted rather than a note to re-write a third time.
+and a LaTeX command off the accepted list. The page is a chosen few and links out to the
+README for the rest. The middle refusal was a task list until `md2pdf-core` 0.4.0 accepted
+one (`mpdf-006` Phase 5). **The page states no count of constructs**: the one its lede
+carried fell five behind the engine before `mpdf-006` Phase 6 dropped it, and a page
+that does not state it cannot be behind.
 
 **Each example is one element, and four consumers read it.** A
 `<script type="text/markdown" data-example="…" data-expect="ok|error">` holds the source;
@@ -99,7 +92,7 @@ file is not membership.
 
 **A `<script>` is `display: none` in every UA stylesheet**, and the source column of every
 row is one. `script[data-example] { display: block; white-space: pre; overflow-x: auto }`
-renders it. A visible `<pre>` duplicate was refused deliberately: two copies of an example
+renders it, in Libertinus Mono on `--paper`. A visible `<pre>` duplicate was refused deliberately: two copies of an example
 can differ, which is the failure the whole arrangement prevents.
 
 ## The other column, and where its markup comes from
@@ -122,7 +115,8 @@ tag — the `raw-html` block ends `</div>`, the `footnote` block carries a
 under another name; a comment cannot nest and `push_html` emits none. **What lies between a
 pair is exactly what the generator returned**, nothing trimmed at either end, so the page
 and the test compare the same bytes by construction; `raw-html` ends without a trailing
-newline. A `div.rendered` wrapper sits outside the markers, uncompared, carrying the type
+newline. A `div.rendered` wrapper sits outside the markers, uncompared, inside a
+`figure.col` whose italic `figcaption` carries the label, carrying the type
 scale four real tables, two real checkboxes, a heading, a listing and a real `<div>` need.
 
 **One substitution, and exactly one**: an image destination equal to the page's
@@ -176,3 +170,46 @@ markdown reaches the compiler through the app's Open…; their images and biblio
 not until `ltr-001` Phase 3's import — an `![…](their-file.svg)` comes back
 `Error::MissingImage` from `core/src/lib.rs:collect`. The page is not an editor: the app
 is, and `mpdf-001` §1.1 still refuses servers permanently.
+
+## How it looks, and why
+
+**Set in the type of the pages Letur makes** (`mpdf-006` Phase 6). Libertinus Serif for
+everything a person reads, on a 1.25 scale from a 19px body — 19, 23.75, 29.7, 37.1px —
+line-height 1.5, prose held to 36em; Libertinus Mono for every source column and `code`.
+These are the faces `md2pdf-core`'s template sets every page in, so a visitor reads the
+product's output before running it. No third face, no capitals, no letter-spacing, no
+bold italic.
+
+**The faces are hosted here, in `web/fonts/`**: Serif Regular, Italic and Bold and Mono
+Regular, subset from `md2pdf-core-0.4.0/assets/fonts/` to `U+0020-007E`, `U+00A0-00FF`,
+`U+2010-2027` and `U+2190-2193` as woff2, beside the OFL. The command is in
+`web/assemble.sh`, which copies the directory to `_site/fonts/`. **Self-hosted because a
+font CDN would be the first request this page made to anyone but its own host**, and
+`web/check.mjs` clause (a) refuses any such request. Any character outside the subset
+would fall back to another face; none on the page does.
+
+**The colours are the window's tokens**, copied from `app/dist/index.html`'s `:root`
+blocks — `--ground`, `--chrome`, `--edge`, `--ink`, `--quiet`, `--alarm`, `--paper` — the
+dark values under `prefers-color-scheme`, so a token changed there is changed here too.
+Three rules, measured by the WCAG 2 formula and held at 4.5:1 by clause (o):
+
+- **Text is `--ink`** (11.8:1 light, 13.2:1 dark on `--ground`); secondary text is `--ink`
+  set smaller or italic. `--quiet` is 4.39:1 on light `--ground`, so it draws rules only.
+- **`--paper` is white in both themes**, and text on it — the source column — is the light
+  ink `#2b3140` in both (13.0:1).
+- **One accent**: `#1e3c82`, `pipeline.svg`'s stroke, in light; `#9db4ec` in dark. Links,
+  the calls to open Letur and the focus outline, nothing else. The call is filled with it
+  and lettered white in light, `--ground` in dark. Refusal sentences are `--alarm`.
+
+**Every keyboard stop shows an outline** — `:focus-visible`, in the accent — which covers
+the links and, in Chromium, the scrolling source blocks. No `transition`, `animation` or
+`scroll-behavior`, so there is no motion for `prefers-reduced-motion` to reduce.
+
+**The hero shows the window, captured**: `web/hero-light.png` and `web/hero-dark.png`, 2560
+× 1600, written by `web/hero.mjs` (`rules/web-app.md`) and shown through a `<picture>`
+keyed on `prefers-color-scheme`. Below 720px the hero stacks picture-last and each row
+source-first.
+
+**What it weighs**, measured 2026-09-26, raw and under `brotli -q 11`: the HTML 28,692 and
+7,458 bytes; the four fonts 93,008, which woff2 has already compressed; the two images
+66,260 and 66,303 raw, about 50,800 each. A visitor loads one image.

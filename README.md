@@ -18,11 +18,12 @@ button that says so.
 
 Letur also runs in a tab, with nothing to install:
 
-- **<https://ivapo.github.io/letur/>** — what the dialect adds to markdown, twelve
-  examples long, each beside the same parse set down as HTML. The page loads no module.
+- **<https://ivapo.github.io/letur/>** — what Letur is, a picture of its window, and what
+  its markdown can say, twelve examples long, each beside the same text set down as plain
+  HTML. It is set in the faces the PDF is set in, and it loads no module.
 - **<https://ivapo.github.io/letur/app/>** — Letur's own window: the file panel, the text
   pane and the drawn pages, redrawn as you type. Every example on the page above has an
-  **open in Letur** link that opens it here as `document.md`, beside the page's
+  **Open in Letur** link that opens it here as `document.md`, beside the page's
   `pipeline.svg` and `refs.yml`.
 
 It is the same window as the desktop app, and the same rules decide what it shows, but
@@ -278,7 +279,15 @@ $ bun web/check.mjs --webkit   # WebKit
 ```
 
 `bash web/assemble.sh` builds the published site into `_site/` on its own, if you want
-to serve it by hand.
+to serve it by hand. The landing page's picture of the window is a capture, not a
+drawing, and one command remakes it; `--shots` writes the landing page itself at desktop
+and phone widths, light and dark, in both engines, into `_shots/` for a look before a
+push:
+
+```console
+$ bun web/hero.mjs             # web/hero-light.png, web/hero-dark.png
+$ bun web/hero.mjs --shots     # _shots/, eight screenshots
+```
 
 ## Licence
 
@@ -288,7 +297,8 @@ The app draws its page with Mozilla's `pdf.js`, vendored as two modules under
 `app/dist/pdfjs/` and licensed Apache-2.0; see `app/dist/pdfjs/LICENSE`.
 
 The fonts are the engine's and ship inside `md2pdf-core`; its README carries their
-licences.
+licences. The landing page carries subsets of Libertinus Serif and Mono in `web/fonts/`,
+under the SIL Open Font License beside them in `web/fonts/OFL.txt`.
 
 **The engine's Rust crates are listed in the engine's own notice.** `md2pdf-core` ships
 `THIRD-PARTY-LICENSES.md` inside the published crate, so the version this app pins carries

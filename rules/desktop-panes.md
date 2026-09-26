@@ -485,6 +485,12 @@ either palette — and `checks.mjs` pins it unmoved in all six system-by-state
 readings, which is what keeps `specs/desktop_app_spec.md` §1.1's narrowing honest:
 this app themes its own chrome and nothing about the document.
 
+**`web/index.html` copies the tokens** — `--ground`, `--chrome`, `--edge`, `--ink`,
+`--quiet`, `--alarm` and `--paper`, light and dark, the dark under
+`prefers-color-scheme` alone, since the landing page has no toggle (`mpdf-006` Phase 6,
+`rules/web-demo.md`). **A change to a token here is a change to both**, and the landing
+page's own contrast is `web/check.mjs` clause (o)'s to hold.
+
 **The auto margin is `#controls`' and the brand comes last.** It moved off `#brand`
 in Phase 13 so the shape is readouts left, icon group right, product name last; left
 where it was, the toggle would have sat outside the group's own right edge. **`#brand`'s
