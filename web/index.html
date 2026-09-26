@@ -3,63 +3,131 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>md2pdf — markdown in, a typeset PDF out</title>
+<title>Letur — markdown on the left, a typeset page on the right</title>
+<link rel="icon" href="data:,">
 <style>
+  /*
+    Set in the type of the pages Letur makes — `mpdf-006` Phase 6. Libertinus
+    Serif and Mono are the faces `md2pdf-core`'s template sets every page in,
+    subset into `fonts/` by the command `web/assemble.sh` records, and served
+    from this page's own host: a font CDN would be the first request this page
+    made to anyone else. Four files and no bold italic, so nothing here asks for
+    one.
+  */
+  @font-face { font-family: "Libertinus Serif"; src: url(fonts/LibertinusSerif-Regular.woff2) format("woff2"); font-weight: 400; font-style: normal; }
+  @font-face { font-family: "Libertinus Serif"; src: url(fonts/LibertinusSerif-Italic.woff2) format("woff2"); font-weight: 400; font-style: italic; }
+  @font-face { font-family: "Libertinus Serif"; src: url(fonts/LibertinusSerif-Bold.woff2) format("woff2"); font-weight: 700; font-style: normal; }
+  @font-face { font-family: "Libertinus Mono"; src: url(fonts/LibertinusMono-Regular.woff2) format("woff2"); font-weight: 400; font-style: normal; }
+
+  /*
+    **The window's own tokens, copied from `app/dist/index.html`'s `:root`
+    blocks**, so this page and the app are one product and the link between
+    them crosses no seam. A change to a token there is a change here too.
+
+    Three rules, measured by the WCAG 2 formula and held by `web/check.mjs`'s
+    clause (o). Text is `--ink`; secondary text is `--ink` too, set smaller or
+    in italic, because `--quiet` is 4.39:1 on light `--ground` and carries only
+    rules here. `--paper` is white in both themes, as the window keeps it, and
+    text on it is the light ink in both. One accent — the stroke
+    `pipeline.svg` is drawn in, lightened for the dark — colours links and the
+    call to open Letur, and nothing else.
+  */
   :root {
     color-scheme: light dark;
-    --line: color-mix(in srgb, currentColor 18%, transparent);
-    --dim: color-mix(in srgb, currentColor 62%, transparent);
-    --soft: color-mix(in srgb, currentColor 5%, transparent);
+    --ground: #f4f4f2;
+    --chrome: #e8e8e4;
+    --edge: #d5d5cf;
+    --ink: #2b3140;
+    --quiet: #6b7280;
+    --alarm: #a03323;
+    --paper: #fff;
+    --paper-ink: #2b3140;
+    --accent: #1e3c82;
+    --on-accent: #fff;
+    --serif: "Libertinus Serif", Georgia, serif;
+    --mono: "Libertinus Mono", ui-monospace, Menlo, monospace;
   }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #1c1f27;
+      --chrome: #262a34;
+      --edge: #363b47;
+      --ink: #e6e6e2;
+      --quiet: #9aa1ae;
+      --alarm: #e08573;
+      --accent: #9db4ec;
+      --on-accent: #1c1f27;
+    }
+  }
+
   * { box-sizing: border-box; }
   body {
-    margin: 0;
-    font: 14px/1.5 system-ui, -apple-system, sans-serif;
+    margin: 0; background: var(--ground); color: var(--ink);
+    font: 19px/1.5 var(--serif);
+    font-kerning: normal; font-variant-ligatures: common-ligatures;
   }
-  header { padding: 10px 14px; border-bottom: 1px solid var(--line); }
-  header b { font-weight: 650; }
-  header span { opacity: .65; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
   /*
-    The list of what the dialect adds. Since `ltr-001` Phase 2 it is the whole
-    page: no module loads here, and the compile is the app's, one link away.
+    Every stop the keyboard makes shows where it is: the links, and in Chromium
+    the source blocks too, which scroll and so take focus. Clause (o) holds it.
   */
-  #adds { max-width: 62rem; margin: 0 auto; padding: 26px 14px 34px; }
-  #adds > h1 { font-size: 13px; font-weight: 650; letter-spacing: .09em; text-transform: uppercase; margin: 0 0 6px; }
-  #adds > p.lede { margin: 0 0 26px; color: var(--dim); max-width: 46rem; }
-  #adds > p.lede a, .group > p a, .row p a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  code { font-family: var(--mono); font-size: .85em; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
 
-  .group { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 26px; }
-  .group > h2 { font-size: 15px; font-weight: 650; margin: 0 0 4px; }
-  .group > p { margin: 0 0 20px; color: var(--dim); max-width: 46rem; }
-
-  .row { margin: 0 0 26px; }
-  .row > .head {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 14px; margin: 0 0 3px;
+  /* The bar and the hero: what Letur is, what it looks like, and the way in. */
+  .bar { background: var(--chrome); border-bottom: 1px solid var(--edge); }
+  .bar .wrap { display: flex; align-items: center; justify-content: space-between; min-height: 56px; }
+  .mark { font-size: 23.75px; font-weight: 700; }
+  .cta {
+    display: inline-block; background: var(--accent); color: var(--on-accent);
+    text-decoration: none; border-radius: 4px; padding: 4px 14px; font-weight: 700;
   }
-  .head > h3 { font-size: 14px; font-weight: 650; margin: 0; }
-  .row > p.says { margin: 0 0 10px; color: var(--dim); max-width: 46rem; }
-  .row > p.does { margin: 10px 0 0; }
-  .row > p.does::before { content: "→ "; color: var(--dim); }
+  .cta:hover { text-decoration: underline; }
+  .hero {
+    display: grid; grid-template-columns: 5fr 7fr; gap: 48px; align-items: center;
+    padding-top: 64px; padding-bottom: 72px;
+  }
+  .hero h1 { font-size: 37.1px; line-height: 1.2; font-weight: 400; margin: 0 0 20px; }
+  .hero p { margin: 0 0 24px; max-width: 34em; }
+  .hero .cta { font-size: 23.75px; padding: 8px 22px; }
+  .hero p.small { margin: 12px 0 0; font-size: 15.2px; font-style: italic; }
+  .hero picture, .hero img { display: block; width: 100%; height: auto; }
+  .hero img { border: 1px solid var(--edge); border-radius: 6px; }
+
+  /*
+    The examples. Since `ltr-001` Phase 2 no module loads here, and the compile
+    is the app's, one link away.
+  */
+  #adds { padding-top: 16px; padding-bottom: 72px; }
+  #adds > h2 { font-size: 29.7px; font-weight: 400; margin: 0 0 8px; }
+  #adds p.lede { margin: 0 0 16px; max-width: 36em; }
+
+  .group { border-top: 1px solid var(--quiet); margin-top: 56px; padding-top: 24px; }
+  .group > h3 { font-size: 23.75px; font-weight: 400; margin: 0 0 6px; }
+  .group > p { margin: 0 0 32px; max-width: 36em; }
+
+  .row { margin: 0 0 48px; }
+  .row > .head {
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+    column-gap: 24px; margin: 0 0 4px;
+  }
+  .head > h4 { font-size: 19px; font-weight: 700; margin: 0; }
+  .row > p.says { margin: 0 0 14px; max-width: 36em; }
+  .row > p.does { margin: 14px 0 0; max-width: 36em; }
+  .row > p.does::before { content: "→ "; }
 
   /*
     Each row's way into the app. A link rather than a button since `ltr-001`
     Phase 2: the compile moved to its own page, so the click is a navigation and
-    works with scripting off.
+    works with scripting off. `web/check.mjs` counts exactly twelve of this
+    class; the bar's and the hero's calls to open Letur are `.cta`.
   */
-  .open {
-    flex: none; font-size: 12px; font-weight: 600; color: inherit; text-decoration: none;
-    background: var(--soft); border: 1px solid var(--line); border-radius: 4px;
-    padding: 3px 10px; white-space: nowrap;
-  }
-  .open:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+  .open { white-space: nowrap; }
 
-  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
-  @media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
-  .col > .cap {
-    display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
-    color: var(--dim); margin: 0 0 4px;
-  }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .col { margin: 0; min-width: 0; }
+  .col > figcaption { margin: 6px 0 0; font-size: 15.2px; font-style: italic; }
 
   /*
     A `script` element is `display: none` in every UA stylesheet, and the left
@@ -67,13 +135,15 @@
     source a reader reads, the source the page will load and the source
     `app/tests/page_examples_test.rs` compiles are one copy of one thing. A
     visible duplicate beside it would be two copies that can differ, which is
-    the whole failure this page is built to avoid.
+    the whole failure this page is built to avoid. It sits on `--paper`, the one
+    white surface, because it is what becomes a page.
   */
   script[data-example] {
     display: block; white-space: pre; overflow-x: auto;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
-    background: var(--soft); border: 1px solid var(--line); border-radius: 4px;
-    padding: 10px 12px; margin: 0;
+    font: 15.2px/1.5 var(--mono);
+    background: var(--paper); color: var(--paper-ink);
+    border: 1px solid var(--edge); border-radius: 4px;
+    padding: 12px 14px; margin: 0;
   }
   /*
     The other column. Its markup is not written here — it is
@@ -81,49 +151,70 @@
     and compared against it by `app/tests/page_examples_test.rs`. So a real
     table, a real checkbox, a heading and the page's own diagram all land inside
     this box, and it carries its own type scale rather than inheriting the list's.
+    It sits on `--ground`, because it is the comparison and not the product.
   */
   .col > .rendered {
-    padding: 10px 12px; border: 1px dashed var(--line); border-radius: 4px;
-    color: var(--dim); overflow-x: auto;
+    padding: 12px 14px; border: 1px solid var(--edge); border-radius: 4px;
+    font-size: 17px; overflow-x: auto;
   }
   .rendered > :first-child { margin-top: 0; }
   .rendered > :last-child { margin-bottom: 0; }
   .rendered p { margin: 8px 0; }
-  .rendered h1, .rendered h2, .rendered h3 { font-size: 14px; font-weight: 650; margin: 12px 0 6px; }
-  .rendered table { border-collapse: collapse; margin: 8px 0; font-size: 12.5px; }
-  .rendered th, .rendered td { border: 1px solid var(--line); padding: 2px 7px; text-align: left; font-weight: 400; }
+  .rendered h1, .rendered h2, .rendered h3 { font-size: 19px; font-weight: 700; margin: 12px 0 6px; }
+  .rendered table { border-collapse: collapse; margin: 8px 0; }
+  .rendered th, .rendered td { border: 1px solid var(--quiet); padding: 2px 8px; text-align: left; font-weight: 400; }
   .rendered pre { margin: 8px 0; overflow-x: auto; }
-  .rendered ul { margin: 8px 0; padding-left: 22px; }
+  .rendered pre code { font-size: 15.2px; }
+  .rendered ul, .rendered ol { margin: 8px 0; padding-left: 24px; }
   .rendered img { max-width: 100%; height: auto; }
   .rendered .footnote-definition { margin: 8px 0; }
   .rendered .footnote-definition p { display: inline; }
-  .col code, .row p code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
   code[data-error-for] {
     display: inline-block; white-space: pre; overflow-x: auto; max-width: 100%;
-    vertical-align: bottom; color: #b00020;
+    vertical-align: bottom; color: var(--alarm);
   }
-  @media (prefers-color-scheme: dark) { code[data-error-for] { color: #ff8a8a; } }
 
+  /* Today's breakpoint: the hero stacks picture-last, a row source-first. */
+  @media (max-width: 720px) {
+    .wrap { padding: 0 16px; }
+    .hero { grid-template-columns: 1fr; gap: 32px; padding-top: 40px; padding-bottom: 48px; }
+    .hero h1 { font-size: 29.7px; }
+    .cols { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <b>md2pdf</b> <span>— one markdown file in, one typeset PDF out. No server.</span>
+<header class="bar">
+<div class="wrap">
+  <span class="mark">Letur</span>
+  <a class="cta" href="app/">Open Letur</a>
+</div>
 </header>
 
-<section id="adds">
+<section class="hero wrap">
+<div>
+<h1>Markdown on the left, a typeset page on the right, redrawn as you write.</h1>
+<p>Letur is an editor for writing that ends as a PDF. You write markdown — with captions,
+figures, references, math and citations — and beside it the page is set in the type you
+are reading now.</p>
+<a class="cta" href="app/">Open Letur</a>
+<p class="small">Runs in this browser. Nothing to install, and no server sees your text.</p>
+</div>
+<picture>
+<source srcset="hero-dark.png" media="(prefers-color-scheme: dark)">
+<img src="hero-light.png" width="1280" height="800" alt="Letur's window: a list of files, the markdown of a captioned figure, and the typeset page it makes, a diagram numbered Figure 1.">
+</picture>
+</section>
 
-<h1>What this adds to markdown</h1>
-<p class="lede">Twenty-three constructs are supported and twelve are shown here — the ones
-only the emitter reads. The
-<a href="https://github.com/Ivapo/md2pdf#what-the-markdown-may-contain">README</a> is the
-complete reference. Each row is one source under two writers: what <code>md2pdf</code>
-makes of it, and what that same parse looks like when <code>pulldown-cmark</code>'s own
-HTML backend sets it down instead of the emitter — one parser, one set of options, two
-ways out. And <b>open in Letur</b> opens the source in <a href="app/">Letur</a>, the
-editor, in this browser — the page drawn beside the text as you write it, the three
-refusals included.</p>
+<section id="adds" class="wrap">
+
+<h2>What the markdown can say</h2>
+<p class="lede">Twelve examples, each set two ways: the source Letur reads, and the same
+text as plain HTML, which has no way to show what it means. Open any of them in Letur to
+see the page it becomes. The
+<a href="https://github.com/Ivapo/md2pdf#what-the-markdown-may-contain">README</a> lists
+everything the markdown may contain.</p>
 
 <!--
   Every `data-example` element below is compiled by `app/tests/page_examples_test.rs`,
@@ -144,36 +235,38 @@ refusals included.</p>
 -->
 
 <div class="group">
-<h2>1 · Syntax only the emitter reads</h2>
-<p>The marker means something to the emitter and nothing to the writer beside it, so the
-difference is on the page without a PDF: the other column loses it — printed as ordinary
-text, or set down as something with nothing left of the meaning.
+<h3>Captions, figures and references</h3>
+<p>A few short markers that plain markdown prints as ordinary text. Letur turns them into
+numbered tables, listings, figures and equations, and keeps every reference to them right
+as the document changes around them.
 <a href="https://github.com/Ivapo/md2pdf#captions">Captions</a> ·
 <a href="https://github.com/Ivapo/md2pdf#figures-with-more-than-one-member">Groups</a> ·
 <a href="https://github.com/Ivapo/md2pdf#naming-a-figure-or-an-equation-and-pointing-at-it">Names</a></p>
 
 <div class="row">
 <div class="head">
-<h3>A caption makes a figure, and numbers it</h3>
-<a class="open" href="app/#example=caption-table">open in Letur ▸</a>
+<h4>A caption makes a figure, and numbers it</h4>
+<a class="open" href="app/#example=caption-table">Open in Letur</a>
 </div>
 <p class="says">A paragraph opening <code>: </code> beneath a table, an image or a code
 block is that block's caption.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="caption-table" data-expect="ok">| a | b |
 |---|---|
 | 1 | 2 |
 
 : The measurements.</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:caption-table--><table><thead><tr><th>a</th><th>b</th></tr></thead><tbody>
 <tr><td>1</td><td>2</td></tr>
 </tbody></table>
 <p>: The measurements.</p>
 <!--/html:caption-table--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does"><b>Table 1</b>, set beneath the table, on a counter tables keep to
 themselves.</p>
@@ -181,25 +274,27 @@ themselves.</p>
 
 <div class="row">
 <div class="head">
-<h3>The same marker under a code block</h3>
-<a class="open" href="app/#example=caption-listing">open in Letur ▸</a>
+<h4>The same marker under a code block</h4>
+<a class="open" href="app/#example=caption-listing">Open in Letur</a>
 </div>
 <p class="says">One mechanism over three constructs, each counting on its own — so
 inserting a table above a listing does not renumber the listing.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="caption-listing" data-expect="ok">```rust
 fn main() {}
 ```
 
 : The entry point.</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:caption-listing--><pre><code class="language-rust">fn main() {}
 </code></pre>
 <p>: The entry point.</p>
 <!--/html:caption-listing--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does"><b>Listing 1</b>, captioned beneath and standing 2em off the margin the
 prose stands on, because code is read from where its lines begin.</p>
@@ -207,22 +302,24 @@ prose stands on, because code is read from where its lines begin.</p>
 
 <div class="row">
 <div class="head">
-<h3>The same marker over an image</h3>
-<a class="open" href="app/#example=caption-image">open in Letur ▸</a>
+<h4>The same marker over an image</h4>
+<a class="open" href="app/#example=caption-image">Open in Letur</a>
 </div>
 <p class="says">The third construct a caption reaches, and the only one that needs a file —
 so the page carries one: <code>pipeline.svg</code> travels inside this page itself.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="caption-image" data-expect="ok">![The three steps, drawn as boxes](pipeline.svg)
 
 : The conversion pipeline, with the *emitter* in the middle.</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:caption-image--><p><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20320%2072%22%20width%3D%22320%22%20height%3D%2272%22%3E%0A%20%20%3Cg%20fill%3D%22none%22%20stroke%3D%22%231e3c82%22%20stroke-width%3D%223%22%0A%20%20%20%20%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%0A%20%20%20%20%3Crect%20x%3D%224%22%20y%3D%2216%22%20width%3D%2288%22%20height%3D%2240%22%20rx%3D%226%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22116%22%20y%3D%2216%22%20width%3D%2288%22%20height%3D%2240%22%20rx%3D%226%22%2F%3E%0A%20%20%20%20%3Crect%20x%3D%22228%22%20y%3D%2216%22%20width%3D%2288%22%20height%3D%2240%22%20rx%3D%226%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M96%2036%20H112%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M104%2030%20L112%2036%20L104%2042%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M208%2036%20H224%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M216%2030%20L224%2036%20L216%2042%22%2F%3E%0A%20%20%3C%2Fg%3E%0A%3C%2Fsvg%3E" alt="The three steps, drawn as boxes" /></p>
 <p>: The conversion pipeline, with the <em>emitter</em> in the middle.</p>
 <!--/html:caption-image--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does"><b>Figure 1</b>, the caption set beneath the image, on a counter the tables
 and the listings above do not touch.</p>
@@ -257,13 +354,13 @@ and the listings above do not touch.</p>
 
 <div class="row">
 <div class="head">
-<h3>A pair of <code>:::</code> lines makes several blocks one figure</h3>
-<a class="open" href="app/#example=figure-group">open in Letur ▸</a>
+<h4>A pair of <code>:::</code> lines makes several blocks one figure</h4>
+<a class="open" href="app/#example=figure-group">Open in Letur</a>
 </div>
 <p class="says">The members share one caption, one number and one name. No arrangement of
 the <code>: </code> marker alone can say that.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="figure-group" data-expect="ok">:::
 
 | step | what |
@@ -277,8 +374,9 @@ the <code>: </code> marker alone can say that.</p>
 : The two halves of the pipeline.
 
 :::</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:figure-group--><p>:::</p>
 <table><thead><tr><th>step</th><th>what</th></tr></thead><tbody>
 <tr><td>1</td><td>parse</td></tr>
@@ -289,7 +387,8 @@ the <code>: </code> marker alone can say that.</p>
 <p>: The two halves of the pipeline.</p>
 <p>:::</p>
 <!--/html:figure-group--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does">One <b>Table 1</b> with both members side by side, taking a single number
 between them.</p>
@@ -297,13 +396,13 @@ between them.</p>
 
 <div class="row">
 <div class="head">
-<h3>Name a figure, and point at it</h3>
-<a class="open" href="app/#example=name-and-reference">open in Letur ▸</a>
+<h4>Name a figure, and point at it</h4>
+<a class="open" href="app/#example=name-and-reference">Open in Letur</a>
 </div>
 <p class="says">End a caption with <code>{#name}</code>, then write <code>[](#name)</code>
 — a link with nothing between the brackets — to refer to it.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="name-and-reference" data-expect="ok">| a | b |
 |---|---|
 | 1 | 2 |
@@ -311,15 +410,17 @@ between them.</p>
 : The measurements. {#tab:m}
 
 As [](#tab:m) shows, the two columns agree.</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:name-and-reference--><table><thead><tr><th>a</th><th>b</th></tr></thead><tbody>
 <tr><td>1</td><td>2</td></tr>
 </tbody></table>
 <p>: The measurements. {#tab:m}</p>
 <p>As <a href="#tab:m"></a> shows, the two columns agree.</p>
 <!--/html:name-and-reference--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does">“As <b>Table 1</b> shows…”, and it stays true — insert another table above
 it and the sentence reads <i>Table 2</i> without your touching it.</p>
@@ -327,23 +428,25 @@ it and the sentence reads <i>Table 2</i> without your touching it.</p>
 
 <div class="row">
 <div class="head">
-<h3>Math is LaTeX, and it is checked before it is set</h3>
-<a class="open" href="app/#example=display-math">open in Letur ▸</a>
+<h4>Math is LaTeX, and it is checked before it is set</h4>
+<a class="open" href="app/#example=display-math">Open in Letur</a>
 </div>
 <p class="says"><code>$…$</code> sets in the running text and <code>$$…$$</code> as a
 block of its own, converted in the browser rather than by a service.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="display-math" data-expect="ok">$$
 \sqrt{x^2 + y^2} \leq |x| + |y|
 $$</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:display-math--><p><span class="math math-display">
 \sqrt{x^2 + y^2} \leq |x| + |y|
 </span></p>
 <!--/html:display-math--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does">The formula typeset as a display block, with the radical, the relation
 and the bars set as math rather than as characters that resemble it.</p>
@@ -351,17 +454,17 @@ and the bars set as math rather than as characters that resemble it.</p>
 </div>
 
 <div class="group">
-<h2>2 · Things markdown has no way to say</h2>
-<p>These are not markers a renderer misses. They are decisions about a printed page, and
-a page is what markdown has never had.
+<h3>What a printed page has</h3>
+<p>A title block, notes at the foot of the column, a list of references: things a printed
+page carries and markdown has never had a way to ask for.
 <a href="https://github.com/Ivapo/md2pdf#frontmatter">Frontmatter</a> ·
 <a href="https://github.com/Ivapo/md2pdf#footnotes">Footnotes</a> ·
 <a href="https://github.com/Ivapo/md2pdf#citing-sources">Citations</a></p>
 
 <div class="row">
 <div class="head">
-<h3>Nine frontmatter keys decide the look</h3>
-<a class="open" href="app/#example=frontmatter">open in Letur ▸</a>
+<h4>Nine frontmatter keys decide the look</h4>
+<a class="open" href="app/#example=frontmatter">Open in Letur</a>
 </div>
 <p class="says">A leading <code>---</code> block picks one of two looks, one or two
 columns, and whether display formulas are numbered. <code>author</code> takes several names
@@ -369,7 +472,7 @@ separated by <code>;</code>, and a <code>^</code> after one points at an
 <code>affiliation</code>. <code>date</code> is your text and nothing else —
 <code>md2pdf</code> never reads a clock.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="frontmatter" data-expect="ok">---
 title: A Minimal Example
 author: Iva Po^1; Someone Else^2
@@ -383,12 +486,14 @@ equations: numbered
 # Introduction
 
 Body text under a title block the markdown itself asked for.</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:frontmatter--><h1>Introduction</h1>
 <p>Body text under a title block the markdown itself asked for.</p>
 <!--/html:frontmatter--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does">A centred title block, the body in one column, and every
 <code>$$…$$</code> numbered <code>(1)</code>, <code>(2)</code> down the page.</p>
@@ -396,24 +501,26 @@ Body text under a title block the markdown itself asked for.</script>
 
 <div class="row">
 <div class="head">
-<h3>A footnote lands at the foot of its column</h3>
-<a class="open" href="app/#example=footnote">open in Letur ▸</a>
+<h4>A footnote lands at the foot of its column</h4>
+<a class="open" href="app/#example=footnote">Open in Letur</a>
 </div>
 <p class="says">The definition may sit anywhere in the file, above or below the reference
 that cites it.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="footnote" data-expect="ok">A claim that needs a source[^src].
 
 [^src]: The note itself, which may hold *emphasis* and `code`.</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:footnote--><p>A claim that needs a source<sup class="footnote-reference"><a href="#src">1</a></sup>.</p>
 <div class="footnote-definition" id="src"><sup class="footnote-definition-label">1</sup>
 <p>The note itself, which may hold <em>emphasis</em> and <code>code</code>.</p>
 </div>
 <!--/html:footnote--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does">The note at the foot of the column that carries the reference, where a
 reader's eye already is.</p>
@@ -421,25 +528,27 @@ reader's eye already is.</p>
 
 <div class="row">
 <div class="head">
-<h3>A citation earns a reference list</h3>
-<a class="open" href="app/#example=citation">open in Letur ▸</a>
+<h4>A citation earns a reference list</h4>
+<a class="open" href="app/#example=citation">Open in Letur</a>
 </div>
 <p class="says">A tenth frontmatter key names a bibliography — a Hayagriva
 <code>.yml</code> or a BibLaTeX <code>.bib</code>, the file you already have — and
 <code>[@key]</code> cites it. This page carries one: <code>refs.yml</code>, beside the
 diagram.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="citation" data-expect="ok">---
 bibliography: refs.yml
 ---
 
 Typesetting was rethought from the ground up [@knuth1986].</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:citation--><p>Typesetting was rethought from the ground up <a href="@knuth1986">@knuth1986</a>.</p>
 <!--/html:citation--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does">A numbered mark where you cited, and the reference list set at the end of
 the document under the label the look draws.</p>
@@ -464,47 +573,49 @@ the document under the label the look draws.</p>
 </div>
 
 <div class="group">
-<h2>3 · What it refuses, on purpose</h2>
-<p>A showcase that hides its refusals is selling something. Dropping or flattening content
-would ship a PDF that lies about its source, so the compiler names what it cannot handle
-and its line — and these are the sentences it prints, checked against the compiler by the
-same test that compiles every example above.</p>
+<h3>What it refuses, and says so</h3>
+<p>Letur never quietly drops what it cannot set, because a PDF that leaves out part of its
+source looks finished and is wrong. It names the construct and the line instead, and these
+are the sentences it shows — checked against the compiler, like every example above.</p>
 
 <div class="row">
 <div class="head">
-<h3>Raw HTML</h3>
-<a class="open" href="app/#example=raw-html">open in Letur ▸</a>
+<h4>Raw HTML</h4>
+<a class="open" href="app/#example=raw-html">Open in Letur</a>
 </div>
 <p class="says">A PDF has no <code>&lt;div&gt;</code>, and guessing what one should become
 is how a converter starts lying.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="raw-html" data-expect="error">A paragraph the emitter accepts.
 
 <div>a raw HTML block</div></script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:raw-html--><p>A paragraph the emitter accepts.</p>
 <div>a raw HTML block</div><!--/html:raw-html--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does"><code data-error-for="raw-html">unsupported markdown construct 'raw HTML block' at line 3</code></p>
 </div>
 
 <div class="row">
 <div class="head">
-<h3>A task marker in a numbered list</h3>
-<a class="open" href="app/#example=ordered-task-list">open in Letur ▸</a>
+<h4>A task marker in a numbered list</h4>
+<a class="open" href="app/#example=ordered-task-list">Open in Letur</a>
 </div>
 <p class="says">A bullet list of <code>- [ ]</code> items compiles, the box drawn where the
 bullet was. In a numbered list the number and the box would both claim that place, so the
 compiler names the line rather than choosing one.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="ordered-task-list" data-expect="error">1. [ ] a numbered task
 2. [x] and a second</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:ordered-task-list--><ol>
 <li><input disabled="" type="checkbox"/>
 a numbered task</li>
@@ -512,35 +623,37 @@ a numbered task</li>
 and a second</li>
 </ol>
 <!--/html:ordered-task-list--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does"><code data-error-for="ordered-task-list">unsupported markdown construct 'task list marker in an ordered list' at line 1</code></p>
 </div>
 
 <div class="row">
 <div class="head">
-<h3>A LaTeX command outside the accepted subset</h3>
-<a class="open" href="app/#example=math-refusal">open in Letur ▸</a>
+<h4>A LaTeX command outside the accepted subset</h4>
+<a class="open" href="app/#example=math-refusal">Open in Letur</a>
 </div>
 <p class="says">The dialect accepts a bounded list — the Greek letters, the relations,
 sums and integrals, <code>\frac</code>, <code>\sqrt</code>, the accents, the matrix and
 <code>aligned</code> environments. A command off it is named rather than dropped.</p>
 <div class="cols">
-  <div class="col"><span class="cap">md2pdf</span>
+  <figure class="col">
 <script type="text/markdown" data-example="math-refusal" data-expect="error">A formula $\includegraphics{fig.png}$ names a command outside the dialect.</script>
-  </div>
-  <div class="col"><span class="cap">the same parse, as HTML</span>
+  <figcaption>md2pdf</figcaption>
+  </figure>
+  <figure class="col">
     <div class="rendered"><!--html:math-refusal--><p>A formula <span class="math math-inline">\includegraphics{fig.png}</span> names a command outside the dialect.</p>
 <!--/html:math-refusal--></div>
-  </div>
+  <figcaption>the same parse, as HTML</figcaption>
+  </figure>
 </div>
 <p class="does"><code data-error-for="math-refusal">math error at line 1: unsupported command '\includegraphics'</code></p>
 </div>
 </div>
 
-<p class="lede">Every sentence in red above is the sentence the command-line tool prints
-at a terminal, because it is the same <code>Display</code> over the same error, from the
-same crate compiled to WebAssembly.</p>
+<p class="lede">A refusal reads the same in Letur as at a terminal: the window runs the
+compiler the <code>md2pdf</code> command-line tool runs, built for your browser.</p>
 
 </section>
 
