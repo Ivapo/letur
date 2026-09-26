@@ -6,7 +6,7 @@ note: >
   dialect adds to markdown, every claim it makes is a snippet the workspace suite
   compiles, and one click sets that snippet as a PDF in the reader's own browser.
 status: accepted
-last_updated: 2026-08-22
+last_updated: 2026-09-25
 
 phases:
   - name: "Phase 1 — the page says what the dialect adds"
@@ -27,6 +27,11 @@ phases:
   - name: "Phase 4 — the other column stops describing and starts showing"
     reviewed: 2026-08-22
     shipped: 2026-08-22
+    cut: null
+    by: null
+  - name: "Phase 5 — the refusal the engine withdrew, and the one it made in its place"
+    reviewed: 2026-09-25
+    shipped: null
     cut: null
     by: null
 
@@ -221,7 +226,9 @@ Phase 2's, and Phase 1 left the line alone.)*
 
 **The failure this design exists to prevent is a page that shows markdown the compiler
 refuses.** It is the failure most likely to happen and least likely to be noticed: the
-dialect refuses raw HTML and a task list wholesale through `core/src/emit.rs:describe`,
+dialect refuses raw HTML and a task list wholesale through `core/src/emit.rs:describe`
+*(**CORRECTED 2026-09-25:** a task list no longer; see the note under "Three kinds of
+difference")*,
 refuses the image destination shapes `core/src/emit.rs:check_image` lists, refuses eight
 group shapes, and refuses every LaTeX command off `core/src/math.rs:COMMANDS`. A snippet
 typed into a landing page by hand is one edit away from any of them, and the page would
@@ -462,6 +469,16 @@ and a flat list would imply they are.
    feature — `web/src/lib.rs:render` maps the error through the same `Display` the CLI
    prints, so the sentence in the page is the sentence at the terminal. This is the group
    the test in §2 checks hardest, because its rows assert an exact message.
+
+   > **CORRECTED 2026-09-25, by Phase 5.** *"Raw HTML and a task list"* is no longer what
+   > the dialect refuses. `md2pdf-core` 0.4.0 (`mpdf-001` Phase 15, next door) sets a
+   > bullet task list, drawing the box where the bullet was, and refuses two shapes in its
+   > place: a task marker in an *ordered* list, and a list mixing task items with plain
+   > ones. The group keeps three rows and the decision above stands whole — the refusal
+   > *is* the feature — but its middle row is now the first of those two shapes,
+   > `1. [ ] …`, and not a task list. The same premise at the head of *"What the page
+   > claims is what the compiler does"* keeps its words with a one-line pointer here; its
+   > argument never turned on which construct it was.
 
 **Twenty-two constructs are supported and the page shows nowhere near that many.** The
 rows are chosen for what a reader cannot get elsewhere; ordinary emphasis, lists and
@@ -847,3 +864,103 @@ the half of the page that never had a gate.
   **README: none needed**, and the reason is that it documents the dialect and the CLI,
   neither of which this changes; a crate export that no command surfaces is not
   user-facing. One push.
+
+### Phase 5 — the refusal the engine withdrew, and the one it made in its place
+
+*Produces the observable: **yes**, in one respect, and the rest is argued.* `md2pdf-core`
+0.4.0 sets a bullet task list, so a reader who types `- [ ] a` into the box at the foot of
+the page gets a PDF with the box drawn where the bullet was, where today they get a
+refusal. That arrives with `web/Cargo.toml`'s bump and nothing else. **The phase earns
+the rest of its place because §2's gate stopped holding the day 0.4.0 was published.**
+The page's middle refusal row, `task-list`, prints `unsupported markdown construct 'task
+list marker' at line 1` beside a source the compiler now accepts, and
+`app/tests/page_examples_test.rs:every_refusal_prints_the_sentence_beside_it` fails on it
+under 0.4.0. Measured 2026-09-25 in a scratch worktree: that assertion is the whole
+failure, and the other 142 + 11 pass.
+
+It needs Phase 4's blessing mode, because the row's generated column changes with its
+source.
+
+**The row is swapped for a refusal, not moved into the accepted groups** (decision,
+recorded 2026-09-25). A task list is not something this dialect adds to markdown. It is
+GFM, and the row's own generated column already shows `pulldown-cmark` drawing two
+checkboxes. Under §2's grouping an accepted task list is neither *syntax only the emitter
+reads* nor *something markdown has no way to say*. What 0.4.0 added is the rule about
+where a box may stand, and that rule is a refusal that belongs in group 3. The
+alternatives were an accepted row in group 2, which the group's heading makes untrue, and
+dropping the row, which gives up a refusal the dialect makes on purpose. The swap keeps
+twelve rows and three refusals, so the lede's *"the three refusals included"* and the
+test's `EXPECTED = 12` both stand unedited.
+
+- **Scope:**
+  - **`web/Cargo.toml` and `web/Cargo.lock`, `app/Cargo.toml` and `Cargo.lock`**:
+    `md2pdf-core = "0.3"` becomes `"0.4"` in both manifests, in one push. The page
+    compiles through `web/`'s copy and its test compiles through `app/`'s, so a push that
+    moved one would leave the live page and its gate disagreeing about what compiles.
+    `app/Cargo.toml`'s comment above the line records what 0.4.0 brought: task lists, the
+    article's one-column default, and no new `Error` variant, the two new sentences
+    being `Error::UnsupportedConstruct`'s. It also records that **the showcase PDF is still byte-identical
+    to 0.1.3's**, measured 2026-09-25 as 138,441 bytes under both, so that spec's OQ-5
+    reopening condition is still unspent. `.github/workflows/pages.yml`'s comment naming
+    `"0.3"` follows.
+  - **`web/index.html`**: the `task-list` row becomes `ordered-task-list`, meaning its
+    `data-example`, its `data-error-for` and its pair of `html:` markers. Its heading
+    becomes *A task marker in a numbered list*. Its source is
+    `1. [ ] a numbered task` over `2. [x] and a second`, flush left under §2's byte rule.
+    Its `says` paragraph says that a bullet list of `- [ ]` items compiles with the box
+    where the bullet was, and that in a numbered list the number and the box would both
+    claim that place, so the compiler names the line rather than choosing one. Its `<code>`
+    holds `unsupported markdown construct 'task list marker in an ordered list' at line
+    1`, measured against 0.4.0 in the same scratch run. The generated column is written by
+    the blessing mode and never by hand. **The page's own HTML comments carry the same
+    stale pointers as the test**, and they are the ones an implementer reads first: the
+    blessing command `cargo test -p md2pdf-core --test page_examples_test -- --ignored
+    bless` in the "Do not reformat" comment, and five mentions of
+    `core/tests/page_examples_test.rs`. They become `-p letur` and
+    `app/tests/page_examples_test.rs`. Nothing else on the page changes.
+  - **`app/tests/page_examples_test.rs`**: no assertion changes. The count stays twelve,
+    and the refusal set is read off the page. Two hints printing
+    `cargo test -p md2pdf-core --test page_examples_test` name a package this repository
+    has not held since `mpdf-011` Phase 1, and they become `-p letur`. The phase touches
+    that file's blessing path, so this is the one stale pointer §6.1 lets it fix.
+- **Not in scope, and logged rather than forgotten.** The lede's *"Twenty-three constructs
+  are supported"* was already behind before 0.4.0, and task lists take it one further.
+  `rules/web-demo.md` logs that gap and argues it belongs to a phase adding the
+  `abstract` and `keywords` rows, which this is not. The engine's frozen copies of the
+  twelve rows (`tests/fixtures/examples/` next door) keep `task-list` under `ok/` and do
+  not hold the new row. They are the engine's own fixtures and it said so when it moved
+  them, so Letur's test is now the only thing holding this row to the compiler.
+- **Exit gate:**
+  1. `cargo test --workspace` passes with both lockfiles at `md2pdf-core` 0.4.0, the
+     equality assertion covering the new row's blessed block.
+  2. `git grep "task list marker' at"` returns only `specs/reviews/`, which is append-only,
+     and this line.
+  3. The module is rebuilt with `wasm-pack build --target web --release` and served
+     locally. In a browser the new row's **load it** puts the new sentence in the status
+     line, and typing `- [ ] a` / `- [x] b` into the box sets a PDF with no error. The
+     second half is the observable. The first half proves the page's copy of the engine
+     is the test's.
+  4. The module's size at 0.4.0 is recorded raw and under `brotli -q 11`. **0.3.0 is
+     re-measured the same day on the same toolchain**, the way the rule's 0.3.0 record was
+     taken against 0.1.3, so the delta is the engine's and not the toolchain's.
+     `rules/web-demo.md` requires this of every engine version. It is a record and never a
+     ceiling.
+  5. `spec-lint` reports 0 errors after `spec-lint --write-index`, and no warning that is
+     not already reported at the phase's parent commit.
+- **Close-out:** `rules/web-demo.md` changes in several places. Its three refusals name the
+  numbered-list task marker. Its supported-construct count says twenty-six, which was
+  already one behind the engine at 0.3.0, and it becomes the engine's twenty-eight. The
+  lede gap it logs goes from three behind to five, and the rule names both steps. The *"8/3 split"* it says the test
+  does not assert, already stale, becomes 9/3. It gains the 0.4.0 module size and the
+  `"0.4"` in its deploy paragraph. `rules/desktop.md` names `"0.4"`. It also records that
+  the frozen `tests/fixtures/samples/` copies were **not** re-synced to 0.4.0's rewording
+  of `article.md` and `showcase/`: that rule's own argument for the freeze is that only a
+  phase of this repository may move them, and both documents pin `columns`, so the one
+  thing 0.4.0 changed about how they render cannot reach them. **The one-column default
+  moves nothing else here.** The scratch run found no Letur test, gate script or page
+  sentence that assumed an unkeyed document sets in two columns. The page's one row
+  naming a count writes `columns: 1` itself. **`rules/web-demo.md` is at 260 of its 265
+  lines**, and the edits above are counted against that cap. Either the paragraphs they
+  land in are compressed, or the cap is raised and the reason recorded in the commit, as
+  Phase 4 did. **README: none needed**, because it names
+  neither the refusals nor a column default. **`CLAUDE.md`: none needed.** One push.

@@ -2,6 +2,54 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 2 — Phase 5 only — 2026-09-25 — same reviewer, resumed with the author's changelog — **READY**
+
+Verdict: `READY`, zero blocking, and nothing new raised. Converged inside the cap. All
+six round-1 refinements were checked **against the file**, not the changelog.
+`web/index.html` holds five mentions of `core/tests/page_examples_test.rs`, at the lines
+the scope now names, plus the blessing command. Gate 5 can be checked: 0 errors and 68
+warnings before `--write-index`, every one of them present at the parent commit except the
+index drift this edit causes. The two new CORRECTED lines do not carry gate 2's literal,
+so that gate still returns only the review record and its own line.
+
+### Round 1 — Phase 5 only — 2026-09-25 — fresh clean-context reviewer with repo access — **READY**
+
+**Round 0**, answered by the author against §1: the phase produces the observable. A
+bullet task list typed into the page's box now sets as a PDF, where under 0.3 it was
+refused, and gate 3 checks that in a browser. The rest of the phase is argued explicitly
+as restoring §2's gate, which `md2pdf-core` 0.4.0 broke on the day it was published. The
+episode is this one appended phase. It was opened by that release, and by the owner
+choosing, over keeping the row as an accepted example or dropping it, to swap the
+task-list refusal for the ordered-list refusal 0.4.0 introduced.
+
+Verdict: `READY`, zero blocking, six non-blocking, all accepted and folded in before round 2.
+
+**Re-measured by the reviewer in a separate scratch worktree:**
+- With only the bump, 142 passed, then 11 passed and 1 failed. The failure is
+  `every_refusal_prints_the_sentence_beside_it` on `task-list`.
+- The new source gives `unsupported markdown construct 'task list marker in an ordered list' at line 1`.
+- With the row swapped, renamed and blessed, 12/12 page tests pass. The blessed block is
+  an `<ol>` with two disabled checkboxes and none of the four refused substrings.
+- The split is 9 `ok` and 3 `error`. The engine's supported count is 27 at 57da814 and
+  28 at a5b0512.
+- 0.3.0 and 0.4.0 have identical `Error` variants and an identical `pub` API.
+- The frozen showcase compiles to identical 138,441-byte PDFs under the 0.1.3 CLI and
+  under 0.4.0.
+
+**The six non-blocking findings, and what was done with each:**
+1. There were three stale `-p md2pdf-core` hints, not two. The third is in the page's
+   "Do not reformat" comment, along with five `core/tests/` paths. They are now in scope.
+2. Gate 5's "clean" was undefined. It is now "0 errors after `--write-index`, and no new
+   warning".
+3. `rules/web-demo.md` is at 260/265 lines. The close-out now says to compress or raise
+   the cap.
+4. The rule's count was already one behind at 0.3.0. The close-out now names both steps:
+   26 → 28, and a gap of three → five.
+5. The variant is `Error::UnsupportedConstruct`, not `Unsupported`.
+6. The §2 premise now carries an inline dated pointer. It had been left bare.
+
+Gate 4 now also names `brotli -q 11` and requires 0.3.0 to be re-measured the same day.
+
 ### Round 2 — Phase 4 only — 2026-08-22 — same reviewer, resumed with the author's changelog — **READY**
 
 Verdict: `READY`, zero blocking, two non-blocking. Converged inside the cap, on the

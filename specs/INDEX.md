@@ -4,7 +4,7 @@
 
 - **[desktop-app](desktop_app_spec.md)** — `mpdf-003` · accepted · partial
   A macOS desktop app that shows the PDF while you write: a Tauri window wraps the same core crate, watches the document and its images, and re-renders.
-- **[web-demo](web_demo_spec.md)** — `mpdf-006` · accepted · done
+- **[web-demo](web_demo_spec.md)** — `mpdf-006` · accepted · partial
   The published browser demo becomes the project's front door: the page says what the dialect adds to markdown, every claim it makes is a snippet the workspace suite compiles, and one click sets that snippet as a PDF in the reader's own browser.
 - **[pdf-renderer](pdf_renderer_spec.md)** — `mpdf-009` · accepted · done
   The app draws the page itself: `pdf.js` is vendored as two static modules and rasterises each page onto a canvas the pane owns, so fit-to-width is a mode rather than a transform, the type is sharp at the display's own resolution, and the text and links come back with it.
