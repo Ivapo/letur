@@ -31,7 +31,7 @@ phases:
     by: null
   - name: "Phase 5 — the refusal the engine withdrew, and the one it made in its place"
     reviewed: 2026-09-25
-    shipped: null
+    shipped: 2026-09-25
     cut: null
     by: null
 

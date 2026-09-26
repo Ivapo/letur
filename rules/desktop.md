@@ -79,7 +79,9 @@ engine's `samples/` tree under `tests/fixtures/samples/` as `article.md`,
 directory and asserts no master sits at its top. Copies on purpose: these tests
 assert what the *app* does with a document, so a fixture that stopped tracking
 the dialect costs them nothing, where one that kept tracking it would move this
-app's measured numbers on every dialect phase.
+app's measured numbers on every dialect phase. So 0.4.0's rewording of `article.md` and
+`showcase/` for the one-column default was not taken: both pin `columns`, and the
+showcase's PDF is still byte-identical to 0.1.3's.
 
 **The pane's text is what compiles**, and several claims below turn on it. The
 file beside it need never have held that text. **The pane holds exactly one file
@@ -104,7 +106,7 @@ so neither adds a crate to the tree**, and that fact is what picked
 `objc2-foundation` over the `trash` crate, whose macOS implementation is the
 same `NSFileManager` call. There is no `target.'cfg(...)'` table: this binary is
 macOS only by construction and `src/main.rs` says so. **`md2pdf-core` is a
-registry dependency at `"0.3"`** since `mpdf-011` Phase 3 published it, a `{ git, rev }`
+registry dependency at `"0.4"`** since `mpdf-011` Phase 3 published it, a `{ git, rev }`
 table staying the seam for any publish Letur cannot wait for. A patch lands with no
 commit here — that spec's OQ-5, and what its reopening condition watches — and a minor,
 `0.x`'s breaking release, takes one. Its diagram renderer `merman` sets a Rust 1.95 floor

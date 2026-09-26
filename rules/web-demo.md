@@ -64,13 +64,14 @@ brotli, of which `core/assets/fonts` is 2.5 MB; nothing in the design is keyed t
 figure. `web/Cargo.toml`'s release profile is tuned for size over speed — `opt-level = "s"`,
 `lto`, one codegen unit, `panic = "abort"`.
 
-`web/pkg/md2pdf_web_spike_bg.wasm` is **33,160,438 bytes** at `md2pdf-core` 0.3.0 and
-**9,906,385** under brotli, measured 2026-09-21 against **25,415,506** and **7,912,959** at
-0.1.3 on the same day, toolchain and profile: **+7,744,932 raw, +1,993,426 over the wire**,
-and all of it the engine's. 0.2.0 brought the diagram renderer — `merman`, and `lol_html`
-with `cssparser` and `selectors` under it — and 0.3.0 the URL image, which in a browser is
-always refused, since nothing here fetches. The record is the requirement, never a ceiling;
-the one before it was 25,362,143 on 2026-08-23, after `mpdf-007` Phase 4.
+`web/pkg/md2pdf_web_spike_bg.wasm` is **33,165,169 bytes** at `md2pdf-core` 0.4.0 and
+**9,900,913** under `brotli -q 11`, measured 2026-09-25 against 0.3.0 rebuilt that day, which
+reproduced its own record exactly: **+4,731 raw, −5,472 over the wire**. 0.4.0 brought task
+lists. 0.3.0's record was taken 2026-09-21 against **25,415,506** and **7,912,959** at 0.1.3,
+on the same day, toolchain and profile: **+7,744,932 raw, +1,993,426 over the wire**, all
+of it the engine's — the diagram renderer from 0.2.0 (`merman`, `lol_html`, `cssparser`,
+`selectors`) and 0.3.0's URL image, always refused in a browser. The record is the
+requirement, never a ceiling; 25,362,143 on 2026-08-23 was the one before those.
 
 The panes sit beneath the list, so the page scrolls and `main` takes a slice of the
 viewport — `clamp(360px, 70svh, 720px)`, in `svh` rather than `dvh` so browser chrome
@@ -133,18 +134,20 @@ The page carries three groups and **twelve examples**: syntax an ordinary render
 through as text (a caption over a table, over a listing and over an image, a `:::` group, a
 `{#name}` and the `[](#name)` that points at it, display math), things markdown has no way
 to say (the nine frontmatter keys that decide the look, a footnote, a citation and the
-reference list it earns), and three refusals — raw HTML, a task list, and a LaTeX command
-off the accepted list. Twenty-six constructs are supported, so the page is a chosen few
-and links out to the README for the rest.
+reference list it earns), and three refusals — raw HTML, a task marker in a numbered list,
+and a LaTeX command off the accepted list. Twenty-eight constructs are supported, so the
+page is a chosen few and links out to the README for the rest. The middle refusal was a
+task list until `md2pdf-core` 0.4.0 accepted one (`mpdf-006` Phase 5).
 
-**The page's own lede is three behind that**, and the gap is logged rather than half-fixed
+**The page's own lede is five behind that**, and the gap is logged rather than half-fixed
 here: `web/index.html:172`'s `<p class="lede">` reads "Twenty-three constructs are supported
 and twelve are shown here", which was one behind before `mpdf-005` Phase 10, two behind
-after it and three behind after that spec's Phase 11. Correcting the number alone would
+after it, three behind after that spec's Phase 11, four at 0.3.0 — which this rule missed,
+still saying twenty-six — and five once 0.4.0 took task lists. Correcting the number alone would
 leave the page claiming a count it shows no example of, and an example is real work under
 this spec's own gate — every claim on the page is a snippet the workspace suite compiles —
 so the count, an `::: abstract` row and a `::: keywords` row all belong to a phase of
-`mpdf-006` rather than to another spec's close-out. **That the gap has now widened twice is
+`mpdf-006` rather than to another spec's close-out. **That the gap has now widened four times is
 itself the finding**: a logged gap that keeps growing is a phase of this spec waiting to be
 drafted rather than a note to re-write a third time.
 
@@ -170,7 +173,7 @@ row's visible `<code data-error-for="…">` text, character for character. **The
 sentence is the one the reader sees** — an attribute copy would prove agreement with a
 string nobody reads. The `<code>` scan is weaker than the `<script>` scan, parsed markup
 equalling its raw slice only while the sentence needs no character reference, so a separate
-assertion refuses a message carrying `<`, `&` or a newline. It does **not** assert the 8/3
+assertion refuses a message carrying `<`, `&` or a newline. It does **not** assert the 9/3
 split.
 
 **That test is a workspace test over a file outside the workspace, and that is the point.**
@@ -266,7 +269,7 @@ share link: `mpdf-001` §1.1 refuses servers permanently, and Pages serves stati
 trigger with `mpdf-011` Phase 1**: the engine is a dependency of `web/Cargo.toml` rather
 than a directory beside it, so there is no `core/` here to watch and a new version of it
 reaches the page through a commit to that manifest or its lockfile, both of which `web/**`
-covers. It was a git revision until `mpdf-011` Phase 3 and is `md2pdf-core = "0.3"` off
+covers. It was a git revision until `mpdf-011` Phase 3 and is `md2pdf-core = "0.4"` off
 the registry since. It assembles
 `_site` from **`web/index.html` and `web/pkg/` only**, so anything the page needs must be
 inline in that file or added to that step — which is why both of the page's files are. `wasm-pack`'s
