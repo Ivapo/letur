@@ -2,6 +2,8 @@
 
 # Specs
 
+- **[web-app](web_app_spec.md)** — `ltr-001` · accepted · pending
+  The published page splits in two: a landing page that shows the dialect and loads no module, and Letur itself in a browser tab — the desktop front end unchanged, answered by a browser host over a project held in the browser's own storage, or, in Chromium, a folder on the reader's disk.
 - **[desktop-app](desktop_app_spec.md)** — `mpdf-003` · accepted · partial
   A macOS desktop app that shows the PDF while you write: a Tauri window wraps the same core crate, watches the document and its images, and re-renders.
 - **[web-demo](web_demo_spec.md)** — `mpdf-006` · accepted · done
