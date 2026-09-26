@@ -39,6 +39,11 @@ phases:
     shipped: 2026-09-26
     cut: null
     by: null
+  - name: "Phase 7 — each row shows the page Letur sets, and a refusal reads as one"
+    reviewed: 2026-09-26
+    shipped: null
+    cut: null
+    by: null
 
 extends: null
 supersedes: null
@@ -688,7 +693,11 @@ is for, not what it costs the suite.
   there as the single unchecked assertion on a page Phase 4 had just finished removing the
   last of, which is the argument this spec has made against itself four times.
 - **OQ-6 — does each row show the page md2pdf sets, as well as the HTML column?**
-  *(design call — deferred; not Phase 6.)* The strongest thing a row could show is the
+  *(design call)* **RESOLVED 2026-09-26: yes, by Phase 7** — the reopening condition
+  below was met by the author's first reading of the Phase 6 page. Each `ok` row shows a
+  picture of its first page on the right, guarded by the hash of the PDF it was made
+  from; the HTML column moves beneath, into a closed `<details>`.
+  ~~*(deferred; not Phase 6.)*~~ The strongest thing a row could show is the
   typeset result, and the page loads no module, so it would be a picture: each `ok`
   example's first page rasterised at bless time and committed beside the page, with a
   test that the picture is current. That is a second generated artefact per row, a bless
@@ -1193,4 +1202,200 @@ but its own host.
     its "In a browser" bullet for the landing page is re-read against the new page.
   - A dated `CORRECTED` note beside §1's 2026-09-02 note answers the question it left
     open: the page is Letur's front door, and says so.
+  - `CLAUDE.md`: none needed.
+
+### Phase 7 — each row shows the page Letur sets, and a refusal reads as one
+
+*Produces the observable: **no**, and it is the nearest this page can come to it.* The
+page the author sees beside their text is drawn by the app, and nothing here changes it.
+What this phase puts on the landing page is **a picture of that page for every example
+that makes one** — the first time a visitor sees the product's output without opening
+it. It is argued for by the reading it corrects rather than assumed.
+
+**The author's reading of the shipped Phase 6 page, 2026-09-26**, was a question: *"are
+the parse blocks showing what it would look like in the pdf? because for example the
+math isnt showing nor the captions"* — and of the three refusal rows, *"why?"*. Both are
+the page working as designed and failing to say so:
+
+- **The right-hand column is not the PDF.** It is `md2pdf_core::md_to_html` over the
+  row's source (§2, Phase 4) — what the parse means to anything but Letur — so the
+  caption comes back `<p>: The measurements.</p>` and the formula as raw `\sqrt{…}`.
+  That is the argument, but a visitor reads the box beside the source as *the result*,
+  and the only result on the page is one click away. The column's label, *the same
+  parse, as HTML*, is the one place that says otherwise, in 15px italic.
+- **The refusals read as failures.** Each ends in a red monospace sentence after a `→`,
+  the arrow every other row uses for *what the page carries* — so the three rows say
+  "this is what you get" and then print an error.
+
+This is OQ-6's reopening condition — *"the redesigned page still reads as description
+rather than demonstration"* — met, and this phase resolves OQ-6 (§3 records it).
+
+**The row's new shape (decision, recorded).** Source on the left, as now, its caption
+`md2pdf` kept; **on the right, the page Letur makes of it**, a picture in a
+`figure.shot` captioned *the page Letur sets*. The HTML column stays — it is still the
+sharpest statement of what the markers mean, and still what
+`app/tests/page_examples_test.rs` generates — but **it moves beneath, into a `<details>`,
+closed by default, placed after the row's `div.cols` and after `p.does` where the row
+has one.** Its `<summary>` reads *Without Letur: the same parse, as plain HTML* and
+replaces the column's old `figcaption`, keeping Phase 4's words inside it. A `<details>`
+opens with scripting off, so the page still runs no script. **The summary's default
+marker is hidden** (`list-style: none`, and `::-webkit-details-marker { display: none }`)
+because `▸`/`▾` are outside the font subset and Phase 6 allows no glyph either face lacks;
+in its place a `::before` of `+ ` closed and `– ` (U+2013) open, both inside the subset.
+Three side-by-side columns were weighed and refused: at the 1120px measure each would be
+about 350px, too narrow for a Libertinus Mono line or a page picture at a readable size,
+and the comparison would still sit where the result is expected.
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│  A caption makes a figure, and numbers it       Open in Letur │
+│  <says>                                                       │
+│  ┌─────────────────────┐  ┌────────────────────────────┐      │
+│  │ source, mono,       │  │ picture of the page Letur  │      │
+│  │ on --paper          │  │ sets, cropped to the ink   │      │
+│  └─────────────────────┘  └────────────────────────────┘      │
+│   md2pdf                   the page Letur sets                │
+│  → <does>                                                     │
+│  + Without Letur: the same parse, as plain HTML               │
+└───────────────────────────────────────────────────────────────┘
+```
+
+Below 720px the two columns stack, source first, as Phase 6 made them.
+
+**A refusal row has no page, and says so in the page's place.** Its right-hand slot holds
+a `div.refusal` on `--ground`, ruled on the left by 3px of `--alarm` (a rule, not text),
+reading *Letur sets no page, and says:* in `--ink`, above the row's
+`code[data-error-for]` — the same element, its text unchanged, moved out of `p.does`,
+**and that emptied `p.does` is deleted**, so the refusal rows carry no `→`. The group
+intro already says why a refusal is the feature; the panel makes the row look like the
+answer rather than a crash. The longest sentence scrolls inside the panel, as it scrolls
+today.
+
+**How a picture is made (decision, recorded).** Phase 6's rule holds: **captured, not
+drawn**, and regenerated by one command. `web/hero.mjs`'s default mode gains the rows: for
+each `ok` example it opens `app/#example=NAME` in the assembled site in Chromium, waits for
+status `current`, takes the PDF the window holds (`invoke('current_pdf')`, the bytes clause
+(c) compares with the CLI's), and renders its first page with the window's own vendored
+pdf.js — **`app/dist/pdfjs/pdf.min.mjs` in the repository, imported from the page as
+`/app/pdfjs/pdf.min.mjs`**, whose worker the window has already configured — via
+`getViewport({ scale: 3 })` onto a canvas of exactly that viewport's size: **3 canvas
+pixels per PDF point, whatever the context's device scale factor.** The window's own canvas
+is not screenshotted, because its scale follows the pane's width. It dies if an example
+makes more than one page (measured 2026-09-26: each of the nine makes exactly one A4 page).
+
+- **Cropped to the ink**: the bounding box of pixels with any channel below 250, padded
+  by 36 canvas pixels (12pt) on every side, clamped to the page. **One rule for every row,
+  with no special case**: the footnote row's ink runs from the text near the top to the
+  note at the foot, so its crop is the page's height and the ink's width — about 294 × 968
+  CSS px, a tall picture, which is that row's claim.
+- **One picture per example, not two.** `--paper` is white in both themes and the page Typst
+  sets is white in either palette, so the picture carries no theme — nine PNGs,
+  `web/pages/NAME.png`, committed, since the page renders with no build step.
+- **Shown at true size where the column allows**: each `<img>` carries `width` and
+  `height` equal to **`Math.round(px × 4 / 9)`** of the PNG's own width and height — 3
+  canvas px per pt, 4/3 CSS px per pt — so 1pt is 1.333 CSS px, one scale for every row.
+  The stylesheet gives it `max-width: 100%; height: auto`, so a crop wider than its column
+  scales down undistorted. At 1280px the widest crop, the citation at about 528 CSS px,
+  meets the ~526px column; at phone width several scale down, each by its own factor —
+  one scale holds on the desktop layout, not below 720px. **`web/hero.mjs` prints the
+  nine `width`/`height` pairs**, and they are written into `web/index.html` by hand like
+  the rest of its markup; clause (a) holds them to the PNGs (below). `loading="lazy"` on
+  all nine. Each carries an `alt` written for that row saying what the page shows
+  (*"Table 1: a two-column table with its caption set beneath"*), since the `→` sentence
+  is a claim and not a description.
+
+**A picture that can go stale is guarded by the bytes it was made from, and its size by
+its own pixels (decision, recorded).** The risk is an engine bump: `web/Cargo.lock` moves
+to a new `md2pdf-core`, every PDF changes, and nine committed pictures still show the old
+ones. A pixel comparison across machines would be flaky, so the guard sits upstream of the
+pixels: `web/hero.mjs` writes **`web/pages/pages.json`, each example's name to the SHA-256
+of the PDF its picture was rendered from**, and `web/check.mjs` clause (c), which already
+holds each `ok` example's PDF bytes, asserts their hash equals that entry — failing with
+*"web/pages/NAME.png was made from another PDF: run bun web/hero.mjs"* — and that the
+manifest names exactly the nine `ok` examples. Regenerating after a bump rewrites the PNGs
+and can change their sizes, so **clause (a) asserts each row's `width` and `height`
+attributes equal `Math.round(naturalWidth × 4 / 9)` and `Math.round(naturalHeight × 4 / 9)`**,
+and a size left stale in the HTML fails there.
+
+**What the guard does not catch, stated so nobody leans on it**: a change to `hero.mjs`'s
+crop, padding, scale or threshold; a pdf.js upgrade under `app/dist/pdfjs/`; a PNG edited
+by hand or two swapped; an `alt` that no longer describes its picture. The stated risk is
+the engine, and the rest are changes someone makes on purpose and looks at. **And it runs
+only where `web/check.mjs` runs** — locally, before a push; `.github/workflows/pages.yml`
+does not run it, so a push that bumps the engine without re-running `web/hero.mjs` would
+publish stale pictures. The README's Developing section is what stands in the way.
+
+**What does not move, and why it binds** — Phase 6's list, unchanged: every
+`script[data-example]` and `script[data-asset]` with its attributes in their order and its
+content, every `code[data-error-for]` with its text, every `<!--html:NAME-->` block
+between its markers, and each row's `<a class="open" href="app/#example=NAME">`, twelve.
+`div.rendered`, `p.does`, the columns' `figure`s and their captions are wrapper markup and
+may move; the `code[data-error-for]` elements move out of `p.does` with their bytes
+intact. No reader depends on the wrapper: the test and the seed read by attribute, and
+`web/check.mjs`'s regexes by attribute order and text.
+
+- **Scope:**
+  - **`web/index.html`**: each `ok` row's right-hand slot becomes a `figure.shot` holding
+    its `<img>` and its caption; each refusal row's becomes `div.refusal`, and its emptied
+    `p.does` is deleted; each row's `div.rendered` moves into the closed `<details>`
+    above. The lede's sentence beginning "Twelve examples, each set two ways" is rewritten
+    to say the picture is the page Letur sets and the plain-HTML version is beneath. The
+    stylesheet gains `figure.shot`, `div.refusal`, the `<details>` and its marker, and
+    still carries no `transition`, `animation` or `scroll-behavior`.
+  - **`web/pages/`**: nine PNGs and `pages.json`, written by `web/hero.mjs`.
+  - **`web/hero.mjs`**: the rows above, in its default mode after the hero, so one
+    command makes every picture the page shows and prints their sizes. **`--shots` keeps
+    its eight viewport screenshots and adds three full-page ones per engine** —
+    `landing-<engine>-full-1280-light.png` and `landing-<engine>-full-390-light.png` with
+    every `<details>` closed, and `landing-<engine>-full-1280-dark-open.png` with every
+    `<details>` opened — fourteen in all, so the rows themselves are in front of the
+    author. A full-page capture does not scroll, so before each one it scrolls every
+    `figure.shot img` into view and waits for all nine to load; a lazy picture below the
+    fold would otherwise be captured as an empty slot.
+  - **`web/assemble.sh`**: copies `web/pages/*.png` to `_site/pages/` **when any exist**,
+    as Phase 6 copies the hero images, so `web/hero.mjs`'s first run can assemble before
+    the first picture; `pages.json` is not published.
+  - **`web/check.mjs`**:
+    - **(c)**: the hash assertion and the manifest's names.
+    - **(a)**: for each `figure.shot img` — the nine, and not the generated column's `data:`
+      image inside a `<details>` — it scrolls the image into view and waits for it to load
+      or fail, then asserts `naturalWidth > 0` and the two size equalities above.
+    - **(o)**: runs, both walks, with every `<details>` opened. The contrast walk needs it
+      so the plain-HTML columns stay under it. The keyboard walk needs it because three of
+      the page's links (`#tab:m`, `#src`, `@knuth1986`) live inside those columns and are
+      unreachable while closed. The walk already accepts any outlined stop that is not a
+      link, so the twelve `<summary>` stops need no change; its budget of three stops per
+      link stays.
+  - **`app/tests/page_examples_test.rs`**: no change.
+- **Exit gate:**
+  1. `cargo test --workspace` passes with `app/tests/page_examples_test.rs` unchanged, and
+     the readers' bytes extract equal, in equal order, from the commit before the phase and
+     from the working copy — Phase 6's gate 1, the same four patterns.
+  2. `bun web/check.mjs` and `bun web/check.mjs --webkit` pass every clause.
+  3. **The guards are falsified, in Chromium, each against a copy restored afterwards**:
+     with one `pages.json` entry altered, clause (c) fails naming that example; with one
+     PNG deleted, clause (a) fails; with one `<img>`'s `width` changed by 1, clause (a)
+     fails. The three results are recorded in `specs/reviews/mpdf-006.md`.
+  4. **The one gate a test cannot hold**: `bun web/hero.mjs --shots` writes the fourteen
+     screenshots above, and the author approves them before the push — recorded in
+     `specs/reviews/mpdf-006.md` with their names, and with the question this phase
+     answers put to them again: does each row now show what Letur makes?
+  5. `grep` finds no `transition`, `animation` or `scroll-behavior` in `web/index.html`.
+  6. `spec-lint` reports 0 errors after `spec-lint --write-index`.
+- **Close-out:**
+  - **`rules/web-demo.md`**: the row's new shape, the pictures and how they are made, sized
+    and guarded — including what the guard does not catch and that it runs only locally —
+    the refusal panel, the summary's marker, and the page's weight with `web/pages/`
+    added, raw and under `brotli -q 11`. **The weight is recorded, not budgeted**: OQ-6
+    estimated half a megabyte, and the nine are lazy-loaded, so a visitor pays for the rows
+    they scroll to. The rule is at 197 of its 200 body lines, so `max_lines` rises to fit
+    and `covers:` grows to name the pictures.
+  - **`rules/web-app.md`**: the `_site/` inventory gains `pages/`; `web/hero.mjs`'s rows,
+    manifest and fourteen shots; clause (a)'s and (c)'s new assertions and (o) opening
+    every `<details>`.
+  - **`README.md`**'s Developing section: after an engine bump, `bun web/hero.mjs` before
+    `bun web/check.mjs`, since (c) will refuse stale pictures, and the two command comments
+    corrected to what they now write. The "In a browser" bullet says each example shows
+    the page Letur sets.
+  - **`.gitignore`**'s comment on `/_shots/` names fourteen screenshots, not eight.
   - `CLAUDE.md`: none needed.

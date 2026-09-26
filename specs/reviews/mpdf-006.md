@@ -2,6 +2,83 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 3 — Phase 7 only — 2026-09-26 — the correctness reviewer, resumed — **READY (converged)**
+
+The one blocker left open in round 2 is resolved: before each full-page capture, the
+script now scrolls every `figure.shot img` into view and waits for all nine to load.
+Nothing else had changed, and nothing new was raised.
+
+### Round 2 — Phase 7 only — 2026-09-26 — the same three reviewers, resumed — **NOT READY (1 blocking)**
+
+**Both round-1 blockers are resolved in the file.** The exit-gate reviewer and the scope
+reviewer returned READY.
+
+**The correctness reviewer found that the fix for B1 introduced a blocker.** Playwright's
+`fullPage` capture does not scroll. So a `loading="lazy"` image below the fold is never
+requested, and its `naturalWidth` stays 0 in both engines. The reviewer measured this with
+one image placed 6000px down. The six full-page shots would have shown the rows with their
+pictures missing, which is B1 again. The exit-gate reviewer raised the same point as a
+non-blocking caution.
+
+Accepted. Before each full-page capture, the script scrolls every `figure.shot img` into
+view and waits for all nine to load.
+
+### Round 1 — Phase 7 only — 2026-09-26 — a fresh panel of three (correctness, exit gate, scope) — **NOT READY (2 blocking, deduplicated)**
+
+**Round 0 — is this the right thing to build at all?** Phase 7 produces no observable, and
+it argues this explicitly. It puts a picture of the observable, the page Letur sets, beside
+each example on the page every visitor meets first. It is the right thing to build: the
+author's first reading of the Phase 6 page took the HTML column for the PDF and the
+refusals for failures. That is OQ-6's reopening condition, met.
+
+**The two blockers, both raised by all three reviewers:**
+
+1. **Gate 4's screenshots never reached a row.**
+   - `web/hero.mjs:shots` takes viewport-only screenshots.
+   - The first `.row` starts at about y 965px at 1280 × 900 and about 1369px at 390 × 844 (measured).
+   - So the author would have been asked "does each row show what Letur makes?" about images that contain no row.
+   - **Resolved:** `--shots` adds three full-page captures per engine, fourteen in all:
+     - 1280 light, `<details>` closed
+     - 390 light, `<details>` closed
+     - 1280 dark, `<details>` open
+2. **Nothing wrote or checked each picture's `width`/`height`.**
+   - After an engine bump, the fix the guard tells you to run rewrites the PNGs and `pages.json`, and clause (c) passes, while the HTML keeps stale sizes.
+   - Rounding was unstated, and `height: auto` was missing.
+   - **Resolved:**
+     - The size is `Math.round(px × 4/9)`, printed by `hero.mjs` and written into the page by hand.
+     - Clause (a) asserts each attribute against the PNG's natural size.
+     - `height: auto` is set.
+     - A third falsification changes one width by 1.
+
+**Non-blocking findings, all accepted:**
+- `assemble.sh` now tolerates a missing `web/pages/`.
+- The pdf.js path is given as the repository path plus the URL it is served at.
+- The scale is "canvas pixels", independent of the device scale factor.
+- The `<summary>` marker is hidden, because `▸`/`▾` are outside the font subset. It is replaced by `+ ` and `– `.
+- One crop rule, with no special case for the footnote row.
+- The crop threshold and padding are stated.
+- The emptied `p.does` on refusal rows is deleted, and where the `<details>` sits is stated.
+- Labels:
+  - The summary keeps Phase 4's words.
+  - The picture is captioned *the page Letur sets*.
+- Both of clause (o)'s walks run opened, with the reason stated for each: three links live inside the plain-HTML columns.
+- Clause (a) is scoped to `figure.shot img`, waiting for each image to load.
+- What the guard does not catch is written down, and so is the fact that it runs only locally.
+- Gate 3 is scoped to Chromium, runs on restored copies, and its results are recorded.
+- Close-out items the draft had missed: the rule's line cap, the `_site/` inventory, the command comments in the README, and the `.gitignore` comment.
+
+The redundant close-out step marking OQ-6 resolved was removed. Nothing was rejected.
+
+**Numbers re-measured this round**, so the build can trust them. They were measured by
+running `md2pdf` 0.4.0 on the nine `ok` examples, with both assets beside them.
+- **Pages.** Each example makes exactly one A4 page (595.28 × 841.89 pt), and two runs gave identical bytes.
+- **Page furniture.** No page number or footer is printed.
+- **Crops, at true size in CSS px:**
+  - caption-listing is the narrowest, at 160 wide
+  - citation is the widest, at about 528–529, against a right-hand column of about 526 at 1280
+  - footnote is about 294 × 968
+- **Tab stops.** The keyboard walk with every `<details>` open takes about 50–63 stops, within its budget of 72.
+
 ### Gate 3 — Phase 6 — 2026-09-26 — the author, on the screenshots — **APPROVED**
 
 `bun web/hero.mjs --shots` wrote eight viewport screenshots of the landing page into
