@@ -20,8 +20,8 @@
   header b { font-weight: 650; }
   header span { opacity: .65; }
   /*
-    The list of what the dialect adds. It is first in the document and needs
-    nothing from the module, so a reader reads it while the module lands.
+    The list of what the dialect adds. Since `ltr-001` Phase 2 it is the whole
+    page: no module loads here, and the compile is the app's, one link away.
   */
   #adds { max-width: 62rem; margin: 0 auto; padding: 26px 14px 34px; }
   #adds > h1 { font-size: 13px; font-weight: 650; letter-spacing: .09em; text-transform: uppercase; margin: 0 0 6px; }
@@ -43,18 +43,16 @@
   .row > p.does::before { content: "→ "; color: var(--dim); }
 
   /*
-    Readiness is the buttons'. They carry `disabled` in the markup, so with
-    scripting off they are honestly inert rather than promising a compile the
-    page cannot run, and the module resolving is what enables them. A reader
-    looks at the thing they are about to click to know whether they may.
+    Each row's way into the app. A link rather than a button since `ltr-001`
+    Phase 2: the compile moved to its own page, so the click is a navigation and
+    works with scripting off.
   */
-  .load {
-    flex: none; font: inherit; font-size: 12px; font-weight: 600; color: inherit;
+  .open {
+    flex: none; font-size: 12px; font-weight: 600; color: inherit; text-decoration: none;
     background: var(--soft); border: 1px solid var(--line); border-radius: 4px;
-    padding: 3px 10px; white-space: nowrap; cursor: pointer;
+    padding: 3px 10px; white-space: nowrap;
   }
-  .load:hover:not(:disabled) { background: color-mix(in srgb, currentColor 12%, transparent); }
-  .load:disabled { opacity: .4; cursor: default; }
+  .open:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
 
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
   @media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
@@ -106,65 +104,13 @@
   }
   @media (prefers-color-scheme: dark) { code[data-error-for] { color: #ff8a8a; } }
 
-  /*
-    The panes sit beneath the list, so the page scrolls and they take a slice of
-    the viewport rather than all of it. `svh` rather than `dvh`: mobile browser
-    chrome hiding mid-scroll would otherwise resize the frame and lose the
-    reader's place in the PDF.
-  */
-  main {
-    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto minmax(0, 1fr);
-    height: clamp(360px, 70svh, 720px);
-    border-top: 1px solid var(--line);
-  }
-  @media (max-width: 720px) {
-    main { grid-template-columns: 1fr; grid-template-rows: auto 1fr 1fr; height: 100svh; }
-    textarea { border-right: 0; border-bottom: 1px solid var(--line); }
-  }
-
-  /*
-    The compile's own line and nothing else: the sentence a refusal names, and
-    nothing at all when the compile succeeded. It sits inside `main` because a
-    click scrolls the reader here — a message about the pane, above the pane,
-    rather than one at the head of a page they have left. Empty it paints
-    nothing, so a page that compiles shows no strip where a message would go.
-  */
-  #status {
-    grid-column: 1 / -1;
-    padding: 6px 14px; border-bottom: 1px solid var(--line);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
-    white-space: pre-wrap; overflow-x: auto;
-  }
-  #status:empty { display: none; }
-  #status.bad { color: #b00020; }
-  @media (prefers-color-scheme: dark) { #status.bad { color: #ff8a8a; } }
-
-  textarea {
-    border: 0; border-right: 1px solid var(--line); resize: none; padding: 12px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
-    background: transparent; color: inherit; min-height: 0;
-  }
-  textarea:focus { outline: none; }
-  iframe { border: 0; width: 100%; height: 100%; min-height: 0; }
-  noscript p { margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--dim); }
-
-  /*
-    The one limit a visitor meets by typing rather than by clicking, said before
-    they meet it. Above `main` rather than inside it, so it costs the PDF none of
-    the clamped height below.
-  */
-  .filenote { margin: 0; padding: 10px 14px; border-top: 1px solid var(--line); color: var(--dim); }
 </style>
 </head>
 <body>
 
 <header>
-  <b>md2pdf</b> <span>— one markdown file in, one typeset PDF out. Everything below compiles in this page. No server.</span>
+  <b>md2pdf</b> <span>— one markdown file in, one typeset PDF out. No server.</span>
 </header>
-
-<noscript><p>Every example below is on this page either way. Compiling one is what needs
-JavaScript, so with it off the <b>load it</b> buttons stay grey and the two panes at the
-foot of the page stay empty.</p></noscript>
 
 <section id="adds">
 
@@ -175,8 +121,9 @@ only the emitter reads. The
 complete reference. Each row is one source under two writers: what <code>md2pdf</code>
 makes of it, and what that same parse looks like when <code>pulldown-cmark</code>'s own
 HTML backend sets it down instead of the emitter — one parser, one set of options, two
-ways out. And <b>load it</b> puts the source in the box at the foot of the page and
-compiles it here, the three refusals included.</p>
+ways out. And <b>open in Letur</b> opens the source in <a href="app/">Letur</a>, the
+editor, in this browser — the page drawn beside the text as you write it, the three
+refusals included.</p>
 
 <!--
   Every `data-example` element below is compiled by `app/tests/page_examples_test.rs`,
@@ -208,7 +155,7 @@ text, or set down as something with nothing left of the meaning.
 <div class="row">
 <div class="head">
 <h3>A caption makes a figure, and numbers it</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=caption-table">open in Letur ▸</a>
 </div>
 <p class="says">A paragraph opening <code>: </code> beneath a table, an image or a code
 block is that block's caption.</p>
@@ -235,7 +182,7 @@ themselves.</p>
 <div class="row">
 <div class="head">
 <h3>The same marker under a code block</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=caption-listing">open in Letur ▸</a>
 </div>
 <p class="says">One mechanism over three constructs, each counting on its own — so
 inserting a table above a listing does not renumber the listing.</p>
@@ -261,7 +208,7 @@ prose stands on, because code is read from where its lines begin.</p>
 <div class="row">
 <div class="head">
 <h3>The same marker over an image</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=caption-image">open in Letur ▸</a>
 </div>
 <p class="says">The third construct a caption reaches, and the only one that needs a file —
 so the page carries one: <code>pipeline.svg</code> travels inside this page itself.</p>
@@ -282,10 +229,10 @@ and the listings above do not touch.</p>
 </div>
 
 <!--
-  The one image this page can read, carried inline. The Pages workflow assembles the
-  published site from this file and the module directory alone, so a file dropped beside
-  them would be a 404 on the published page while a locally served directory showed the
-  row above working. The attribute's value IS the path the compiler is handed, and the
+  The one image the examples can read, carried inline. The app's seed (`web/host/host.mjs`)
+  reads it off this page and opens it beside the example as `pipeline.svg`, and the Pages
+  workflow publishes nothing else of it, so a file dropped beside this page would be a 404
+  on the published site while a locally served directory showed the row above working. The attribute's value IS the path the compiler is handed, and the
   row names the same one — a mismatch comes back `no image file supplied for …` and fails
   `app/tests/page_examples_test.rs`. No leading and no trailing newline, so the page and
   that test read the same bytes; the indentation inside is free, these bytes reaching
@@ -311,7 +258,7 @@ and the listings above do not touch.</p>
 <div class="row">
 <div class="head">
 <h3>A pair of <code>:::</code> lines makes several blocks one figure</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=figure-group">open in Letur ▸</a>
 </div>
 <p class="says">The members share one caption, one number and one name. No arrangement of
 the <code>: </code> marker alone can say that.</p>
@@ -351,7 +298,7 @@ between them.</p>
 <div class="row">
 <div class="head">
 <h3>Name a figure, and point at it</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=name-and-reference">open in Letur ▸</a>
 </div>
 <p class="says">End a caption with <code>{#name}</code>, then write <code>[](#name)</code>
 — a link with nothing between the brackets — to refer to it.</p>
@@ -381,10 +328,10 @@ it and the sentence reads <i>Table 2</i> without your touching it.</p>
 <div class="row">
 <div class="head">
 <h3>Math is LaTeX, and it is checked before it is set</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=display-math">open in Letur ▸</a>
 </div>
 <p class="says"><code>$…$</code> sets in the running text and <code>$$…$$</code> as a
-block of its own, converted in this page rather than by a service.</p>
+block of its own, converted in the browser rather than by a service.</p>
 <div class="cols">
   <div class="col"><span class="cap">md2pdf</span>
 <script type="text/markdown" data-example="display-math" data-expect="ok">$$
@@ -414,7 +361,7 @@ a page is what markdown has never had.
 <div class="row">
 <div class="head">
 <h3>Nine frontmatter keys decide the look</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=frontmatter">open in Letur ▸</a>
 </div>
 <p class="says">A leading <code>---</code> block picks one of two looks, one or two
 columns, and whether display formulas are numbered. <code>author</code> takes several names
@@ -450,7 +397,7 @@ Body text under a title block the markdown itself asked for.</script>
 <div class="row">
 <div class="head">
 <h3>A footnote lands at the foot of its column</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=footnote">open in Letur ▸</a>
 </div>
 <p class="says">The definition may sit anywhere in the file, above or below the reference
 that cites it.</p>
@@ -475,7 +422,7 @@ reader's eye already is.</p>
 <div class="row">
 <div class="head">
 <h3>A citation earns a reference list</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=citation">open in Letur ▸</a>
 </div>
 <p class="says">A tenth frontmatter key names a bibliography — a Hayagriva
 <code>.yml</code> or a BibLaTeX <code>.bib</code>, the file you already have — and
@@ -502,7 +449,7 @@ the document under the label the look draws.</p>
   The second file this page can read, carried inline exactly as the image above is. One
   attribute names both — `data-asset`'s value IS the path `md2pdf_core::Asset` is given,
   which is as true of a `.yml` as of an `.svg` — and the `type` is what tells them apart,
-  for the page's module and for `app/tests/page_examples_test.rs` alike. No leading and
+  for the app's seed and for `app/tests/page_examples_test.rs` alike. No leading and
   no trailing newline, so the page and that test read the same bytes.
 
   **Unlike the SVG above, the indentation inside here is load-bearing.** Those bytes reach
@@ -526,7 +473,7 @@ same test that compiles every example above.</p>
 <div class="row">
 <div class="head">
 <h3>Raw HTML</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=raw-html">open in Letur ▸</a>
 </div>
 <p class="says">A PDF has no <code>&lt;div&gt;</code>, and guessing what one should become
 is how a converter starts lying.</p>
@@ -547,7 +494,7 @@ is how a converter starts lying.</p>
 <div class="row">
 <div class="head">
 <h3>A task marker in a numbered list</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=ordered-task-list">open in Letur ▸</a>
 </div>
 <p class="says">A bullet list of <code>- [ ]</code> items compiles, the box drawn where the
 bullet was. In a numbered list the number and the box would both claim that place, so the
@@ -573,7 +520,7 @@ and a second</li>
 <div class="row">
 <div class="head">
 <h3>A LaTeX command outside the accepted subset</h3>
-<button type="button" class="load" disabled>load it ▸</button>
+<a class="open" href="app/#example=math-refusal">open in Letur ▸</a>
 </div>
 <p class="says">The dialect accepts a bounded list — the Greek letters, the relations,
 sums and integrals, <code>\frac</code>, <code>\sqrt</code>, the accents, the matrix and
@@ -597,199 +544,5 @@ same crate compiled to WebAssembly.</p>
 
 </section>
 
-<p class="filenote">The box below reads two files and no others:
-<code>pipeline.svg</code> and <code>refs.yml</code>, both carried inside this page. A
-browser has no filesystem, so an <code>![…](your-figure.svg)</code> of your own comes back
-<code>no image file supplied for 'your-figure.svg' at line 1</code> — your own figures and
-your own bibliography are what the desktop app and the command line are for.</p>
-
-<main>
-  <div id="status" role="status"></div>
-  <textarea id="text" spellcheck="false" aria-label="markdown source"></textarea>
-  <iframe id="pane" title="the compiled PDF"></iframe>
-</main>
-
-<script type="module">
-/*
-  The browser front end, owned by `mpdf-006`. It is the first place a reader
-  meets the tool without installing anything: `render` below calls the same
-  `md2pdf_core::md_to_pdf` the CLI calls, so the PDF in the pane is the PDF the
-  command writes, byte for byte.
-
-  It carries one image and only one: the page's own, inline beside the caption
-  row that names it and handed to every compile. A reader's own files still have
-  nowhere to come from — a browser has no filesystem — and that story stays
-  parked.
-
-  **Two acts reach `compile`, and they get different answers.** Typing passes
-  through broken states constantly, so a failed compile keeps the last good
-  page — that is the desktop app's behaviour and the catch branch below is
-  where it lives. Clicking a row's `load it` is a reader asking to be shown
-  that row, and on one captioned "what it refuses, on purpose" the honest
-  answer is the refusal rather than the previous row's PDF. So `load` empties
-  the pane before it compiles, and **the button owns that clearing, not
-  `compile`** — which keeps the two acts apart in the code as well as in the
-  argument.
-*/
-const text = document.getElementById('text')
-const pane = document.getElementById('pane')
-const status = document.getElementById('status')
-const panes = document.querySelector('main')
-const buttons = document.querySelectorAll('button.load')
-const still = matchMedia('(prefers-reduced-motion: reduce)')
-
-/*
-  The page's two files, each read from the element that carries it rather than
-  named a second time here. One attribute names both and the `type` tells them
-  apart — a selector rather than document order, so neither depends on which
-  row happens to come first. Both acts get both: `compile` is the single call
-  site, so what a click draws is what the reader's next keystroke keeps.
-*/
-const encoder = new TextEncoder()
-const svg = document.querySelector('script[type="image/svg+xml"][data-asset]')
-const yaml = document.querySelector('script[type="application/yaml"][data-asset]')
-const ASSET = svg.dataset.asset
-const BYTES = encoder.encode(svg.textContent)
-const BIBLIOGRAPHY = yaml.dataset.asset
-const BIBLIOGRAPHY_BYTES = encoder.encode(yaml.textContent)
-
-const SAMPLE = `---
-title: Compiled in your browser
-author: wasm32-unknown-unknown
-columns: 1
----
-
-# Introduction
-
-Every byte of this PDF was produced by \`md2pdf-core\` running as WebAssembly,
-inside the page that is showing it. Nothing was sent anywhere.
-
-Type on the left. The page follows.
-
-# What the dialect carries
-
-*Emphasis*, **strong**, \`monospace\`, and math like $\\sqrt{x^2 + y^2} \\leq |x| + |y|$
-— each needing its own bundled face, because Typst renders what it finds and
-synthesises nothing.
-
-> A block quote, to show the look does something with it.
-
-# Where this stops
-
-Images need a file, and a browser has no filesystem. This page carries exactly one
-image inside itself — the diagram the caption row above the box loads — and can read
-no other. Your own figures are what the desktop app and the command line are for.
-`
-
-const MB = (n) => (n / 1048576).toFixed(1) + ' MB'
-
-/*
-  Whether the host compressed the module, read from the page rather than
-  asserted. `encodedBodySize` is what crossed the wire and `decodedBodySize` is
-  what the module weighs, and the pair is only readable same-origin — which a
-  page serving its own wasm is.
-*/
-function transfer() {
-  const entry = performance
-    .getEntriesByType('resource')
-    .find((r) => r.name.endsWith('.wasm'))
-
-  if (!entry || !entry.decodedBodySize) return 'module: size not reported'
-  if (!entry.encodedBodySize || entry.encodedBodySize === entry.decodedBodySize) {
-    return `module: ${MB(entry.decodedBodySize)} UNCOMPRESSED over the wire`
-  }
-  const ratio = (entry.decodedBodySize / entry.encodedBodySize).toFixed(1)
-  return `module: ${MB(entry.encodedBodySize)} over the wire, ${MB(entry.decodedBodySize)} decoded (${ratio}x)`
-}
-
-let drawn = null
-let timer = null
-let wasm = null
-
-function draw(bytes) {
-  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
-  pane.hidden = false
-  pane.src = url
-  if (drawn) URL.revokeObjectURL(drawn)
-  drawn = url
-}
-
-/*
-  Empty the pane and leave it empty. Hidden rather than merely pointed at
-  `about:blank`, which paints a white rectangle a dark page has no use for; the
-  blob is revoked, so the PDF is gone rather than hidden.
-*/
-function clear() {
-  pane.hidden = true
-  pane.src = 'about:blank'
-  if (drawn) URL.revokeObjectURL(drawn)
-  drawn = null
-}
-
-function compile() {
-  try {
-    const bytes = wasm.render(text.value, ASSET, BYTES, BIBLIOGRAPHY, BIBLIOGRAPHY_BYTES)
-    status.className = ''
-    status.textContent = ''
-    draw(bytes)
-  } catch (e) {
-    // The last good page stays, as it does in the desktop app: an author
-    // mid-edit passes through broken states constantly. A click has already
-    // emptied the pane by the time it reaches here, so a refusal that was
-    // asked for is a refusal shown.
-    status.className = 'bad'
-    status.textContent = String(e.message ?? e)
-  }
-}
-
-/*
-  One row's own source, into the box, compiled. Writing `value` fires no
-  `input` event, so this calls `compile` itself rather than waiting on the
-  typing path's 300 ms debounce — and the rows sit above the panes, so it
-  scrolls to them.
-*/
-function load(button) {
-  const source = button.closest('.row').querySelector('script[data-example]')
-  text.value = source.textContent
-  clear()
-  compile()
-  panes.scrollIntoView({ behavior: still.matches ? 'auto' : 'smooth', block: 'start' })
-}
-
-try {
-  const t0 = performance.now()
-  const mod = await import('./pkg/md2pdf_web_spike.js')
-  await mod.default()
-  wasm = mod
-
-  /*
-    The instrument panel was the spike's, and a visitor has no use for a list
-    of anchors. What the module cost over the wire is different: it is the live
-    answer to one of the three questions the spike exists to ask, so it moves
-    here rather than being deleted. The person asking it opens a console; the
-    reader does not.
-  */
-  const engine = navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome') ? 'WebKit' : 'Blink'
-  console.log(`${transfer()} · instantiated in ${(performance.now() - t0).toFixed(0)} ms · ${engine}`)
-
-  // Readiness, carried by the thing a reader is about to click.
-  for (const button of buttons) {
-    button.addEventListener('click', () => load(button))
-    button.disabled = false
-  }
-
-  text.value = SAMPLE
-  compile()
-
-  text.addEventListener('input', () => {
-    clearTimeout(timer)
-    timer = setTimeout(compile, 300)
-  })
-} catch (e) {
-  status.className = 'bad'
-  status.textContent = 'failed to start: ' + (e.message ?? e)
-  console.error(e)
-}
-</script>
 </body>
 </html>

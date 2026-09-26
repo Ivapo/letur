@@ -77,9 +77,10 @@ const IMAGE_OPEN: &str = "<script type=\"image/svg+xml\"";
 /// **One attribute, two elements, told apart by their `type`.** `data-asset`'s
 /// value *is* the path `md2pdf_core::Asset` is given, which is as true of a
 /// `.yml` as of an `.svg`, so a second attribute would be a second mechanism for
-/// something the page already has one word for. The type is what the page's own
-/// module selects on and what this file scans for, and it is also what keeps the
-/// `data:` URI substitution below keyed to the image alone.
+/// something the page already has one word for. The type is what this file
+/// scans for — the app's seed, `web/host/host.mjs`, takes every `data-asset`
+/// element under its own name — and it is also what keeps the `data:` URI
+/// substitution below keyed to the image alone.
 const BIBLIOGRAPHY_OPEN: &str = "<script type=\"application/yaml\"";
 
 /// What a generated block may never contain.
@@ -182,9 +183,9 @@ fn named(open: &str) -> Asset {
 
 /// One asset element, as its attribute region and its content.
 ///
-/// **The `type` is what picks it out**, not document order — the page's own
-/// module selects on the same attribute pair, so neither reader depends on which
-/// of the two elements happens to come first. Two readers want different halves
+/// **The `type` is what picks it out**, not document order — the app's seed
+/// selects on the attribute and names each file by its value, so neither reader
+/// depends on which of the two elements happens to come first. Two readers want different halves
 /// of the same element — the compiler wants the path and the bytes, the generated
 /// `data:` URI wants the media type — and one scan serves both rather than each
 /// finding the element for itself.
@@ -300,8 +301,8 @@ fn close_marker(name: &str) -> String {
 ///
 /// **One substitution, and exactly one.** An image destination equal to the
 /// page's asset name becomes a `data:` URI over those same bytes. The file is
-/// carried inline in the page rather than published beside it — `pages.yml`
-/// assembles the site from `web/index.html` and `web/pkg/` alone — so a verbatim
+/// carried inline in the page rather than published beside it — `web/assemble.sh`
+/// publishes `web/index.html` and nothing beside it at the site root — so a verbatim
 /// destination would render a broken image on the published page while every
 /// local server showed it working: the comparison column lying about what
 /// markdown can do. Everything else is `md_to_html`'s output, byte for byte.
@@ -466,8 +467,8 @@ fn every_ok_example_compiles() {
 /// string nobody reads while the printed prose said something else, which voids
 /// the only argument the page makes for carrying its refusals at all.
 ///
-/// The equality is exact: `web/src/lib.rs:render` hands the error's `Display` to
-/// the page unchanged, and `cli/src/main.rs` prints that same `Display` after
+/// The equality is exact: the app's session (`web/src/lib.rs`) hands the error's
+/// `Display` to the window unchanged, and `cli/src/main.rs` prints that same `Display` after
 /// its `error: ` prefix, so the sentence in the page is the sentence at the
 /// terminal.
 #[test]
