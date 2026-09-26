@@ -154,10 +154,54 @@ async function rendered() {
   top = Math.max(0, top - PAD)
   right = Math.min(width - 1, right + PAD)
   bottom = Math.min(height - 1, bottom + PAD)
+  // A blank stretch taller than 80pt closes to a 32pt gap with a dashed cut across it,
+  // so a page whose ink sits at its top and its foot is not shown at its full height.
+  const [OVER, GAP] = [240, 96]
+  const blank = (y) => {
+    for (let x = left; x <= right; x++) {
+      const i = (y * width + x) * 4
+      if (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250) return false
+    }
+    return true
+  }
+  const runs = [] // [from, to) runs of the page's rows kept, with a cut after each but the last
+  let from = top
+  for (let y = top; y <= bottom;) {
+    if (!blank(y)) { y++; continue }
+    let end = y
+    while (end <= bottom && blank(end)) end++
+    if (end - y > OVER) {
+      runs.push([from, y + PAD])
+      from = end - PAD
+    }
+    y = end
+  }
+  runs.push([from, bottom + 1])
+  const cuts = runs.length - 1
   const crop = document.createElement('canvas')
   crop.width = right - left + 1
-  crop.height = bottom - top + 1
-  crop.getContext('2d').drawImage(canvas, left, top, crop.width, crop.height, 0, 0, crop.width, crop.height)
+  crop.height = runs.reduce((sum, [a, b]) => sum + b - a, 0) + cuts * (GAP - 2 * PAD)
+  const out = crop.getContext('2d')
+  out.fillStyle = '#fff'
+  out.fillRect(0, 0, crop.width, crop.height)
+  let at = 0
+  runs.forEach(([a, b], n) => {
+    out.drawImage(canvas, left, a, crop.width, b - a, 0, at, crop.width, b - a)
+    at += b - a
+    if (n < cuts) {
+      // Each run ends in PAD blank rows and the next begins in PAD, so the cut sits
+      // centred in a GAP of white between the two inks.
+      const middle = at + (GAP - 2 * PAD) / 2
+      out.strokeStyle = '#9ca3af'
+      out.lineWidth = 3
+      out.setLineDash([12, 9])
+      out.beginPath()
+      out.moveTo(PAD, middle)
+      out.lineTo(crop.width - PAD, middle)
+      out.stroke()
+      at += GAP - 2 * PAD
+    }
+  })
   return { bytes: kept, png: crop.toDataURL('image/png'), width: crop.width, height: crop.height }
 }
 
