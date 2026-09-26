@@ -1,22 +1,30 @@
-# The browser front end, owned by `mpdf-006`. It began as a spike answering
-# three questions a browser can answer and this machine cannot — whether
-# `md2pdf-core` runs as WebAssembly at all, what the module costs over the wire,
-# and whether Safari agrees with Chromium about both — and all three still hold.
-# What changed is what it is for: `mpdf-006` promoted it to the project's front
-# door, the first place a reader meets the tool without installing anything.
+# Letur in a browser tab: the window's session, compiled to WebAssembly.
 #
-# The crate keeps the name the spike gave it. `web/index.html` imports
-# `./pkg/md2pdf_web_spike.js` and the Pages workflow copies that directory
-# wholesale, so renaming it would break the published page to no end.
+# It began as `mpdf-006`'s spike — does `md2pdf-core` run as WebAssembly at
+# all, what does the module cost over the wire, does Safari agree with Chromium
+# — and all three still hold. `ltr-001` Phase 2 made it the session behind
+# Letur's own window: `src/lib.rs` answers the commands `app/dist/index.html`
+# sends, over a project held in memory, through the same `letur-project` rules
+# the desktop answers through. `web/host/` is the JavaScript that carries them.
+#
+# **Named `letur_web` since that phase** (`ltr-001` OQ-6), so the module is
+# `pkg/letur_web_bg.wasm`. The spike's name was kept while renaming it would have
+# broken the published page to no end; that phase rewrote the page, the
+# workflow and the module around it anyway.
 #
 # **Deliberately not a workspace member.** The empty `[workspace]` table below
 # detaches it from the root workspace, so `cargo build --workspace` and
 # `cargo test --workspace` — which every phase's exit gate runs — behave exactly
-# as they did before this directory existed.
+# as they did before this directory existed. `letur-project` is reached by path.
+#
+# **`Cargo.lock` is seeded from the published `md2pdf-cli`'s**, so every package
+# the two share resolves to the CLI's version. `web/check.mjs` compares this
+# module's PDFs with that CLI's byte for byte, and Typst breaks lines with
+# `icu_segmenter`'s compiled data: the engine's version alone is not the graph.
 [workspace]
 
 [package]
-name = "md2pdf-web-spike"
+name = "letur_web"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
@@ -26,11 +34,16 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# The engine, from the registry since `mpdf-011` Phase 3 published it — the same
-# dependency `app/Cargo.toml` takes, spelled the same way, and a git revision in
-# both until that phase. A registry dependency builds for `wasm32` exactly as
-# the git one did, and as the path one before it did.
+# The engine, from the registry — the same dependency `app/Cargo.toml` takes,
+# spelled the same way.
 md2pdf-core = "0.4"
+# The rules the window answers through: `Files`, `MemFiles`, `Preview`.
+letur-project = { path = "../project" }
+# **Every structured answer crosses as a JSON string**, from the serializer
+# Tauri's IPC uses on the desktop. `serde-wasm-bindgen` was refused: it turns
+# `None` into `undefined`, and the window hides its bars on `=== null`
+# (`ltr-001` §2). Already in the tree through `md2pdf-core`.
+serde_json = "1.0.151"
 wasm-bindgen = "0.2.104"
 console_error_panic_hook = "0.1.7"
 
@@ -39,8 +52,8 @@ console_error_panic_hook = "0.1.7"
 # 2.5 MB of that; the rest is Typst and the PDF writer.
 #
 # That is a dated measurement and not the current figure. The number the record
-# tracks is `web/pkg/md2pdf_web_spike_bg.wasm` in the tree, and
-# `rules/web-demo.md` carries its latest measurement, and carries it once.
+# tracks is `web/pkg/letur_web_bg.wasm` in the tree, and `rules/web-app.md`
+# carries its latest measurement, and carries it once.
 [profile.release]
 opt-level = "s"
 lto = true
