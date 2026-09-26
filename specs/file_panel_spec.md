@@ -302,7 +302,7 @@ falls only on a root holding two masters, where it is one click.
 `app/dist/index.html`'s `#files` comment names the four things that turn on the
 rows not loading. Each is answered here, and none of them is `core`'s:
 
-1. **The anchors.** `app/src/document.rs:render_with` keeps only the anchors
+1. **The anchors.** `project/src/document.rs:render_with` keeps only the anchors
    whose `location.file` is `None`, because those are the master's own and the
    pane holds the master. It becomes **the anchors belonging to the file the pane
    holds**, and `None` is simply what that filter reads as when the pane holds
@@ -321,7 +321,7 @@ rows not loading. Each is answered here, and none of them is `core`'s:
      1 adds this one.**
    - **`Edited`** — the file the pane holds, when that is not `main`. It cannot
      ride `Asset`: a section the master names is *already* in the asset list
-     `app/src/document.rs:render_with` builds, so it already classifies as
+     `project/src/document.rs:render_with` builds, so it already classifies as
      `Asset` and would silently recompile instead of running the divergence
      rule. `Edited` is therefore tested **before** `Asset` and takes precedence
      over it for that one path. **Phase 2 adds this one**, with the rule that
@@ -347,8 +347,8 @@ rows not loading. Each is answered here, and none of them is `core`'s:
    solved, and measuring it is what shrank this spec.** `core` never reads a
    file: `core/src/sections.rs:assemble` takes `&[Asset]`, each carrying its own
    bytes, per `mpdf-008` §2's *"`core` stays OS-free"* decision. The disk read is
-   the app's, in `app/src/document.rs:read_sections_with`, through the closure
-   `app/src/document.rs:render_with` injects — whose own doc comment says **"One
+   the app's, in `project/src/document.rs:read_sections_with`, through the closure
+   `project/src/document.rs:render_with` injects — whose own doc comment says **"One
    closure serves both passes… every file this app opens for one compile goes
    through the counter."** So the unsaved edit reaches the compile by passing a
    closure that answers the edited path from the pane's buffer and delegates
@@ -364,7 +364,7 @@ today.** That is tolerable behind a menu item and a native dialog, which is wher
 it has lived; it is not tolerable one click away from every row in a panel.
 
 So the switch **refuses while the buffer diverges from `saved`, names both ways
-out, and takes neither** — which is `app/src/preview.rs:DIVERGED`'s *shape*,
+out, and takes neither** — which is `project/src/preview.rs:DIVERGED`'s *shape*,
 already in this app and already reviewed, applied to a second occasion. Save, or
 discard, and the author says which.
 
@@ -555,11 +555,11 @@ window or put state on a row that `app/dist/index.html:parts` rebuilds.
   **The reason this entry gave was already false when it was written, and that
   is why the answer moves without any new evidence.** *"A pane holding it
   compiles nothing meaningful"* describes a window in which the pane's file is
-  what compiles — which is exactly what Phase 2 ended. `app/src/document.rs:render_project`
+  what compiles — which is exactly what Phase 2 ended. `project/src/document.rs:render_project`
   compiles **`main`**, and the override closure it builds is keyed on the *path*
   it is handed, `resolve(file) == resolve(edited)`, with no opinion about a file
   kind. The bibliography is read through that same closure —
-  `app/src/document.rs:read_assets_with`, which `render_with` hands it to — so a
+  `project/src/document.rs:read_assets_with`, which `render_with` hands it to — so a
   `.bib` in the pane feeds its **unsaved** buffer to the citation pass while the
   page goes on drawing the whole document. The suppression the middle shape
   asked for would be a rule written to hold off behaviour that already works,
@@ -577,7 +577,7 @@ window or put state on a row that `app/dist/index.html:parts` rebuilds.
   **Two costs, stated rather than found later.** A `.bib` contributes no
   anchors, so the caret's own page does nothing while the pane holds one, which
   is already the shipped behaviour for a `README.md` beside a master. **The
-  reason is not `app/src/document.rs:Pane` putting it out of reach**, which this
+  reason is not `project/src/document.rs:Pane` putting it out of reach**, which this
   entry first claimed: `Pane` is decided by directory containment —
   `under(main, edited)` — so a `refs.bib` beside its master answers `Beside`
   like any section. It holds for a simpler reason that survives either arm: an
@@ -590,7 +590,7 @@ window or put state on a row that `app/dist/index.html:parts` rebuilds.
   evidence)* It does, per §2, because a PDF is a legal figure and the list is the
   pipeline's own. Whether that reads as correct or as noise needs the panel in
   use for a week; the alternative is to hide the path
-  `app/src/document.rs:default_output` names, which is a special case that would
+  `project/src/document.rs:default_output` names, which is a special case that would
   be wrong the moment an author names their figure the same thing. **Blocks
   nothing.**~~
 
@@ -878,7 +878,7 @@ no state of this app has ever shown.*
      read reads the same in the window whichever path reached it.
 
   2. **The anchor filter takes the path as the master names it.**
-     `app/src/document.rs:render_with` keeps the anchors whose `location.file`
+     `project/src/document.rs:render_with` keeps the anchors whose `location.file`
      matches the edited file, `None` meaning main. **`location.file` is
      master-relative** — it is the marker's own spelling, per
      `md2pdf_core::Location` — where `edited` is root-relative, and the two
@@ -929,7 +929,7 @@ no state of this app has ever shown.*
 
   **The switch, and the two ways out it names.** A new command sets `edited` and
   **refuses while `buffer != saved`**, per §2. It gets **its own sentence and its
-  own constant** beside `app/src/preview.rs:DIVERGED` rather than reusing it,
+  own constant** beside `project/src/preview.rs:DIVERGED` rather than reusing it,
   for the reason §2 now records: `DIVERGED` opens *"this file changed on disk"*,
   which is false here. **The second way out is built in this phase**, because a
   refusal naming one that does not exist is worse than a refusal naming one —
@@ -1256,7 +1256,7 @@ Finder for half the task, which is the state Phase 3 was written to end.*
   repository**, in the developer's own `~/.Trash`, which nothing cleans and
   `app/src/document.rs:scratch_dir`'s doc comment — *"so runs do not collide and
   the repository stays clean"* — has no reach over. So `trash_file` takes the
-  call as a parameter, the way `app/src/document.rs:render_with` takes its read,
+  call as a parameter, the way `project/src/document.rs:render_with` takes its read,
   and `app/src/main.rs` passes the real one. Every refusal below is then
   reachable with nothing entering the Trash, and the one claim that needs a real
   Trash is the window's. **The double removes the file as well as recording the
@@ -1294,7 +1294,7 @@ Finder for half the task, which is the state Phase 3 was written to end.*
     its own.
   - **Deleting `edited`** refuses first while the buffer diverges from `saved`,
     which is §2's switch rule and the same hazard. It needs **a sentence of its
-    own**, not `app/src/preview.rs:SWITCHING`, which opens *"the pane holds
+    own**, not `project/src/preview.rs:SWITCHING`, which opens *"the pane holds
     unsaved edits, so it is still holding this file. Save to keep them, or
     discard them to open the other file"* — nothing is being opened by a delete,
     so reusing it would put a lie in the window, verbatim §2's argument for why
@@ -1313,14 +1313,14 @@ Finder for half the task, which is the state Phase 3 was written to end.*
     worse than not arming**: the buffer still holds the *trashed* file's text
     while `edited` now names `main`, so `app/src/preview.rs:Preview::save`
     writes a deleted section over the master, and
-    `app/src/document.rs:render_project`'s closure answers `main` from that same
+    `project/src/document.rs:render_project`'s closure answers `main` from that same
     buffer once the two paths are equal — the next compile draws the deleted
     section as the whole document. Nothing announces either, so the window never
     shows it happen.
   - **Deleting a file the master names is allowed**, and the next compile
     refuses. **Not with `md2pdf_core::Error::MissingSection`**, which this
     phase's text claimed and which this app never reaches:
-    `app/src/document.rs:read_sections_with` fails first with *"cannot read
+    `project/src/document.rs:read_sections_with` fails first with *"cannot read
     {path} for the section {location}"* and `?` propagates before
     `core/src/sections.rs:section_text` — the only place `MissingSection` is
     raised — is called at all. The recoverable behaviour is the same; the
@@ -1329,7 +1329,7 @@ Finder for half the task, which is the state Phase 3 was written to end.*
   - **The panel is refreshed by the command and not by the watch**, which is
     this phase's one departure from Phase 3 and is forced.
     `app/src/watch.rs:classify` answers the **first** match, and a section the
-    master names is already in the asset list `app/src/document.rs:render_with`
+    master names is already in the asset list `project/src/document.rs:render_with`
     builds — so deleting it answers `Change::Asset`, never `Change::Tree`, and
     `app/src/preview.rs:Session::on_change` refreshes `preview.tree` only under
     `changed.tree`. The panel would keep an ordinary unmarked row for a file that
@@ -2137,7 +2137,7 @@ when Phase 2 separated `edited` from `main`, and nobody went back to look.
   **`README.md`**. **No Rust behaviour changes**, and that is the finding rather
   than an omission: `app/src/preview.rs:Session::set_edited` confines the path
   and refuses a dirty buffer and asks nothing about a file kind, and
-  `app/src/document.rs:render_project`'s closure is keyed on the path it is
+  `project/src/document.rs:render_project`'s closure is keyed on the path it is
   handed. OQ-2 above carries the whole argument and it is not restated here.
 
   1. **Two terms of `fileRow`, and the second is the one a literal reading of
@@ -2162,7 +2162,7 @@ when Phase 2 separated `edited` from `main`, and nobody went back to look.
      is the phase. **No anchors**, so the caret's own page does nothing while
      the pane holds a bibliography. **The reason is directory containment and
      not naming**, which the first draft had wrong: `render_project` computes
-     `under(main, edited)`, so `app/src/document.rs:Pane` answers `Beside` for
+     `under(main, edited)`, so `project/src/document.rs:Pane` answers `Beside` for
      any file under `main`'s own folder — `refs.bib` included, named or not —
      and `Away` for one outside it. Either arm gives the same outcome here,
      because no anchor's `location.file` is ever a `.bib`: anchors are headings,
@@ -2177,7 +2177,7 @@ when Phase 2 separated `edited` from `main`, and nobody went back to look.
      runs the divergence rule rather than silently recompiling. **Item 5's
      fixture change is what puts this phase's own gate on that path**: once
      `book.md` declares `bibliography: refs.bib`, that path is in the asset list
-     `app/src/document.rs:render_with` builds, so it classifies `Asset` where it
+     `project/src/document.rs:render_with` builds, so it classifies `Asset` where it
      classified `Tree` before, and the ordering is load-bearing rather than
      incidental. A `.bib` no master names stays `Tree` until the pane holds it.
 

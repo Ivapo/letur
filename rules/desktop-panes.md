@@ -6,6 +6,8 @@ sources:
   - app/typecheck.mjs
   - app/src/document.rs
   - app/src/preview.rs
+  - project/src/document.rs
+  - project/src/preview.rs
   - app/harness/stub.mjs
   - app/harness/serve.mjs
   - app/harness/checks.mjs
@@ -422,9 +424,9 @@ this app a rename could leave wrong in silence**, the page being outside every o
 suite here.
 
 **`#receipt` is what the last save did, for four seconds, and it is usually not
-there.** Both sentences are `app/src/preview.rs:Session`'s — `SAVED` is the bare word
+there.** Both sentences are `project/src/preview.rs:Preview`'s — `SAVED` is the bare word
 `⌘S` gets, since the file is the one the cell to its left already names, and
-`Session::save_as` composes `saved as <name> in <folder>` with the folder absolute and
+`Preview::save_as` composes `saved as <name> in <folder>` with the folder absolute and
 spelled as landed. They ride the two commands' **return** and not `Status`, a receipt
 being an event rather than state: a field would re-arrive on every render, need
 clearing, and put a near-always-null property in the page's typedef block. So the page
@@ -644,7 +646,7 @@ put the ink back detached. `visibility: hidden` and never `display: none`, or a
 for the drag, so the pane goes plain rather than empty.
 
 **Three grammars, one pass, chosen off the extension of the file in the pane**,
-folded to lower case as `app/src/document.rs:kind_of` folds it — so `.yml` and
+folded to lower case as `project/src/document.rs:kind_of` folds it — so `.yml` and
 `.yaml` are bibliographies and the YAML lexer is written once and used twice, for
 those and for a markdown frontmatter block. The markdown pass carries block state
 and cannot be per-line: a fence opened on line 40 makes line 41 code. A line with

@@ -12,7 +12,7 @@ last_updated: 2026-09-25
 phases:
   - name: "Phase 1 — the rules the window answers through leave the desktop crate"
     reviewed: 2026-09-25
-    shipped: null
+    shipped: 2026-09-25
     cut: null
     by: null
   - name: "Phase 2 — two URLs, and the app is Letur's own window over a project in memory"
@@ -224,7 +224,7 @@ the browser's.
 | events `export`, `view-lines` | — | not bound: `export` has no desktop accelerator, and ⌘L is the browser's address bar. Both have buttons |
 
 **The debounce is the host's**, and the session gains the command the desktop keeps
-implicit: `edit` stores the text and compiles nothing, as `app/src/preview.rs:Preview::edit`
+implicit: `edit` stores the text and compiles nothing, as `project/src/preview.rs:Preview::edit`
 does, and the host sends `compile` 300 ms after the last `edit` — or at once before
 `save`, since `saveDocument` sends `edit` and `save` back to back. **The window's title**,
 which the desktop sets from Rust, the host sets as `document.title` from the `main` and
@@ -245,11 +245,11 @@ The host could reimplement the backend in JavaScript, and the web crate could
 reimplement it in Rust. **Neither**: the panel's order, the main a project opens on, the
 files a compile reads, the state the pane is in, the refusals `SWITCHING`, `TRASHING` and
 `DIVERGED`, the `SAVED` receipt, `exportable`'s two sentences and the counters `revision`
-and `reloaded` are `app/src/document.rs`'s and `app/src/preview.rs:Preview`'s, tested
+and `reloaded` are `app/src/document.rs`'s and `project/src/preview.rs:Preview`'s, tested
 there, and a copy would be a second implementation of every rule
 `rules/desktop-project.md` and `rules/desktop-compile.md` describe, checked against none.
 
-**The seam is I/O, time and threads.** `app/src/document.rs:render_with` already takes
+**The seam is I/O, time and threads.** `project/src/document.rs:render_with` already takes
 the file read as a closure, which `mpdf-010` Phase 2 opened so the pane's buffer could
 stand in for one file. Phase 1 widens that seam to the whole state machine:
 
@@ -285,7 +285,7 @@ stand in for one file. Phase 1 widens that seam to the whole state machine:
   would not catch `std::fs`, which compiles for `wasm32-unknown-unknown` and fails at
   run time.
 
-`app/src/preview.rs:Preview`'s exact split is the plan's to make; the spec's constraint
+`project/src/preview.rs:Preview`'s exact split is the plan's to make; the spec's constraint
 is the one above — **after Phase 1, every sentence the window shows and every counter it
 reads is produced by `letur-project`**, except the tail an I/O error's own `Display`
 contributes, which is the `Files` implementation's, and Phase 2's web session is `MemFiles`, a

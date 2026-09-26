@@ -8,12 +8,19 @@ sources:
   - app/src/document.rs
   - app/src/preview.rs
   - app/src/remote.rs
+  - project/Cargo.toml
+  - project/clippy.toml
+  - project/src/files.rs
+  - project/src/document.rs
+  - project/src/preview.rs
+  - project/src/remote.rs
   - app/dist/index.html
   - app/tsconfig.json
   - app/package.json
   - app/driver/drive.mjs
 covers: >
-  the desktop app: the crate and its files, the window and its menu, the five
+  the desktop app: the crate and its files, the second crate the rules left for
+  and the door every file goes through, the window and its menu, the five
   submenus and the six ids the one filter enumerates, the two items that name a
   view and carry no state, the two
   titles an open sets, the commands and the signal between them, the file I/O the
@@ -136,6 +143,26 @@ who never drives the page installs nothing, and the browser binaries are a
 the workspace root because the workspace is Cargo's and nothing outside this crate
 reads them; `node_modules/` and the scratch directory `app/.harness/` are gitignored,
 the second for the same reason `app/types/` is not under `dist/`.
+**The rules are a second crate, `project/` (`letur-project`), and `app` takes it
+by path** — `ltr-001` Phase 1, so the web session answers this window through the
+same code. It holds what `document.rs`, `preview.rs` and `remote.rs` *decide*: the
+compile's two read passes and their sentences, the panel's entries and order,
+discovery, `Preview` with every refusal, receipt and counter the page reads, and
+the `Web` state of the images fetched by URL. It reaches every file through
+`project/src/files.rs:Files`, which `app/src/document.rs:Disk` answers over a
+folder and `project/src/files.rs:MemFiles` over a map. **Nothing in it touches a
+file, reads a clock or starts a thread**, and `project/clippy.toml` enumerates
+what that means — every `std::fs` function and `std::fs::File`, the `Path`
+methods that stat, `Instant::now`, `SystemTime::now`, `thread::spawn` and `mpsc` —
+which `cargo clippy -p letur-project -- -D clippy::disallowed_methods -D
+clippy::disallowed_types` holds; `cargo build -p letur-project --target
+wasm32-unknown-unknown` holds the rest. So the clock is a `Timer` the host hands
+in and a claim a callback it supplies. Its dependencies are `md2pdf-core`, `serde`
+and `http` — `ureq`'s own URI parser, already in the lock — and it is `publish =
+false`. **Every desktop sentence keeps its absolute path**: `Files::locate` is the
+path a sentence spells, `Disk`'s being `root.join`, so only the tail a host's
+`io::Error` contributes differs between hosts.
+
 `capabilities/default.json` grants
 `core:default` to the window labelled `main`, plus **one entry per dialog** —
 `dialog:allow-open` and `dialog:allow-save`.
@@ -286,13 +313,13 @@ a rule written into a command is a rule nothing in this repository can reach.
 
 ## The file I/O
 
-`app/src/document.rs:render_with` **takes the markdown as a parameter and not a
+`project/src/document.rs:render_with` **takes the markdown as a parameter and not a
 path**, and hands that one string to both the asset list and the compile; the read
-left it for `app/src/document.rs:read_document` one call out, so the string the
+left it for `project/src/document.rs:read_document` one call out, so the string the
 pane holds is what compiles, and `md2pdf_core::md_to_pdf` already took a `&str`.
-`app/src/document.rs:render_project` is the caller that puts the project back
-together — `main`'s text and directory, with the buffer standing in for `edited`
-through the read closure below. Both return a `Render`, which carries the asset
+`project/src/document.rs:render_project` is the caller that puts the project back
+together over a `Files` — `main`'s text and directory, with the buffer standing in
+for `edited` through the read closure below. Both return a `Render`, which carries the asset
 paths **even when the compile failed**: emission reads the text and not the disk,
 so a document whose figures are all missing still names them, which is what keeps
 the watch filter alive while nothing compiles.
@@ -322,7 +349,7 @@ are missing from the disk still names them.
 **A file the document names makes two journeys through this app, and they are
 independent.** The bytes travel `read_sections_with` → `read_assets_with` →
 `md_to_pdf_with_anchors` and reach nothing else; the paths are built separately
-in `app/src/document.rs:render_with`, which calls all three exports for itself,
+in `project/src/document.rs:render_with`, which calls all three exports for itself,
 and travel `Render::assets` → the watch filter. **The bytes are what make the
 document compile; the paths are what make a change to one of them redraw.** The
 image and bibliography exports come off one walk, so they answer or fail
@@ -331,7 +358,7 @@ named before it exists depends on. **An image named by an http or https URL make
 neither journey**: `ImageRef::is_url` drops it from both, because a URL is a name
 and not a file. Since `mpdf-003` Phase 25 **its bytes travel from memory once
 fetched** — supplied to the compile under the URL itself, from what
-`app/src/remote.rs` holds for the process — and its path still reaches no watch,
+`project/src/remote.rs:Web` holds for the process — and its path still reaches no watch,
 there being no file to watch. A URL nobody has allowed is refused by `core`'s
 `Error::UnfetchedImage`, as it always was; `rules/desktop-compile.md` has the
 consent, the fetch and the line.
@@ -339,21 +366,21 @@ consent, the fetch and the line.
 The compile itself is `md2pdf_core::md_to_pdf_with_anchors`, and `Render` carries
 its `anchors` beside the bytes. **They go the other way from `assets`**: a failed
 compile has none, because they describe the *page* where the asset list describes
-the text. `app/src/document.rs:Anchor` is `md2pdf_core::Anchor` again — the
+the text. `project/src/document.rs:Anchor` is `md2pdf_core::Anchor` again — the
 duplication `read_assets_with` already makes — and is a line and a page where
 `core`'s carries a `md2pdf_core::Location`, because **`document::Pane` keeps only
 the anchors written in the file the pane holds** and drops the rest.
 `rules/desktop-panes.md` has its three arms and why the third is not an absence.
 
 **The reading is two passes and it mirrors the CLI's.**
-`app/src/document.rs:read_sections_with` runs first, as
+`project/src/document.rs:read_sections_with` runs first, as
 `cli/src/main.rs:read_sections` does and for the reason that function records: the
 markers are in the master's own text, so the sections can be read with no join,
 where neither shopping list can answer about a document that has not been
-assembled. `app/src/document.rs:read_assets_with` then mirrors
+assembled. `project/src/document.rs:read_assets_with` then mirrors
 `cli/src/main.rs:read_assets` — it takes the sections, seeds `seen` with their
 paths, carries them out on the same array, resolves each remaining path against
-`app/src/document.rs:directory`, reads each once, and keeps the path the markdown
+`project/src/document.rs:directory`, reads each once, and keeps the path the markdown
 wrote. **The bibliography is read first of the two remaining channels**, the line
 it names being the frontmatter's and therefore earlier than every image's. A
 section's own images are found beside it with nothing added here: `core` wrote the
@@ -369,15 +396,17 @@ in `render_with`. The read is a parameter so a caller counting its own reads can
 check that a path named twice is read once, and a second closure would leave half
 of them outside that counter. **It is also the seam the pane's buffer rides**:
 `render_project` builds one that answers `edited` from the buffer, `main`'s own
-text included, so the buffer compiles exactly when the pane holds main. Both
+text included, so the buffer compiles exactly when the pane holds main — deciding
+"is this `edited`" by `Files::same`, which `Disk` answers by resolving both sides. Both
 classes of failure reach the page in the terminal's words — an `Error` through its
 `Display`, a file that will not read through the sentence this builds — and a
 `main` that is not UTF-8 fails there too, wrapped so the two spell alike.
 
 **`app/src/document.rs:asset_bytes` is a fourth reader of a path the author did
 not name in a dialog**, beside the walk, the compile's own closure and
-`preview::Session::set_edited`, and it obeys the rule all four do —
-`app/src/document.rs:confined`, which resolves the path and requires its target
+`preview::Session::set_edited` — `project/src/document.rs:asset_bytes` over `Disk`,
+refusing in the crate's `not_a_file` sentence — and it obeys the rule all four do,
+`Files::holds`, which on the disk is `app/src/document.rs:confined`, which resolves the path and requires its target
 under the resolved root, so a `..`, an absolute path and a symlink leaving the
 root are refused by one comparison and in one sentence. It reads one of the project's figures for
 the window to draw and nothing about the document changes for it — no compile, no
@@ -389,16 +418,18 @@ the first write to such a path**, `write_override`'s being into Application
 Support: it makes an empty file and stops, `rules/desktop-project.md` has the
 three rules it obeys, and the row arrives by the watch rather than by a return.
 
-**`app/src/document.rs:save_file` is the second writer of a path the author *did*
-name in a dialog**, `export` being the first, and **it is the one write in this file
-that confines nothing**: `mpdf-003` Phase 18 dropped its `landing` call, so a
+**`app/src/document.rs:Disk::save_as` is the second writer of a path the author
+*did* name in a dialog**, `export` being the first, and **it is the one write in this
+file that confines nothing**: `mpdf-003` Phase 18 dropped its `landing` call, so a
 `Save as…` goes wherever it is pointed. Its contract is therefore the path **as
 given** — a relative one would resolve against the process working directory and not
-the project — and the confinement question moved to its caller, where it is asked
-*after* the write: `preview::Preview::save_as` requires both
-`app/src/document.rs:confined` and `app/src/document.rs:spell` before it moves the
-pane, `confined` opening on `is_file` and so having nothing to answer before the file
-exists. `kind_of` stays, so a `.txt` is refused wherever it is aimed.
+the project — and the confinement question is asked *after* the write, in the same
+method: it answers a root-relative spelling only when both
+`app/src/document.rs:confined` and `project/src/document.rs:spell` agree, `confined`
+opening on `is_file` and so having nothing to answer before the file exists, and
+`project/src/preview.rs:Preview::save_as` moves the pane only on that answer.
+`project/src/document.rs:creatable` is asked first, so a `.txt` is refused wherever
+it is aimed.
 
 **`app/src/document.rs:trash_file` is the first *destructive* one, and it moves
 to the Trash rather than unlinking.** There is no undo anywhere in this app —
@@ -415,7 +446,7 @@ not, and the difference is where the effect lands: a `std::fs::write` goes into
 a `scratch_dir` the suite owns, where this call's whole effect is **outside the
 repository**, in a `~/.Trash` nothing cleans.
 
-`app/src/document.rs:default_output` is where an export lands unless the user says
+`project/src/document.rs:default_output` is where an export lands unless the user says
 otherwise: **`main`'s** path with a `.pdf` extension, duplicating
 `cli/src/main.rs:default_output` because sharing it would make one crate's binary
 reachable from the other. `document::spell` is the textual root-relative spelling
@@ -472,10 +503,16 @@ fetches. A window that took the disk copy compiled inside the rule and read the 
 assets on the way, so one window never compiles twice, and **nothing is announced
 when nothing happened**.
 
+**Every decision here is the crate's since `ltr-001` Phase 1**: each `Session`
+command asks `project/src/preview.rs:Preview` first — `ask_main`, `set_edited`,
+`trash`, `save`, `save_as`, `discard` — and on the outcome announces, arms, writes
+Application Support or does nothing. The loops still guard on the **absolute** path
+of the file in the pane, joined onto the root, so a loop left over from another
+project cannot pass for this one's on a file of the same name.
+
 `Session::set_main` and `set_edited` **confine rather than merely checking
-existence**: each asks `document::relative` for the path's root-relative spelling
-back, which `root.join("../../secrets.md")` cannot answer where `is_file` would
-have said yes. Both then **refuse while the buffer diverges from the last-saved
+existence**: each asks `Files::holds`, `app/src/document.rs:confined` on the disk,
+which `root.join("../../secrets.md")` cannot pass where `is_file` would have. Both then **refuse while the buffer diverges from the last-saved
 text**, in `SWITCHING`'s own sentence rather than `DIVERGED`'s, which opens *"this
 file changed on disk"* and would be a lie here. **The refusal rides `divergence`
 and not an `Err`**, so one refusal does not arrive in the window two ways, and it
@@ -488,14 +525,15 @@ nothing — the two name the same two exits, and `Preview::save` and
 
 ## The export
 
-`app/src/preview.rs:Preview::export` writes the page's own bytes where the user
+`app/src/preview.rs:OnDisk::export` writes the page's own bytes where the user
 asked. **Nothing in it compiles**: the file is what the pane is already showing,
 which is what keeps the two from disagreeing.
 
 `Preview::exportable` is the one refusal rule, and **it words two sentences
 rather than one**, because an *empty* pane holding no bytes and a *stale* or
 *failed* one holding bytes known to be old are two problems. `export_path` runs
-it before returning the default path, so a pane that cannot be exported never
+it before returning the default path — root-relative in the crate, joined onto the
+root by `OnDisk::export_file` — so a pane that cannot be exported never
 opens a dialog whose answer it would throw away. **That path is `main`'s and not
 the pane's**: the bytes on offer are the master's, so a section in the pane must
 not lend the file its name.
@@ -517,7 +555,7 @@ debounce plus the compile: an author who types and does not save leaves the file
 behind the page for as long as they like, and the pane reads *current* throughout,
 because it is current — for the text in the pane.
 
-Nothing in `preview.rs`, `document.rs` or `watch.rs` needs a window: a GUI whose
+Nothing in `preview.rs`, `document.rs`, `watch.rs` or `project/` needs a window: a GUI whose
 logic is reachable only by clicking has no exit gate but a screenshot. Two claims
 are read by a person: whether the right pixels reached the glass, and whether the
 bundle below runs at all away from `cargo`.

@@ -3,6 +3,8 @@ title: desktop-project
 sources:
   - app/src/document.rs
   - app/src/preview.rs
+  - project/src/document.rs
+  - project/src/files.rs
 covers: >
   the project the desktop app opens: the root the opened file climbs one level
   to and the cap that is chosen rather than derived, the two edges that answer
@@ -44,8 +46,8 @@ roots below the master, recoverable only by opening the master. A parent with no
 parent and a grandparent that will not `read_dir` are both *no candidate*, so the
 root is `watch::root`'s answer unchanged, which is every single-file document.
 
-`app/src/document.rs:masters` is every `.md` **directly in** the root whose text
-names a section, and `discover_main` resolves them: one is main whatever the
+`project/src/document.rs:masters` is every `.md` **directly in** the root whose
+text names a section, over `Files`, and `discover_main` resolves them: one is main whatever the
 author opened, none makes the opened file main, several take the opened file when
 it is one of them and the byte-wise first when it is not. **It does not recurse,
 and that is a property rather than a preference**: `emit::landed_path` refuses a
@@ -98,8 +100,9 @@ behind a command: it drops the buffer, takes the file again, and clears the
 divergence on the way, which answers a refused switch and a refused external
 change alike.
 
-`app/src/document.rs:files_under` walks the root and `merge` adds what the master
-names and the disk lacks. **Two functions because the app runs them at two
+`project/src/document.rs:files_under` filters `Files::list` — on the disk,
+`app/src/document.rs:Disk`'s walk — and `merge` adds what the master names and the
+disk lacks. **Two functions because the app runs them at two
 rates**: the walk costs a `read_dir` per directory and happens at an open and a
 `watch::Change::Tree` event, where the merge is pure and runs on every status.
 The filter is each channel's own comparison rather than one invented here —
@@ -115,7 +118,7 @@ directory already visited is not visited twice.
 **The walk and the four callers ask one question, and that is a correction.**
 `app/src/document.rs:confined` is the whole rule — resolve the path, require its
 target under the resolved root — and `Session::set_main`, `Session::set_edited`,
-`document::asset_bytes` and `Preview::save_as` all go through it. They used to ask something
+`document::asset_bytes` and `Disk::save_as` all go through it, as `Files::holds`. They used to ask something
 stricter, that `document::relative` answer the same root-relative spelling back,
 and stricter was wrong in one direction: `descend` lists a link under its **own**
 name, so a `cover.jpg` pointing at `figures/cover.jpg` *inside* the project was a
@@ -140,8 +143,8 @@ it answers with its *input* when canonicalization fails, so
 `root.join("../escape.md")` would survive a `starts_with` textually. A parent
 that will not canonicalize is a refusal too, which is how `newdir/x.md` is
 refused with no clause of its own and folder creation stays a non-goal.
-`app/src/document.rs:create_file` is one of its two callers — `trash_file` is the
-other — and asks two more:
+`Disk`'s `create` is one of its two callers — `trash_file` is the
+other — and `project/src/document.rs:create_file` asks two more, the kind first:
 `document::kind_of` is the predicate, so the extension decides the kind and
 `.md`, `.bib`, `.yml` and `.yaml` are the panel's own filter minus the images it
 does not make; and `File::create_new` makes *already exists* the filesystem's

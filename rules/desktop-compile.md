@@ -5,6 +5,9 @@ sources:
   - app/src/watch.rs
   - app/src/document.rs
   - app/src/remote.rs
+  - project/src/preview.rs
+  - project/src/document.rs
+  - project/src/remote.rs
 covers: >
   the desktop app's compile: the watch loop and its two debounces, the compile's
   three steps and the two guards on its answer, the state the loop writes and the
@@ -103,9 +106,12 @@ thread. Dropping the typing channel ends its thread the same way. That is the
 whole mechanism by which opening a second document moves both.
 
 **The compile runs with the state lock released, and two guards decide whether its
-answer is still wanted.** `preview.rs:Preview::compile` is three steps: `Preview::plan`
-stamps a serial onto a `Compile` owning the three inputs, `Compile::run` borrows no
-`Preview` and so *cannot* hold the lock, and `Preview::absorb` takes it back.
+answer is still wanted.** `project/src/preview.rs:Preview::compile` is three steps:
+`Preview::plan` stamps a serial onto a `Compile` owning the three inputs,
+`app/src/preview.rs:Compile::run` borrows no `Preview` — it carries the plan and a clone
+of the `Disk`, renders, and times it with an `Instant` — and so *cannot* hold the lock,
+and `Preview::absorb` takes it back with the duration. **The crate reads no clock**: the
+compile it runs whole times itself through the `Timer` the session handed it.
 `Session::recompile_with` and `Session::on_change_with`'s bare-recompile branch — the two
 that fire while a hand is on the keys — drop the lock across the middle step, so a
 keystroke arriving mid-compile waits on nothing. `Preview::load` and `Session::save_as`
@@ -116,24 +122,24 @@ are `Preview::current` over the three inputs — derived, not counted, they bein
 six places — and `Preview::started`/`landed`, on which **the newest-*started* render
 wins**: every change a compile reads is followed by an event scheduling a render that
 starts after it, and a dropped answer always has a fresher one coming, each of those six
-writers being followed by a compile. **`Session::open_at` carries `started` and levels
+writers being followed by a compile. **`Preview::open` carries `started` and levels
 `landed` to it** — *an Open discards every answer in flight* — where the zeroes `revision`
 and `reloaded` take would let an orphan land and freeze the window. Two renders can now
 overlap, doubling peak cost for that span; OQ-14 holds the measurements.
 
 ## The state
 
-`app/src/preview.rs:Preview` is what the loop writes and the pane shows. **Three
-values where it held one**: `root`, what the panel lists and the watch covers;
-`main`, which file under it compiles, root-relative; `edited`, what the pane
-holds and `⌘S` writes, equal to `main` at every open and free to differ from the
-first row click on. **The root moves
+`project/src/preview.rs:Preview` is what the loop writes and the pane shows. **Three
+values where it held one**: `files`, the project's `Files` — on the desktop a
+`Disk` whose root the panel lists and the watch covers; `main`, which file under
+it compiles; `edited`, what the pane holds and `⌘S` writes, both root-relative,
+equal at every open and free to differ from the first row click on. **The root moves
 only on an explicit Open** — a click that re-rooted would strand the author below
 their own project with no way back up. Beside them: **the text the pane holds and
 the text as it stood at the last open or save**, the last good PDF bytes, how
 long they took, the asset list the filter reads, the disk walk the panel is drawn
 from, four counters, a stale flag, the error and the divergence. The two strings are what
-`app/src/preview.rs:external_change` compares, and holding them here rather than
+`project/src/preview.rs:external_change` compares, and holding them here rather than
 in the page is what keeps that rule testable at all.
 
 `Preview::compile` compiles **`main`, with the buffer standing in for `edited`**,
@@ -159,7 +165,7 @@ sets the flag. **The duration travels with the bytes**, replaced and kept
 exactly as they are, so the time the window shows describes the page on screen
 rather than the last attempt at one.
 
-`app/src/preview.rs:State` is the four the window reports: *empty*, the state the
+`project/src/preview.rs:State` is the four the window reports: *empty*, the state the
 app launches into; *current*, a compile that succeeded; *stale*, one that failed
 over a page still drawn; and *failed*, one that failed with no page to keep.
 **What separates *stale* from *failed* is whether there are bytes**, not any
@@ -170,7 +176,7 @@ and compiles inside one lock scope, so nothing observable sits between
 `Preview::default()` and the first outcome. The serialized name is lowercase, and
 the page uses it as a word and as a class.
 
-`app/src/preview.rs:Status` is that state, the compile time worded as `"28 ms"`,
+`project/src/preview.rs:Status` is that state, the compile time worded as `"28 ms"`,
 the error, whether a page is drawn, the divergence, two counters and the anchors —
 one value the page places rather than composes. **Thirteen fields**, the
 appearance and the web line beside the eleven the last compile fills, and
@@ -201,7 +207,7 @@ test is not kept as insurance.
 
 ## The rule an external change runs
 
-`app/src/preview.rs:external_change` is three strings and two comparisons, and it
+`project/src/preview.rs:external_change` is three strings and two comparisons, and it
 needs no dirty flag. **It is asked about the *edited* file and nothing else**: the
 master moving is a bare recompile, because with the pane elsewhere the master is
 one more file the compile reads off the disk. The file equal to the buffer is
@@ -255,7 +261,7 @@ read with `ureq::http::Uri`; a URL with no host is its own site. **The fetched
 bytes are held in memory, for the process, and never on disk** — so after a
 relaunch offline the page says `cannot fetch …` for images it drew yesterday,
 which is the stated cost of having no second store with its own staleness.
-`app/src/remote.rs:Web` holds both, and **they are held apart**: `Session::open_at`
+`project/src/remote.rs:Web` holds both, and **they are held apart**: `Session::open_at`
 replaces the allowed sites from `sites.json` *before* `load` compiles, and carries
 the fetches across, so a project that never allowed a site draws none of that
 site's images out of memory.

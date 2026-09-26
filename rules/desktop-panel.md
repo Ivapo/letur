@@ -4,6 +4,8 @@ sources:
   - app/dist/index.html
   - app/src/document.rs
   - app/src/preview.rs
+  - project/src/document.rs
+  - project/src/preview.rs
 covers: >
   the desktop app's file panel: the column every open document draws and the two
   states it keeps apart, the flat entries it is drawn from and the folders

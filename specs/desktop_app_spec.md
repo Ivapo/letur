@@ -512,7 +512,7 @@ files across three processes, likewise matching an older build's; a document
 naming a PNG gave three identical files, and **the same content under a
 different file name gave the same bytes**, so the output does not depend on the
 path. The round also read the two asset readers line for line —
-`app/src/document.rs:read_assets_with` and `cli/src/main.rs:read_assets` — and
+`project/src/document.rs:read_assets_with` and `cli/src/main.rs:read_assets` — and
 found the same `image_paths` call, the same dedup on the same key, the same
 join and the same order.
 
@@ -1156,7 +1156,7 @@ list to one item.
   number against a compile of **0.6–1.5 ms** — two orders of magnitude below it, so
   "the compile is not what it is protecting." **That measurement is of two single-file
   documents and predates `mpdf-008`.** Re-measured through
-  `app/src/document.rs:render_project`, release, warm, in process, on synthetic
+  `project/src/document.rs:render_project`, release, warm, in process, on synthetic
   projects of uniform sections:
 
   | sections | markdown | `render_project` |
@@ -1545,7 +1545,7 @@ the whole point of the app.*
   real path differs from itself on macOS, so this case fails loudly on a
   canonicalization bug rather than passing under some directory that happens
   not to be symlinked. Counting compiles needs a seam, and
-  `app/src/document.rs:read_assets_with` is the one Phase 1 built for the same
+  `project/src/document.rs:read_assets_with` is the one Phase 1 built for the same
   reason. This case proves the wiring, not the count — the count is (1)'s
   debounce test, which needs no filesystem and cannot flake on one — and its
   wait is bounded generously, because FSEvents' own coalescing sits under the
@@ -1606,7 +1606,7 @@ which is the artifact the CLI writes.*
   this phase attributed the split to the wrong branch.
 
   **Two things the state needs do not exist yet and this phase adds them**: the
-  compile duration, which nothing in `Preview` or `app/src/document.rs:Render`
+  compile duration, which nothing in `Preview` or `project/src/document.rs:Render`
   carries, measured around the compile in `Preview::compile`; and an accessor
   for the open document, which is private today and which the export's default
   path needs. The status crosses to the page as its own command beside
@@ -1642,7 +1642,7 @@ which is the artifact the CLI writes.*
   call over assets the test reads itself. **That last assertion is the middle
   leg of the composition and it is not optional**: without it the two halves
   meet only through §2's line-for-line reading of
-  `app/src/document.rs:read_assets_with` against `cli/src/main.rs:read_assets`,
+  `project/src/document.rs:read_assets_with` against `cli/src/main.rs:read_assets`,
   and a later divergence in either reader would pass both halves while the
   wrappers silently disagreed.
 
@@ -1694,8 +1694,8 @@ rather than as they save.*
 
   **The pane's text becomes what compiles, and that is the change this phase
   really makes.** Every compile path in the tree reads the disk today:
-  `app/src/preview.rs:Preview::compile` calls `app/src/document.rs:render`,
-  which calls `app/src/document.rs:render_with`, which opens with
+  `app/src/preview.rs:Preview::compile` calls `project/src/document.rs:render`,
+  which calls `project/src/document.rs:render_with`, which opens with
   `std::fs::read_to_string`. This phase splits that — the markdown string
   becomes a parameter and the disk read moves out to the caller — and `Preview`
   gains the text it last compiled. **`core` needs nothing**:
@@ -2153,8 +2153,8 @@ phase to append if the answer is yes."
   be exhaustive.
 
   **The app carries it and decides nothing.**
-  `app/src/document.rs:render_with` calls the new function and
-  `app/src/document.rs:Render` gains the anchors beside `pdf`;
+  `project/src/document.rs:render_with` calls the new function and
+  `project/src/document.rs:Render` gains the anchors beside `pdf`;
   `app/src/preview.rs:Preview` holds them with the bytes it already holds; and
   `app/src/preview.rs:Status` — already `Serialize`, and already fetched by
   `app/dist/index.html:refresh` immediately before it draws — carries them to
@@ -4742,7 +4742,7 @@ not a prediction.
 ### Phase 17 — Save as, and the mark that says so
 
 *Produces the observable: **yes**, in four cases, and the fourth is the point.* A Save-as
-lands a markdown file inside the project, and `app/src/document.rs:render_project` reads
+lands a markdown file inside the project, and `project/src/document.rs:render_project` reads
 **every** path except `edited` off the disk — its `read` closure substitutes the pane's
 buffer for that one file and calls `std::fs::read` for the rest. So a Save-as onto the
 master, onto a section or figure the master names, or onto a path the master names that
