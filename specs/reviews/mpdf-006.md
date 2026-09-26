@@ -2,6 +2,59 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 2 — Phase 6 only — 2026-09-26 — the same three reviewers, resumed — **READY (converged)**
+
+Zero blocking, all three lenses, each checking the file rather than the changelog. Every
+ratio the phase now states was recomputed by two reviewers independently and matched:
+`#9db4ec` 7.98 on dark `--ground` and 6.95 on dark `--chrome`; dark `--ground` lettering
+on it 7.98; white on `#1e3c82` 10.38; `#2b3140` on `--paper` 12.99; `--alarm` 6.37 light
+and 6.10 dark; `--quiet` on light `--ground` 4.39, which is why it carries no text. The
+`--unicodes` range covers every non-ASCII character on the page but `▸`, which the phase
+removes.
+
+Non-blocking refinements folded in: `hero.mjs --shots` named in scope, one child process
+per engine (a second launch in one process hangs); clause (o)'s focus walk uses `Alt+Tab`
+in WebKit, whose macOS default skips links; its background lookup starts at the element
+itself (a filled call to action's lettering) and covers only rendered body elements; a
+`data:` favicon so clause (a)'s non-2xx check cannot trip on one; `rules/web-demo.md`'s
+`covers:` and the README's "In a browser" bullet named in the close-out. Nothing rejected.
+
+On convergence: Phase 6 `reviewed: 2026-09-26`.
+
+### Round 1 — Phase 6 only — 2026-09-26 — a fresh panel of three (correctness, exit gate, scope) — **NOT READY (6 blocking, deduplicated)**
+
+**Round 0**, answered by the author: Phase 6 produces no observable and argues it — it is
+the way in to the app, which does — and it is the right thing to build, the author having
+judged the shipped landing page to fail that job, for three stated reasons.
+
+Blockers, and how each was resolved:
+
+1. **The accent failed 4.5:1 on the dark ground** (all three): `#1e3c82` measures 1.59:1
+   there, and "one accent … nowhere else" forbade a dark value. **Resolved**: one accent
+   in two values, `#9db4ec` in dark.
+2. **Text on `--paper` in dark was unspecified** (all three): the window keeps `--paper`
+   white in both themes, so the dark `--ink` on it is 1.25:1. **Resolved**: the light
+   `--ink` on `--paper` in both themes.
+3. **`--quiet` on light `--ground` is 4.39:1** (correctness, exit gate), the window's own
+   comment recording 4.4. **Resolved**: `--quiet` carries no text.
+4. **Gate 4 named no method and no pairs** (exit gate). **Resolved**: `web/check.mjs`
+   clause (o), computed styles in both colour schemes; the reduced-motion clause became a
+   grep.
+5. **The sketch's column labels reversed Phase 4's recorded wording** (scope).
+   **Resolved**: the labels keep `md2pdf` and `the same parse, as HTML`; only their
+   setting changes.
+6. **The close-out left `rules/web-app.md` stale and `web/hero.mjs` in no rule's
+   sources** (scope). **Resolved**: that rule gains both new scripts and its site and
+   check section is corrected; `rules/desktop-panes.md` notes the copied tokens; a
+   `CORRECTED` note beside §1 answers whose front door the page is.
+
+Also folded in: gate 1 by extraction of the pinned tuples rather than a line diff; `hero.mjs`
+specified (viewport, scale, wait) over a shared `web/serve.mjs` with `.woff2` and `.png`
+types; clause (a) refusing other origins, non-2xx responses and executable scripts; row
+links keep `class="open"` and the calls to action take another; `▸` removed and the
+subset's `--unicodes` named with the `uvx` command; `<title>`, the closing lede and the
+README links in the group intros named; the refusals take `--alarm`. Nothing rejected.
+
 ### Round 2 — Phase 5 only — 2026-09-25 — same reviewer, resumed with the author's changelog — **READY**
 
 Verdict: `READY`, zero blocking, and nothing new raised. Converged inside the cap. All

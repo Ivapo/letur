@@ -6,7 +6,7 @@ note: >
   dialect adds to markdown, every claim it makes is a snippet the workspace suite
   compiles, and one click sets that snippet as a PDF in the reader's own browser.
 status: accepted
-last_updated: 2026-09-25
+last_updated: 2026-09-26
 
 phases:
   - name: "Phase 1 — the page says what the dialect adds"
@@ -32,6 +32,11 @@ phases:
   - name: "Phase 5 — the refusal the engine withdrew, and the one it made in its place"
     reviewed: 2026-09-25
     shipped: 2026-09-25
+    cut: null
+    by: null
+  - name: "Phase 6 — the landing page is Letur's, and is set in the page's own type"
+    reviewed: 2026-09-26
+    shipped: null
     cut: null
     by: null
 
@@ -676,6 +681,15 @@ is for, not what it costs the suite.
   generator writes. A browser-support row is unverifiable by construction — it would sit
   there as the single unchecked assertion on a page Phase 4 had just finished removing the
   last of, which is the argument this spec has made against itself four times.
+- **OQ-6 — does each row show the page md2pdf sets, as well as the HTML column?**
+  *(design call — deferred; not Phase 6.)* The strongest thing a row could show is the
+  typeset result, and the page loads no module, so it would be a picture: each `ok`
+  example's first page rasterised at bless time and committed beside the page, with a
+  test that the picture is current. That is a second generated artefact per row, a bless
+  path in a browser rather than in `cargo test`, and roughly half a megabyte of images;
+  Phase 6 takes the hero's one picture instead, and the row keeps its `→` sentence saying
+  what the page does. Reopen if the redesigned page still reads as description rather
+  than demonstration.
 
 ## 4. Implementation phases
 
@@ -987,3 +1001,190 @@ test's `EXPECTED = 12` both stand unedited.
   land in are compressed, or the cap is raised and the reason recorded in the commit, as
   Phase 4 did. **README: none needed**, because it names
   neither the refusals nor a column default. **`CLAUDE.md`: none needed.** One push.
+
+### Phase 6 — the landing page is Letur's, and is set in the page's own type
+
+*Produces the observable: **no**, and the argument is that it is the way in to it.* The
+page the author sees beside their text is drawn by the app, one link away, and nothing
+here changes it. What changes is whether a visitor gets there. `ltr-001` Phase 2 took
+the panes off this page and left the rest as `mpdf-006` built it — a page arguing for a
+dialect, headed *md2pdf*, whose one door into Letur is a link halfway through a five-line
+lede about an emitter and `pulldown-cmark`'s HTML backend. The author's verdict on the
+published result, 2026-09-26, was that it looks awful, and the reasons are specific
+rather than taste:
+
+- **It does not say what Letur is, or show it.** No headline, no picture of the window,
+  and no call to open it that a visitor could find without reading.
+- **Its copy is the spec's voice.** The lede and the group intros describe the
+  implementation (*the emitter*, *one parser, one set of options, two ways out*) where a
+  visitor needs what they can write and what they get.
+- **Every row is the same grey block**, with a small grey button, a dashed box and no
+  hierarchy — twelve of them, and on a phone one long scroll.
+
+**The direction (decision, recorded).** Letur's pages are set in Libertinus Serif and
+Libertinus Mono — `md2pdf-core`'s `assets/template.typ` sets both, and ships them under
+the OFL in `assets/fonts/` — so **the landing page is set in the type of the pages Letur
+makes**, and a visitor reads the product's output before they run it. That is the one
+bold choice; everything around it is quiet.
+
+- **Type.** Libertinus Serif for everything a person reads — headline, prose, row titles
+  — on a 1.25 ratio from a 19px body (19, 23.75, 29.7, 37.1px), line-height 1.5, and a
+  measure of 45–75 characters, Bringhurst's range. Libertinus Mono for every source
+  column, so the markdown a visitor reads is in the face the PDF sets code in. No third
+  face, no all-caps labels, no letter-spacing, and no glyph either face lacks — the rows'
+  `▸` goes. **The two column labels keep their words** — `md2pdf` and `the same parse,
+  as HTML`, which Phase 4 chose as claims about what produced each block — and change
+  only their setting, from tracked capitals to an italic caption beneath the heading, as
+  a figure in the page Letur sets would carry one.
+- **Colour.** The window's own tokens, read off `app/dist/index.html`'s `:root` blocks —
+  `--ground`, `--chrome`, `--edge`, `--ink`, `--quiet`, `--alarm`, `--paper` — so the
+  landing page and the app are one product and the link crosses no seam. Three rules,
+  each measured on 2026-09-26 by the WCAG 2 formula:
+  - **Text is `--ink`**, 11.8:1 on light `--ground` and 13.2:1 on dark. **Secondary text
+    is `--ink` too**, set smaller or in italic rather than greyer: `--quiet` measures
+    4.39:1 on light `--ground` — the window's own comment records it at 4.4 — so it
+    carries rules and borders here and no text.
+  - **`--paper` is white in both themes**, as the window keeps it: the page Typst sets is
+    white in either palette, and the source column is what becomes one. **Text on
+    `--paper` is the light `--ink`, `#2b3140`, in both themes** (13.0:1); the dark
+    `--ink` on it would be 1.25:1.
+  - **One accent, in two values.** `#1e3c82`, the stroke `pipeline.svg` is drawn in, in
+    the light theme (9.4:1 on `--ground`, 10.4:1 on `--paper`); **`#9db4ec`**, the same
+    blue lightened, in the dark (8.0:1 on `--ground`, 7.0:1 on `--chrome`). It colours
+    links and the call to action and nothing else; the call to action is filled with it,
+    lettered in white in light (10.4:1) and in `--ground` in dark (8.0:1). The refusal
+    sentences take `--alarm` (6.4:1 light, 6.1:1 dark) in place of today's `#b00020` and
+    `#ff8a8a`.
+- **Layout.** A hero, then the examples.
+
+  ```
+  ┌───────────────────────────────────────────────────────────────┐
+  │ Letur                                              Open Letur │
+  │                                                               │
+  │  Markdown on the left,          ┌─────────────────────────┐   │
+  │  a typeset page on the right,   │  a picture of Letur's   │   │
+  │  redrawn as you write.          │  window, the image      │   │
+  │                                 │  example open, in the   │   │
+  │  [ Open Letur ]                 │  visitor's own theme    │   │
+  │  Runs in this browser.          └─────────────────────────┘   │
+  │  Nothing to install.                                          │
+  ├───────────────────────────────────────────────────────────────┤
+  │  What the markdown can say                                    │
+  │  <one plain sentence: twelve examples, each opens in Letur>   │
+  │                                                               │
+  │  <group heading>                    <group: one line, links>  │
+  │    A caption makes a figure ─────────────── Open in Letur     │
+  │    <says>                                                     │
+  │    ┌─────────────────────┐  ┌────────────────────────────┐    │
+  │    │ source, mono,       │  │ the HTML column, as it     │    │
+  │    │ on --paper          │  │ renders, on --ground       │    │
+  │    └─────────────────────┘  └────────────────────────────┘    │
+  │     md2pdf                   the same parse, as HTML          │
+  │    <does: what the typeset page carries>                      │
+  └───────────────────────────────────────────────────────────────┘
+  ```
+
+  Left-aligned throughout. The source sits on `--paper`, the one white surface, because it
+  is what becomes a page; the HTML column sits on `--ground` with no dashed border,
+  because it is the comparison and not the product. Below 720px — today's breakpoint —
+  the hero stacks picture-last and each row's columns stack source-first.
+- **The picture is the window, captured, not drawn.** `web/hero.mjs` serves an assembled
+  `_site` through `web/serve.mjs`, opens `app/#example=caption-image` in Chromium at
+  1280 × 800 and device scale factor 2, once per `colorScheme`, waits until the status is
+  `current` and the first page's canvas holds a pixel that is not white, and writes
+  `web/hero-light.png` and `web/hero-dark.png`. The page shows them through a `<picture>`
+  keyed on `prefers-color-scheme`. A drawing of the window would drift from it; a capture
+  is regenerated by one command. They are committed, since the page must render with no
+  build step and no module. The text inside them is outside gate 4 — it is a picture of
+  the window, whose own contrast is `rules/desktop-panes.md`'s.
+- **The copy says what a visitor gets, in plain words.** The `<title>` and the header
+  name Letur and say in one line what it is. The lede drops the implementation and
+  **drops the construct count** rather than correcting it: the count is the gap
+  `rules/web-demo.md` has logged five times, and a page that does not state it cannot be
+  behind. The twelve rows keep their examples, their `says` and `does` sentences and
+  their three groups — the claims are unchanged and still compiled. The three group
+  intros are rewritten to say what the group is for, **keeping their README links**, and
+  the closing lede under the refusals is rewritten to match.
+
+**What does not move, and why it binds.** Every byte the page's readers rely on
+survives: every `script[data-example]` and `script[data-asset]` with its attributes in
+their present order and its content, every `code[data-error-for]` with its text, and
+every `<!--html:NAME-->` block between its markers. `app/tests/page_examples_test.rs`
+reads all four; `web/host/host.mjs`'s seed reads the first two; `web/check.mjs` reads the
+first three through regexes pinned to that attribute order. **Each row keeps its link,
+`<a class="open" href="app/#example=NAME">`**, which `web/check.mjs` counts (exactly
+twelve) and follows; the header's and hero's calls to action use another class, so the
+count stays twelve. The wrapper markup those elements sit in — `div.rendered`, `p.does`,
+the column captions — may change. **The page still runs no script** — every `<script>`
+it carries is a data type — and now makes no request to any other origin: the two faces
+are self-hosted, since a font CDN would be the first request this page makes to anyone
+but its own host.
+
+- **Scope:**
+  - **`web/index.html`**: the `<title>`; a `<link rel="icon" href="data:,">`, so no
+    engine asks the server for a favicon clause (a) would see refused; the `<style>` rewritten to the tokens and type
+    above; a new `<header>` and hero; the lede, the three group intros and the closing
+    lede rewritten; the rows restyled, `▸` removed from their links. The rule that renders
+    `script[data-example]` stays, now in Libertinus Mono on `--paper`.
+  - **`web/fonts/`**: Libertinus Serif Regular, Italic and Bold and Libertinus Mono
+    Regular, from `md2pdf-core-0.4.0/assets/fonts/`, subset and written as `woff2` by
+    `uvx --from 'fonttools[woff]' pyftsubset <font> --flavor=woff2
+    --unicodes='U+0020-007E,U+00A0-00FF,U+2010-2027,U+2190-2193'`, with `OFL.txt`. That
+    command is recorded in a comment in `web/assemble.sh`, which copies the directory to
+    `_site/fonts/`.
+  - **`web/serve.mjs`**: `web/check.mjs`'s server moved into a module both it and
+    `web/hero.mjs` import, its types gaining `.woff2` (`font/woff2`) and `.png`.
+  - **`web/hero.mjs`**, `web/hero-light.png`, `web/hero-dark.png`: the capture above,
+    and what it wrote. **`--shots`** writes gate 3's eight screenshots instead, spawning
+    one child process per engine, since a second browser launch in one process hangs
+    (`web/check.mjs`'s header records it). `web/assemble.sh` copies the two images into `_site/` when they
+    exist, so the first capture can run against a site assembled before them.
+  - **`web/check.mjs`**: clause (a) also refuses any `http(s)` request to an origin other
+    than the served one, any response that is not 2xx, and any `<script>` whose type
+    would execute; and asserts, at a 390 × 844 viewport, that
+    `document.documentElement.scrollWidth <= innerWidth`. A new clause (o), in both
+    `colorScheme` emulations, walks every rendered element under `<body>` with a text
+    node — `display: none` elements such as `script[data-asset]` skipped, and the hero
+    image outside it — takes its computed `color` and the first non-transparent
+    `background-color` **starting at the element itself** and then up its ancestors, and
+    asserts at least 4.5:1 by the WCAG 2 formula; then moves keyboard focus through every
+    link — `Tab` in Chromium, `Alt+Tab` in WebKit, whose macOS default skips links — and
+    asserts each focused link's `outline-style` is other than `none`.
+  - **`app/tests/page_examples_test.rs`**: no change. If a comment it carries about the
+    page's CSS goes stale, only that comment.
+- **Exit gate:**
+  1. `cargo test --workspace` passes with `app/tests/page_examples_test.rs` unchanged.
+     **And the page's readers' bytes are unchanged, by extraction rather than by line
+     diff**: `web/check.mjs`'s two element regexes, plus `<code data-error-for="NAME">…</code>`
+     and `<!--html:NAME-->…<!--/html:NAME-->`, applied to `git show <the commit before the
+     phase>:web/index.html` and to the working copy, yield equal tuples in equal order.
+     This is the clause that guards the sources, since the test re-derives the `html:`
+     blocks from them.
+  2. `bun web/check.mjs` and `bun web/check.mjs --webkit` pass every clause, (a)'s new
+     assertions and (o) included.
+  3. **The one gate a test cannot hold, stated as one**: `bun web/hero.mjs --shots`
+     writes viewport screenshots of the landing page at 1280 × 900 and 390 × 844, light
+     and dark, in Chromium and WebKit — eight — which are put in front of the author, who
+     approves them before the push. The approval and the images' names are recorded in
+     `specs/reviews/mpdf-006.md`.
+  4. The stylesheet carries no `transition`, `animation` or `scroll-behavior` — `grep`
+     over `web/index.html` finds none — so there is no motion for
+     `prefers-reduced-motion` to reduce.
+  5. `spec-lint` reports 0 errors after `spec-lint --write-index`.
+- **Close-out:**
+  - **`rules/web-demo.md`** gains the direction — the faces and why, the tokens and the
+    three colour rules with their measured ratios, the fonts and why they are
+    self-hosted, the hero it shows — and drops its log of the lede's construct count,
+    since the page no longer states one. Its `covers:` grows to name them. It records the page's weight, HTML, the four
+    fonts and the two images, raw and under `brotli -q 11`.
+  - **`rules/web-app.md`** gains `web/hero.mjs` and `web/serve.mjs` as sources, and its
+    section on the site and the check is corrected: `_site/` carries `fonts/` and the two
+    images, the check's clause list gains (a)'s assertions and (o), and the hero's capture
+    is described there, being a script over the built site.
+  - **`rules/desktop-panes.md`**, which owns the window's token blocks, notes that
+    `web/index.html` copies them, so a change to a token is a change to both.
+  - **`README.md`**'s Developing section gains `bun web/hero.mjs` beside the check, and
+    its "In a browser" bullet for the landing page is re-read against the new page.
+  - A dated `CORRECTED` note beside §1's 2026-09-02 note answers the question it left
+    open: the page is Letur's front door, and says so.
+  - `CLAUDE.md`: none needed.
