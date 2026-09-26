@@ -25,6 +25,15 @@
   The check refuses to compare until both hold, and says which did not.
 */
 
+/*
+  **Two clauses hold the landing page rather than the window** — `mpdf-006`
+  Phase 6. (a) refuses a request to any other origin, any response that is not
+  2xx, any `<script>` whose type would run, and a page wider than a 390 px
+  viewport. (o), in both colour schemes, holds every rendered text at 4.5:1
+  against the first opaque background from it up, and walks the keyboard
+  through every link, each stop showing an outline.
+*/
+
 import { chromium, webkit } from 'playwright'
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
@@ -236,12 +245,31 @@ const CLAUSES = {
   async a(browser) {
     const page = await fresh(browser, null)
     const asked = []
+    const refused = []
     page.on('request', (request) => asked.push(request.url()))
+    page.on('response', (response) => {
+      if (response.status() < 200 || response.status() > 299) refused.push(`${response.status()} ${response.url()}`)
+    })
     await page.goto(base + '/', { waitUntil: 'networkidle' })
     const wasm = asked.filter((url) => url.endsWith('.wasm'))
     check(wasm.length === 0, `the landing page requested ${wasm.join(', ')}`)
+    // `mpdf-006` Phase 6: the fonts are self-hosted, so nothing leaves this origin.
+    const elsewhere = asked.filter((url) => /^https?:/.test(url) && new URL(url).origin !== base)
+    check(elsewhere.length === 0, `the landing page asked another origin for ${elsewhere.join(', ')}`)
+    check(refused.length === 0, `the landing page was answered ${refused.join(', ')}`)
+    const executable = await page.$$eval('script', (scripts) =>
+      scripts.map((script) => script.getAttribute('type')).filter((type) =>
+        type === null || /^(|module|(text|application)\/(x-)?(java|ecma)script)$/i.test(type.trim())))
+    check(executable.length === 0, `the landing page carries ${executable.length} script(s) that would run`)
     const links = await page.$$eval('a.open', (links) => links.map((a) => a.getAttribute('href')))
     check(links.length === 12, `the landing page carries ${links.length} links into the app`)
+
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 } })
+    const narrow = await phone.newPage()
+    await narrow.goto(base + '/', { waitUntil: 'networkidle' })
+    const [scroll, inner] = await narrow.evaluate(() => [document.documentElement.scrollWidth, innerWidth])
+    await phone.close()
+    check(scroll <= inner, `at 390 px the landing page is ${scroll} px wide`)
     return page
   },
 
@@ -409,7 +437,68 @@ const CLAUSES = {
     const worn = (await status(page)).appearance
     check(worn === 'dark', `after a reload the appearance is ${worn}`)
     return page
+  },
+
+  async o(browser) {
+    const pages = []
+    for (const colorScheme of ['light', 'dark']) {
+      const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, colorScheme })
+      const page = await context.newPage()
+      await page.addInitScript(counting)
+      page.errors = []
+      pages.push(page)
+      await page.goto(base + '/', { waitUntil: 'networkidle' })
+      await page.evaluate(() => document.fonts.ready)
+      const low = await page.evaluate(contrasts)
+      check(low.length === 0, `${colorScheme}: ${low.length} text below 4.5:1, among them ${low.slice(0, 3).join('; ')}`)
+
+      // WebKit on macOS moves focus between links only with Alt+Tab.
+      const key = engine === 'webkit' ? 'Alt+Tab' : 'Tab'
+      const count = await page.$$eval('a[href]', (links) => links.length)
+      // Chromium also stops on a scrolling source block; every stop needs an outline.
+      const seen = new Set()
+      for (let stop = 1; seen.size < count && stop <= count * 3; stop++) {
+        await page.keyboard.press(key)
+        const at = await page.evaluate(() => {
+          const here = document.activeElement
+          const links = [...document.querySelectorAll('a[href]')]
+          return { index: links.indexOf(here), tag: here.tagName, outline: getComputedStyle(here).outlineStyle }
+        })
+        check(at.tag !== 'BODY', `${colorScheme}: Tab stop ${stop} left the page`)
+        check(at.outline !== 'none', `${colorScheme}: Tab stop ${stop}, a ${at.tag}, is focused with no outline`)
+        if (at.index >= 0) seen.add(at.index)
+      }
+      check(seen.size === count, `${colorScheme}: Tab reached ${seen.size} of ${count} links`)
+    }
+    return pages
   }
+}
+
+/**
+ * Clause (o)'s walk, run in the page: every rendered element with a text node
+ * of its own, its `color` against the first opaque `background-color` from the
+ * element itself up, by the WCAG 2 formula. Answers the ones under 4.5:1.
+ */
+function contrasts() {
+  const rgb = (value) => value.match(/[\d.]+/g).map(Number)
+  const channel = (c) => ((c /= 255) <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  const luminance = ([r, g, b]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+  const low = []
+  for (const element of document.body.querySelectorAll('*')) {
+    const own = [...element.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim() !== '')
+    if (!own || element.closest('picture') !== null) continue
+    if (element.getClientRects().length === 0) continue
+    let back = null
+    for (let at = element; at !== null && back === null; at = at.parentElement) {
+      const value = getComputedStyle(at).backgroundColor
+      if (rgb(value)[3] !== 0) back = value
+    }
+    back ??= getComputedStyle(document.documentElement).backgroundColor
+    const [a, b] = [luminance(rgb(getComputedStyle(element).color)), luminance(rgb(back))]
+    const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+    if (ratio < 4.5) low.push(`${element.tagName.toLowerCase()} "${element.textContent.trim().slice(0, 30)}" ${ratio.toFixed(2)}:1`)
+  }
+  return low
 }
 
 /* -------------------------------------------------------------------- main */
