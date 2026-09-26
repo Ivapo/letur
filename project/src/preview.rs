@@ -350,6 +350,14 @@ pub struct SavedAs {
     pub receipt: String,
 }
 
+/// What a download came to: the bytes the browser hands the reader, and the
+/// receipt the window shows. `ltr-001` Phase 2.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Downloaded {
+    pub bytes: Vec<u8>,
+    pub receipt: String,
+}
+
 /// The pane's state, as Rust holds it.
 ///
 /// The bytes live here rather than only in the page, because the loop is what
@@ -918,6 +926,37 @@ impl<F: Files> Preview<F> {
         })
     }
 
+    /// The pane's text as a file the browser downloads, named `name`.
+    ///
+    /// **A download is a save outside the project, and it is
+    /// [`Preview::save_as`]'s outside arm with no write at all.** A browser's
+    /// Save-as panel hands the reader a file rather than a path, so there is
+    /// nowhere in the project it could land — and handing `name` to
+    /// [`Files::save_as`] would write a file of that name into a `MemFiles`
+    /// and move the pane to it. So the web session recognises its download
+    /// token before any call here, and this is what it calls instead.
+    ///
+    /// **Nothing moves, and `&self` is what says so.** `saved`, `divergence`
+    /// and `edited` stay exactly as a save outside the project leaves them, and
+    /// for its reason: marking the buffer saved would make
+    /// [`Preview::refused_while_dirty`] answer *clean*, and the next row click
+    /// would load the project's older copy over the author's text with no
+    /// [`SWITCHING`] sentence.
+    ///
+    /// The kind is refused in [`document::creatable`]'s words, as the Save-as
+    /// refuses it, and the receipt — `downloaded <name>` — is composed here so
+    /// every sentence the window shows is still this crate's. `ltr-001` Phase 2.
+    pub fn download(&self, name: &str) -> Result<Downloaded, String> {
+        if self.edited.is_none() {
+            return Err(nothing_open());
+        }
+        document::creatable(name)?;
+        Ok(Downloaded {
+            bytes: self.buffer.as_bytes().to_vec(),
+            receipt: format!("downloaded {name}"),
+        })
+    }
+
     /// The disk moved under the open document: decide what that means.
     ///
     /// This is [`external_change`] with the file read for it and its answer
@@ -1418,6 +1457,43 @@ mod tests {
         assert_eq!(preview.saved(), preview.text());
 
         assert_eq!(Preview::<MemFiles>::default().save(), Err(nothing_open()));
+    }
+
+    #[test]
+    fn a_download_hands_over_the_buffer_and_moves_nothing() {
+        let mut preview = opened();
+        preview.edit("# Book, unsaved\n".to_string());
+        let saved = preview.saved().to_string();
+
+        assert_eq!(
+            preview.download("notes.md"),
+            Ok(Downloaded {
+                bytes: b"# Book, unsaved\n".to_vec(),
+                receipt: "downloaded notes.md".to_string(),
+            })
+        );
+        assert_eq!(preview.saved(), saved, "the buffer was marked saved");
+        assert_eq!(preview.edited(), Some("book.md"), "the pane moved");
+        assert_eq!(preview.status().divergence, None);
+        assert!(!preview.files().unwrap().holds("notes.md"), "a file was written");
+
+        // Still dirty, so the next switch is refused rather than loading the
+        // older copy over the author's text.
+        assert_eq!(preview.set_edited("sections/one.md"), Ok(Asked::Refused));
+        assert_eq!(preview.status().divergence.as_deref(), Some(SWITCHING));
+    }
+
+    #[test]
+    fn a_download_is_refused_in_creatable_s_words_and_with_nothing_open() {
+        let preview = opened();
+        assert_eq!(
+            preview.download("page.pdf"),
+            Err(document::creatable("page.pdf").unwrap_err())
+        );
+        assert_eq!(
+            Preview::<MemFiles>::default().download("notes.md"),
+            Err(nothing_open())
+        );
     }
 
     #[test]
