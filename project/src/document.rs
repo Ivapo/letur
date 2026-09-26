@@ -9,7 +9,7 @@
 //! [`Files`] over it.
 
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use md2pdf_core::Asset;
 use serde::Serialize;
@@ -397,6 +397,17 @@ pub fn read_document(files: &impl Files, document: &str) -> Result<String, Strin
 /// CLI does for the same input.
 pub fn directory(document: &Path) -> &Path {
     document.parent().unwrap_or(Path::new(""))
+}
+
+/// Where an export lands unless the user says otherwise: the document's path
+/// with a `.pdf` extension.
+///
+/// This is `cli/src/main.rs:default_output`'s rule, and the duplication is
+/// deliberate for the reason [`read_assets_with`] duplicates its own
+/// counterpart. Sharing it would mean making one crate's binary reachable from
+/// the other, and the two front ends are two binaries over one library.
+pub fn default_output(document: &Path) -> PathBuf {
+    document.with_extension("pdf")
 }
 
 // ---------------------------------------------------------------------------

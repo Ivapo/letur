@@ -705,7 +705,11 @@ impl<F: Files> Preview<F> {
         self.exportable()?;
         self.main
             .as_deref()
-            .map(|main| Path::new(main).with_extension("pdf").to_string_lossy().into_owned())
+            .map(|main| {
+                document::default_output(Path::new(main))
+                    .to_string_lossy()
+                    .into_owned()
+            })
             .ok_or_else(nothing_open)
     }
 
