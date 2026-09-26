@@ -1,0 +1,53 @@
+# **The property `ltr-001` Phase 1 exists for, checked rather than asserted**:
+# nothing in this crate touches a file, reads a clock or starts a thread, so the
+# web session can run it as WebAssembly and the desktop can hand it the disk.
+#
+# **An enumerated list, because clippy matches paths and not modules.** A wasm
+# build alone would not catch most of these: `std::fs` compiles for
+# `wasm32-unknown-unknown` and fails at run time, and `Instant::now` and
+# `SystemTime::now` compile and panic. The `std::path::Path` methods that reach
+# the filesystem are listed beside `std::fs`'s own functions, since a
+# `path.is_file()` is the same call as `std::fs::metadata(path)`.
+#
+# Test code is not linted by the gate's command, so a test may read a fixture.
+disallowed-methods = [
+  { path = "std::fs::canonicalize", reason = "a file is reached through `Files`" },
+  { path = "std::fs::copy", reason = "a file is reached through `Files`" },
+  { path = "std::fs::create_dir", reason = "a file is reached through `Files`" },
+  { path = "std::fs::create_dir_all", reason = "a file is reached through `Files`" },
+  { path = "std::fs::exists", reason = "a file is reached through `Files`" },
+  { path = "std::fs::hard_link", reason = "a file is reached through `Files`" },
+  { path = "std::fs::metadata", reason = "a file is reached through `Files`" },
+  { path = "std::fs::read", reason = "a file is reached through `Files`" },
+  { path = "std::fs::read_dir", reason = "a file is reached through `Files`" },
+  { path = "std::fs::read_link", reason = "a file is reached through `Files`" },
+  { path = "std::fs::read_to_string", reason = "a file is reached through `Files`" },
+  { path = "std::fs::remove_dir", reason = "a file is reached through `Files`" },
+  { path = "std::fs::remove_dir_all", reason = "a file is reached through `Files`" },
+  { path = "std::fs::remove_file", reason = "a file is reached through `Files`" },
+  { path = "std::fs::rename", reason = "a file is reached through `Files`" },
+  { path = "std::fs::set_permissions", reason = "a file is reached through `Files`" },
+  { path = "std::fs::soft_link", reason = "a file is reached through `Files`" },
+  { path = "std::fs::symlink_metadata", reason = "a file is reached through `Files`" },
+  { path = "std::fs::write", reason = "a file is reached through `Files`" },
+  { path = "std::path::Path::canonicalize", reason = "a file is reached through `Files`" },
+  { path = "std::path::Path::exists", reason = "a file is reached through `Files`" },
+  { path = "std::path::Path::is_dir", reason = "a file is reached through `Files`" },
+  { path = "std::path::Path::is_file", reason = "a file is reached through `Files`" },
+  { path = "std::path::Path::is_symlink", reason = "a file is reached through `Files`" },
+  { path = "std::path::Path::metadata", reason = "a file is reached through `Files`" },
+  { path = "std::path::Path::read_dir", reason = "a file is reached through `Files`" },
+  { path = "std::path::Path::read_link", reason = "a file is reached through `Files`" },
+  { path = "std::path::Path::symlink_metadata", reason = "a file is reached through `Files`" },
+  { path = "std::path::Path::try_exists", reason = "a file is reached through `Files`" },
+  { path = "std::time::Instant::now", reason = "panics on wasm32-unknown-unknown; a duration is passed in" },
+  { path = "std::time::SystemTime::now", reason = "panics on wasm32-unknown-unknown" },
+  { path = "std::thread::spawn", reason = "the threads are the host's" },
+  { path = "std::sync::mpsc::channel", reason = "the claim channel is the host's" },
+]
+disallowed-types = [
+  { path = "std::fs::File", reason = "a file is reached through `Files`" },
+  { path = "std::fs::OpenOptions", reason = "a file is reached through `Files`" },
+  { path = "std::sync::mpsc::Sender", reason = "the claim channel is the host's" },
+  { path = "std::sync::mpsc::Receiver", reason = "the claim channel is the host's" },
+]

@@ -1,5 +1,5 @@
 [workspace]
-members = ["app"]
+members = ["app", "project"]
 resolver = "3"
 
 # **`version` is deliberately not here.** It left the workspace table when

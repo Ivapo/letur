@@ -1,0 +1,22 @@
+[package]
+name = "letur-project"
+description = "The rules Letur's window answers through: a project's files, its compile and its status, over any store of files."
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# **No I/O, no clock, no threads**, and `clippy.toml` beside this file is what
+# says so rather than this comment: `ltr-001` Phase 1 took these rules out of
+# `app/` so the web session answers through the same code the desktop does,
+# and a crate the browser runs cannot open a file, read a clock or spawn a
+# thread. Every file is reached through `files::Files`.
+#
+# **`http` is `ureq`'s own URI parser, taken directly**, because the site a URL
+# is on (`remote::host`) is a rule and `ureq` is the desktop's network client. It
+# is already in `Cargo.lock` at this version by way of `ureq`, so declaring it
+# adds no crate to the tree.
+[dependencies]
+http = "1.5.0"
+md2pdf-core = "0.4"
+serde = { version = "1.0.229", features = ["derive"] }

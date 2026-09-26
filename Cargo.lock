@@ -2865,6 +2865,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "letur-project"
+version = "0.1.0"
+dependencies = [
+ "http",
+ "md2pdf-core",
+ "serde",
+]
+
+[[package]]
 name = "libappindicator"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
