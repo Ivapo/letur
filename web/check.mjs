@@ -32,10 +32,18 @@
   viewport. (o), in both colour schemes, holds every rendered text at 4.5:1
   against the first opaque background from it up, and walks the keyboard
   through every link, each stop showing an outline.
+
+  **And they hold the pictures of the page** — Phase 7. (a) holds each row's
+  picture to its own pixels: loaded, and its `width` and `height` 4/9 of them.
+  (c) holds each to the PDF it was made from, by `web/pages/pages.json`'s
+  SHA-256, so an engine bump that leaves the pictures behind fails here. (o)
+  opens every `<details>` first, since three of the page's links live inside
+  the plain-HTML columns.
 */
 
 import { chromium, webkit } from 'playwright'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -142,6 +150,9 @@ if (EXAMPLES.length !== 12) die(`web/index.html carries ${EXAMPLES.length} examp
 const ASSETS = [...LANDING.matchAll(/<script type="[^"]+" data-asset="([^"]+)">([\s\S]*?)<\/script>/g)]
   .map(([, name, text]) => ({ name, text }))
 if (ASSETS.length !== 2) die(`web/index.html carries ${ASSETS.length} assets, not 2`)
+
+/** Each row's picture, by name, to the SHA-256 of the PDF `web/hero.mjs` rendered it from. */
+const MANIFEST = JSON.parse(readFileSync(join(ROOT, 'web/pages/pages.json'), 'utf8'))
 
 /** What the pinned CLI writes for a source, with the page's two files beside it. */
 function reference(source) {
@@ -256,13 +267,37 @@ const CLAUSES = {
     // `mpdf-006` Phase 6: the fonts are self-hosted, so nothing leaves this origin.
     const elsewhere = asked.filter((url) => /^https?:/.test(url) && new URL(url).origin !== base)
     check(elsewhere.length === 0, `the landing page asked another origin for ${elsewhere.join(', ')}`)
-    check(refused.length === 0, `the landing page was answered ${refused.join(', ')}`)
     const executable = await page.$$eval('script', (scripts) =>
       scripts.map((script) => script.getAttribute('type')).filter((type) =>
         type === null || /^(|module|(text|application)\/(x-)?(java|ecma)script)$/i.test(type.trim())))
     check(executable.length === 0, `the landing page carries ${executable.length} script(s) that would run`)
     const links = await page.$$eval('a.open', (links) => links.map((a) => a.getAttribute('href')))
     check(links.length === 12, `the landing page carries ${links.length} links into the app`)
+
+    // `mpdf-006` Phase 7: each row's picture loads, and is drawn at 4/9 of its pixels.
+    const shots = page.locator('figure.shot img')
+    const count = await shots.count()
+    check(count === 9, `the landing page carries ${count} pictures of the page, not 9`)
+    for (let i = 0; i < count; i++) {
+      await shots.nth(i).scrollIntoViewIfNeeded()
+      const shot = await shots.nth(i).evaluate(async (img) => {
+        if (!img.complete) {
+          await new Promise((done) => {
+            img.addEventListener('load', done, { once: true })
+            img.addEventListener('error', done, { once: true })
+          })
+        }
+        return {
+          src: img.getAttribute('src'), naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight,
+          width: Number(img.getAttribute('width')), height: Number(img.getAttribute('height'))
+        }
+      })
+      check(shot.naturalWidth > 0, `${shot.src} did not load`)
+      const [width, height] = [Math.round(shot.naturalWidth * 4 / 9), Math.round(shot.naturalHeight * 4 / 9)]
+      check(shot.width === width && shot.height === height,
+        `${shot.src} is written ${shot.width} × ${shot.height}, and its pixels make it ${width} × ${height}`)
+    }
+    check(refused.length === 0, `the landing page was answered ${refused.join(', ')}`)
 
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 } })
     const narrow = await phone.newPage()
@@ -293,6 +328,10 @@ const CLAUSES = {
 
   async c(browser) {
     const pages = []
+    const ok = EXAMPLES.filter(({ expect }) => expect === 'ok').map(({ name }) => name)
+    const named = Object.keys(MANIFEST)
+    check(named.length === ok.length && ok.every((name) => named.includes(name)),
+      `web/pages/pages.json names ${named.join(', ')}, not the ${ok.length} ok examples`)
     for (const { name, source } of EXAMPLES.filter(({ expect }) => expect === 'ok')) {
       const page = await fresh(browser, app(name))
       pages.push(page)
@@ -301,6 +340,8 @@ const CLAUSES = {
       const ours = await pdfBytes(page)
       const theirs = reference(source)
       check(ours.equals(theirs), `${name}: the page's PDF (${ours.length} bytes) is not md2pdf's (${theirs.length})`)
+      const hash = createHash('sha256').update(ours).digest('hex')
+      check(hash === MANIFEST[name], `web/pages/${name}.png was made from another PDF: run bun web/hero.mjs`)
     }
     return pages
   },
@@ -449,6 +490,8 @@ const CLAUSES = {
       pages.push(page)
       await page.goto(base + '/', { waitUntil: 'networkidle' })
       await page.evaluate(() => document.fonts.ready)
+      // Phase 7: the plain-HTML columns stay under both walks, and three links live in them.
+      await page.$$eval('details', (all) => all.forEach((details) => (details.open = true)))
       const low = await page.evaluate(contrasts)
       check(low.length === 0, `${colorScheme}: ${low.length} text below 4.5:1, among them ${low.slice(0, 3).join('; ')}`)
 
