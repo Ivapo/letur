@@ -12,7 +12,8 @@
 
   **It drives the site `web/assemble.sh` builds**, served on 127.0.0.1 the way
   Pages serves it: `/app` redirected to `/app/`, and `.wasm` as
-  `application/wasm`. So `web/pkg/` must be built first —
+  `application/wasm` — by `web/serve.mjs`, which `web/hero.mjs` serves it
+  through too. So `web/pkg/` must be built first —
   `cd web && wasm-pack build --target web --release`.
 
   **The reference compiler is pinned, and so is the graph it was built from.**
@@ -25,11 +26,11 @@
 */
 
 import { chromium, webkit } from 'playwright'
-import { createServer } from 'node:http'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { extname, join, normalize, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
+import { serve } from './serve.mjs'
 
 const ROOT = resolve(import.meta.dir, '..')
 const SITE = join(ROOT, '_site')
@@ -105,39 +106,6 @@ function copied() {
   if (at < 0 || copy.length !== source.length + 1) return false
   copy.splice(at, 1)
   return copy.every((line, i) => line === source[i]) && source[at].trim() === '</head>'
-}
-
-const TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.wasm': 'application/wasm',
-  '.json': 'application/json',
-  '.svg': 'image/svg+xml',
-  '.pdf': 'application/pdf'
-}
-
-function serve() {
-  const server = createServer((request, response) => {
-    const path = decodeURIComponent(new URL(request.url, 'http://x').pathname)
-    if (path === '/app') {
-      response.writeHead(301, { location: '/app/' })
-      return response.end()
-    }
-    let file = normalize(join(SITE, path))
-    if (file.startsWith(SITE) && existsSync(file) && statSync(file).isDirectory()) {
-      file = join(file, 'index.html')
-    }
-    if (!file.startsWith(SITE) || !existsSync(file) || statSync(file).isDirectory()) {
-      response.writeHead(404)
-      return response.end()
-    }
-    response.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' })
-    response.end(readFileSync(file))
-  })
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () => done({ url: `http://127.0.0.1:${server.address().port}`, server }))
-  )
 }
 
 /* ------------------------------------------------------------ the examples */
@@ -450,7 +418,7 @@ const version = pinned()
 if (!argv.includes('--no-assemble')) assemble()
 if (!copied()) die('_site/app/index.html is not app/dist/index.html and one inserted line')
 
-const { url: base, server } = await serve()
+const { url: base, server } = await serve(SITE)
 const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true })
 console.log(`${engine}, md2pdf ${version}, ${base}`)
 

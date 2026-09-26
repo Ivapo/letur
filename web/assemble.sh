@@ -2,6 +2,8 @@
 # Build the published site in `_site/` at the repository root — `ltr-001` Phase 2.
 #
 #   _site/index.html        the landing page, `web/index.html`, as it is
+#   _site/fonts/            the faces it is set in, `web/fonts/`
+#   _site/hero-*.png        the window it shows, `web/hero.mjs`'s capture
 #   _site/app/index.html    `app/dist/index.html` with one line inserted
 #   _site/app/pdfjs/        the renderer the window vendors
 #   _site/app/host/         the `__TAURI__` the window answers through
@@ -12,6 +14,17 @@
 # script. The inserted line goes immediately before `</head>`, where the harness
 # puts its stub, so the host has set `window.__TAURI__` before the window's own
 # module reads it. It is the only difference, and `web/check.mjs` holds it so.
+#
+# **The fonts are Libertinus Serif and Mono**, the faces `md2pdf-core` sets
+# every page in, subset from `md2pdf-core-0.4.0/assets/fonts/` — `mpdf-006`
+# Phase 6 — by this, once per face, beside that directory's `OFL.txt`:
+#
+#   uvx --from 'fonttools[woff]' pyftsubset <font>.otf --flavor=woff2 \
+#     --unicodes='U+0020-007E,U+00A0-00FF,U+2010-2027,U+2190-2193' \
+#     --output-file=web/fonts/<font>.woff2
+#
+# **The two images are copied when they exist**, so `web/hero.mjs` can make its
+# first capture against a site assembled before them.
 #
 # Run from anywhere; it works from the repository root. `web/pkg/` must exist:
 # `cd web && wasm-pack build --target web --release` first.
@@ -35,6 +48,10 @@ rm -rf _site
 mkdir -p _site/app
 
 cp web/index.html _site/
+cp -R web/fonts _site/fonts
+for scheme in light dark; do
+  if [ -f "web/hero-$scheme.png" ]; then cp "web/hero-$scheme.png" _site/; fi
+done
 awk '/<\/head>/ { print "    <script type=\"module\" src=\"host/host.mjs\"></script>" } { print }' \
   "$page" > _site/app/index.html
 cp -R app/dist/pdfjs _site/app/pdfjs
