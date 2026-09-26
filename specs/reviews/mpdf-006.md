@@ -2,6 +2,59 @@
 
 Append-only. One heading per round, newest first.
 
+### Gate 4 — Phase 7 — 2026-09-26 — the author, on the screenshots — **APPROVED, after two changes**
+
+`bun web/hero.mjs --shots` wrote fourteen screenshots into `_shots/`:
+
+- per engine, `chromium` and `webkit`: `landing-<engine>-1280-light.png`,
+  `-1280-dark.png`, `-390-light.png`, `-390-dark.png`, and the three full-page ones,
+  `landing-<engine>-full-1280-light.png`, `-full-390-light.png` (every `<details>` closed)
+  and `-full-1280-dark-open.png` (every one open).
+
+The author also read the page itself, served locally from `_site/`, and was asked again
+the question this phase answers: does each row now show what Letur makes? Yes, with two
+changes, both made before the approval and both departing from the reviewed text, which
+carries a dated note on each:
+
+1. **The two halves of a row should match.** At true size a small result, Table 1 at
+   168 px, sat beside a 526 px source box. Scaling each picture to its column was weighed
+   and refused: nine scales, and the small crops upscaled about 3× and soft. **Taken:** the
+   picture stays at true size, centred on a `--paper` sheet (`.shot > .paper`) that
+   stretches with the source's box to the taller of the two. CSS and one wrapper per row;
+   the pictures, sizes, manifest and readers' bytes unchanged.
+2. **The footnote row was far too tall** — 294 × 970, and with the sheets matched the
+   source box grew to it. **Taken:** a general rule in `hero.mjs`, not a footnote case: any
+   blank stretch over 80pt is cut to a 32pt gap with a dashed grey rule across it. Only the
+   footnote's page has one; its picture becomes 294 × 103, and the other eight came out
+   byte-identical. Its `alt` names the cut.
+
+**One request logged for a phase of its own, not taken here**: the accepted bulleted task
+list has no example on the page. Phase 5 replaced that row with the numbered-list refusal
+deliberately, and adding it back reverses that, makes thirteen rows —
+`app/tests/page_examples_test.rs`'s `EXPECTED = 12` changes, which this phase said would
+not — and puts the engine's mirrored fixtures out of step again. The author chose a
+Phase 8, drafted and reviewed after this one ships.
+
+Both checks re-run after the two changes: every clause passes in Chromium and WebKit.
+The screenshots are not committed; one command writes them again.
+
+### Gate 3 — Phase 7 — 2026-09-26 — the guards, falsified in Chromium — **ALL THREE FAIL AS THEY SHOULD**
+
+Each break was made against a copy kept in the session's scratch directory and restored
+after, the restore checked with `cmp`:
+
+- **`pages.json`'s `citation` entry set to 64 zeros** → `bun web/check.mjs --only c`:
+  `FAIL c  web/pages/citation.png was made from another PDF: run bun web/hero.mjs`.
+- **`web/pages/footnote.png` deleted** → `--only a`: `FAIL a  pages/footnote.png did not
+  load`.
+- **`caption-table`'s `width` changed from 168 to 169** → `--only a`: `FAIL a
+  pages/caption-table.png is written 169 × 94, and its pixels make it 168 × 94`.
+
+Gate 1 by extraction, the same four patterns as Phase 6's: from `git show
+00aedc5:web/index.html` and from the working copy, 12 examples, 2 assets, 3 error
+sentences and 12 generated blocks, equal tuples in equal order — run again after both of
+gate 4's changes.
+
 ### Round 3 — Phase 7 only — 2026-09-26 — the correctness reviewer, resumed — **READY (converged)**
 
 The one blocker left open in round 2 is resolved: before each full-page capture, the

@@ -8,12 +8,14 @@ covers: >
   what the dialect adds and the marked examples that carry it, the byte rule
   those examples obey and the test that enforces it, the CSS that renders a
   script element, the other column generated from the same parse and the
-  markers and substitution that carry it, the link every row carries into the
-  app, and the two files the page carries down one attribute and the fourth
+  markers and substitution that carry it and the closed `<details>` it sits in,
+  the picture of the page Letur sets beside each accepted example and how it is
+  made, sized, cut and guarded, the panel a refusal shows in its place, the link
+  every row carries into the app, and the two files the page carries down one attribute and the fourth
   reader of them; and how it looks — the two faces it is set in and why, the
   window's tokens it copies and the three colour rules with their ratios, the
   fonts it hosts itself, the hero picture of the window, and what the page weighs
-max_lines: 200
+max_lines: 250
 generated: 2026-09-26
 ---
 
@@ -95,6 +97,46 @@ row is one. `script[data-example] { display: block; white-space: pre; overflow-x
 renders it, in Libertinus Mono on `--paper`. A visible `<pre>` duplicate was refused deliberately: two copies of an example
 can differ, which is the failure the whole arrangement prevents.
 
+## The page Letur sets, beside each source
+
+**Each `ok` row shows the page Letur makes of its source** (`mpdf-006` Phase 7), because
+a visitor reads the box beside the source as the result. The right half of the row's
+`div.cols` is a `figure.col.shot` captioned *the page Letur sets*, holding
+`<img src="pages/NAME.png" loading="lazy">` with an `alt` written for that row — what the
+picture shows, since the `→` sentence is a claim and not a description.
+
+**Captured, not drawn**, by `web/hero.mjs` (`rules/web-app.md`): the PDF the window holds,
+its one page rendered with the window's pdf.js at 3 canvas px per pt, cropped to the ink
+(any channel under 250) padded 36 px. **A blank stretch over 80pt is cut** to a 32pt gap
+with a dashed grey rule across it, so a page whose ink sits at its top and its foot is not
+shown at a page's height: only the footnote's has one, 294 × 970 CSS px uncut, 294 × 103
+cut. Nine PNGs in `web/pages/`, committed; one per example, not per theme, since `--paper`
+and the page are white in both.
+
+**One scale on every row**: each `<img>`'s `width` and `height` are
+`Math.round(px × 4 / 9)` of the PNG's — 3 canvas px per pt, 4/3 CSS px per pt — written
+into the page by hand from `web/hero.mjs`'s printout. `max-width: 100%; height: auto`
+scales a crop wider than its column down whole; none is scaled up. **The picture sits
+centred on a sheet of `--paper`** (`.shot > .paper`) that stretches, with the source's
+box, to the taller of the two, so a row's halves match while the picture keeps the page's
+size: the author's reading of the first screenshots, 2026-09-26.
+
+**Guarded by the bytes it was made from, not by its pixels.** `web/pages/pages.json` maps
+each name to the SHA-256 of the PDF its picture came from; `web/check.mjs` clause (c) holds
+each `ok` example's PDF to that hash and the manifest to the nine names, failing *"run bun
+web/hero.mjs"*, and clause (a) holds each `width`/`height` to the loaded PNG. **What that
+does not catch**: a change to the crop, the cut, the scale or the threshold; a pdf.js
+upgrade under `app/dist/pdfjs/`; a PNG edited by hand or two swapped; an `alt` gone stale.
+**And it runs only where `web/check.mjs` runs** — locally, before a push, not in
+`.github/workflows/pages.yml` — so an engine bump pushed without `bun web/hero.mjs`
+publishes stale pictures.
+
+**A refusal sets no page, and its panel says so in the page's place**: `div.col.refusal`,
+on `--ground`, ruled on the left by 3px of `--alarm`, reading *Letur sets no page, and
+says:* in `--ink` above the row's `code[data-error-for]`, moved there out of `p.does` with
+its bytes intact. The emptied `p.does` is gone, so a refusal row carries no `→`. The panel
+keeps its own height; the longest sentence scrolls inside it.
+
 ## The other column, and where its markup comes from
 
 **The column beside each example is generated, not written.** It is
@@ -103,10 +145,13 @@ can differ, which is the failure the whole arrangement prevents.
 pulldown-cmark's own HTML backend instead of by
 the emitter, so it is not a second renderer but the one the page's whole claim is already
 about. It shows what this parse looks like when something other than the emitter sets it
-down: the caption marker is lost because nothing but the emitter is looking for it. The
-twelve labels read `the same parse, as HTML`. **The bytes are inlined rather than produced
-at load**, so no column sits behind the module and a reader with scripting off meets both
-halves of every row.
+down: the caption marker is lost because nothing but the emitter is looking for it.
+**Since `mpdf-006` Phase 7 it sits beneath the row, closed**: a `<details class="plain">`
+after `div.cols` and `p.does`, its `<summary>` reading *Without Letur: the same parse, as
+plain HTML*. A `<details>` opens with scripting off. Its default marker is hidden —
+`list-style: none` and `::-webkit-details-marker` — because `▸`/`▾` are outside the font
+subset; a `::before` of `+ ` closed and `– ` open stands in. **The bytes are inlined
+rather than produced at load**, so no column sits behind the module.
 
 **The blocks sit between `<!--html:NAME-->` and `<!--/html:NAME-->`**, keyed to the row's
 own `data-example` value. This is the one region in the page that cannot end at a closing
@@ -115,8 +160,8 @@ tag — the `raw-html` block ends `</div>`, the `footnote` block carries a
 under another name; a comment cannot nest and `push_html` emits none. **What lies between a
 pair is exactly what the generator returned**, nothing trimmed at either end, so the page
 and the test compare the same bytes by construction; `raw-html` ends without a trailing
-newline. A `div.rendered` wrapper sits outside the markers, uncompared, inside a
-`figure.col` whose italic `figcaption` carries the label, carrying the type
+newline. A `div.rendered` wrapper sits outside the markers, uncompared, inside the
+`<details>`, carrying the type
 scale four real tables, two real checkboxes, a heading, a listing and a real `<div>` need.
 
 **One substitution, and exactly one**: an image destination equal to the page's
@@ -199,7 +244,8 @@ Three rules, measured by the WCAG 2 formula and held at 4.5:1 by clause (o):
   ink `#2b3140` in both (13.0:1).
 - **One accent**: `#1e3c82`, `pipeline.svg`'s stroke, in light; `#9db4ec` in dark. Links,
   the calls to open Letur and the focus outline, nothing else. The call is filled with it
-  and lettered white in light, `--ground` in dark. Refusal sentences are `--alarm`.
+  and lettered white in light, `--ground` in dark. Refusal sentences are `--alarm`, on the
+  refusal panel's `--ground`.
 
 **Every keyboard stop shows an outline** — `:focus-visible`, in the accent — which covers
 the links and, in Chromium, the scrolling source blocks. No `transition`, `animation` or
@@ -210,6 +256,9 @@ the links and, in Chromium, the scrolling source blocks. No `transition`, `anima
 keyed on `prefers-color-scheme`. Below 720px the hero stacks picture-last and each row
 source-first.
 
-**What it weighs**, measured 2026-09-26, raw and under `brotli -q 11`: the HTML 28,692 and
-7,458 bytes; the four fonts 93,008, which woff2 has already compressed; the two images
-66,260 and 66,303 raw, about 50,800 each. A visitor loads one image.
+**What it weighs**, measured 2026-09-26 after `mpdf-006` Phase 7, raw and under
+`brotli -q 11`: the HTML 33,759 and 8,504 bytes; the four fonts 93,008, which woff2 has
+already compressed; the two hero images 66,260 and 66,303 raw, about 50,800 each, of which
+a visitor loads one; the nine pictures in `pages/` 218,418 raw and 202,399 under brotli,
+from display-math's 5,099 to frontmatter's 61,580. **Recorded, not budgeted**: the nine
+are `loading="lazy"`, so a visitor pays for the rows they scroll to.

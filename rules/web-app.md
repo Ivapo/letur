@@ -21,7 +21,8 @@ covers: >
   seed that opens an example and the landing page it reads, the site the
   assemble step builds, the lockfile seeded from the CLI's and the check that
   refuses to compare without it, the server the check and the capture share,
-  the capture of the window the landing page shows, the module's size, and the
+  the capture of the window the landing page shows and of each row's page with
+  the manifest that guards them, the module's size, and the
   build and deploy that publish it
 max_lines: 220
 generated: 2026-09-26
@@ -141,8 +142,9 @@ name seeds nothing, and the window starts empty with Open… offered.
 ## The site, the lockfile and the check
 
 `web/assemble.sh` builds `_site/`: the landing page at the root, with `fonts/` — the four
-Libertinus subsets from `web/fonts/` — and `hero-light.png` and `hero-dark.png` when they
-exist, so the first capture can run against a site built before them; at `app/` the copied
+Libertinus subsets from `web/fonts/` — `hero-light.png` and `hero-dark.png`, and `pages/`
+with the nine rows' pictures from `web/pages/*.png`, each when it exists, so the first
+capture can run against a site built before them; `pages.json` is not published. At `app/` the copied
 window, `app/dist/pdfjs/`, `web/host/` and `web/pkg/`, with `pkg/.gitignore` removed so
 the Pages upload keeps the module. It dies unless the window has exactly one `</head>`
 and the module has been built.
@@ -162,15 +164,19 @@ two lockfiles agree on every shared package; it checks the copied window is the 
 plus the one line; and it serves `_site` on 127.0.0.1 as Pages does — `/app` redirected,
 `.wasm` as `application/wasm`, `.woff2` and `.png` typed — through `web/serve.mjs`, which
 `web/hero.mjs` shares. Its clauses: the landing page requests no `.wasm`, nothing from
-another origin, gets only 2xx answers, carries no `<script>` whose type would run, and is
-no wider than a 390 px viewport; every
+another origin, gets only 2xx answers, carries no `<script>` whose type would run, is
+no wider than a 390 px viewport, and carries nine `figure.shot img`, each scrolled into
+view, loaded, and written at `Math.round(natural × 4 / 9)` of its pixels; every
 example opens with its source in the pane, one through a `hashchange`; **every `ok`
-example's PDF equals what the pinned `md2pdf` writes, byte for byte**; the three bars
+example's PDF equals what the pinned `md2pdf` writes, byte for byte**, and its SHA-256
+the one `web/pages/pages.json` records for its picture, the manifest naming exactly the
+nine; the three bars
 hidden on an `ok` example; each refusal's exact sentence; the debounce bumping
 `revision` within 2 s of typing and holding still after; create and trash through the
 panel; the `saved` receipt; the download that moves nothing; the export's bytes; Open…;
 the default seed and title; the appearance surviving a reload; (o), in both colour
-schemes, every rendered text on the landing page at 4.5:1 against the first opaque
+schemes and with every `<details>` opened — three links live in the plain-HTML columns —
+every rendered text on the landing page at 4.5:1 against the first opaque
 background from it up, and the keyboard reaching every link with an outline at every
 stop — `Alt+Tab` in WebKit, whose macOS default skips links; and no uncaught page
 error, counted by listeners installed with `addInitScript`. **Its status reads are
@@ -182,9 +188,18 @@ passes at once. **Run 2026-09-26: every clause passes in Chromium and in WebKit*
 assembles and serves the site, opens `app/#example=caption-image` in Chromium at 1280 ×
 800 and device scale factor 2, once per colour scheme, waits for status `current` and a
 first-page canvas holding a pixel that is not white, and writes `web/hero-light.png` and
-`web/hero-dark.png`, which are committed. `--shots` writes the landing page's viewport at
-1280 × 900 and 390 × 844, light and dark, into the ignored `_shots/` — one child process
-per engine, since a second launch in one process hangs — for an author to approve.
+`web/hero-dark.png`, which are committed. **In the same run it makes each row's picture**
+(Phase 7): for each `ok` example it opens `app/#example=NAME`, waits for `current`, takes
+`current_pdf`, and renders its one page with `/app/pdfjs/pdf.min.mjs` — the module the
+window imported, its worker already set — at 3 canvas px per pt; crops to the ink, cuts
+any blank stretch over 80pt (`rules/web-demo.md`), and writes `web/pages/NAME.png`, then
+`web/pages/pages.json`, name → the PDF's SHA-256, and prints the nine `width`/`height`
+pairs for the page. It dies on an example making more than one page. `--shots` writes the
+landing page's viewport at 1280 × 900 and 390 × 844, light and dark, and the whole page
+three ways — 1280 light and 390 light with every `<details>` closed, 1280 dark with
+every one open, each after scrolling every picture into view and waiting for it — so
+fourteen, into the ignored `_shots/`, one child process per engine, since a second
+launch in one process hangs, for an author to approve.
 
 ## The module, and what it costs
 

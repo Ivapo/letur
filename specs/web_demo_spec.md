@@ -41,7 +41,7 @@ phases:
     by: null
   - name: "Phase 7 — each row shows the page Letur sets, and a refusal reads as one"
     reviewed: 2026-09-26
-    shipped: null
+    shipped: 2026-09-26
     cut: null
     by: null
 
@@ -1399,3 +1399,13 @@ intact. No reader depends on the wrapper: the test and the seed read by attribut
     the page Letur sets.
   - **`.gitignore`**'s comment on `/_shots/` names fourteen screenshots, not eight.
   - `CLAUDE.md`: none needed.
+
+**CORRECTED 2026-09-26, at gate 4 (build).** Two sentences above stopped being true before
+the push, both at the author's reading of the screenshots (`specs/reviews/mpdf-006.md`).
+*"Shown at true size where the column allows"* still holds, but the picture is no longer
+the row's right half on its own: it sits centred on a `--paper` sheet that stretches with
+the source's box, so a row's two halves match. And the crop is no longer *"one rule for
+every row, with no special case"* producing a footnote picture *"about 294 × 968 CSS px"*:
+still one rule, it now also cuts any blank stretch over 80pt to a 32pt gap with a dashed
+rule across it, and the footnote's picture is 294 × 103. The guard is unchanged — a change
+to the crop is still one the hash does not see, as this phase says.

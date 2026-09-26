@@ -43,5 +43,5 @@ node_modules/
 /_site/
 /web/node_modules/
 
-# The eight landing-page screenshots `web/hero.mjs --shots` writes for its author.
+# The fourteen landing-page screenshots `web/hero.mjs --shots` writes for its author.
 /_shots/

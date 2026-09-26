@@ -21,7 +21,10 @@
   the CLI's), and renders its one page with the window's own vendored pdf.js at
   3 canvas pixels per PDF point, whatever the device scale factor. It is
   cropped to the ink — every pixel with a channel under 250 — padded 36 px and
-  clamped to the page. It dies on an example that makes more than one page.
+  clamped to the page, and any blank stretch taller than 80pt is cut to a 32pt
+  gap with a dashed rule across it, so the footnote's page, ink at its top and
+  its foot, is not shown at a page's height. It dies on an example that makes
+  more than one page.
   `web/pages/pages.json` maps each name to the SHA-256 of the PDF its picture
   came from, which is what clause (c) holds the pictures to; the printed
   `width`/`height`, `Math.round(px × 4 / 9)`, are written into `web/index.html`

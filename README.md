@@ -19,8 +19,9 @@ button that says so.
 Letur also runs in a tab, with nothing to install:
 
 - **<https://ivapo.github.io/letur/>** — what Letur is, a picture of its window, and what
-  its markdown can say, twelve examples long, each beside the same text set down as plain
-  HTML. It is set in the faces the PDF is set in, and it loads no module.
+  its markdown can say, twelve examples long, each beside the page Letur sets from it — or,
+  for the three it refuses, what it says instead — with the same text as plain HTML
+  beneath. It is set in the faces the PDF is set in, and it loads no module.
 - **<https://ivapo.github.io/letur/app/>** — Letur's own window: the file panel, the text
   pane and the drawn pages, redrawn as you type. Every example on the page above has an
   **Open in Letur** link that opens it here as `document.md`, beside the page's
@@ -279,15 +280,21 @@ $ bun web/check.mjs --webkit   # WebKit
 ```
 
 `bash web/assemble.sh` builds the published site into `_site/` on its own, if you want
-to serve it by hand. The landing page's picture of the window is a capture, not a
-drawing, and one command remakes it; `--shots` writes the landing page itself at desktop
-and phone widths, light and dark, in both engines, into `_shots/` for a look before a
-push:
+to serve it by hand. The landing page's pictures — of the window, and of the page each
+example makes — are captures, not drawings, and one command remakes them all; `--shots`
+writes the landing page itself at desktop and phone widths, light and dark, and whole, in
+both engines, into `_shots/` for a look before a push:
 
 ```console
-$ bun web/hero.mjs             # web/hero-light.png, web/hero-dark.png
-$ bun web/hero.mjs --shots     # _shots/, eight screenshots
+$ bun web/hero.mjs             # web/hero-*.png, web/pages/*.png and pages.json
+$ bun web/hero.mjs --shots     # _shots/, fourteen screenshots
 ```
+
+**After an engine bump, run `bun web/hero.mjs` before `bun web/check.mjs`.** Every PDF
+changes, and the check refuses a row's picture made from another PDF than the one the
+page now sets; the command prints each picture's `width` and `height`, which go into
+`web/index.html` by hand. The deploy does not run the check, so this is what keeps stale
+pictures off the published page.
 
 ## Licence
 
