@@ -2,6 +2,62 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 2 — Phase 10 only — 2026-10-21 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. The round-1 blocker was verified resolved **against the file**. The
+reviewer checked:
+- the hazard paragraph against `arm`, `classify` and `set_edited`/`load`;
+- both quoted precedents, from `Session::save_as` and `Preview::trash`;
+- that `counted_with`, `Session::status()` and `wait_for` exist with the shapes clause 5
+  assumes;
+- every string the revised close-out quotes;
+- that `await openInPane(path)` will be the only occurrence of that text.
+
+One non-blocking finding, folded in: clause 5's announce check could not tell
+`relist`'s announce from `set_edited`'s, since both call `on_render`. The counter is now
+read between the two calls.
+
+### Round 1 — Phase 10 only — 2026-10-21 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0**, answered by the author: Phase 10 does not produce the observable, and says
+so explicitly. It is argued as Phase 3's argument finished: it removes the last two
+reasons the author leaves the window, or reaches for the mouse, to add a file (making a
+folder in Finder, and clicking the new row). The text pane changes; the page does not.
+Right thing to build. Proceeded.
+
+The Rust half held up against the code. The reviewer traced the climb, the `Normal`
+tail and the `symlink_metadata` rule by hand over every gate path, and checked:
+- the `landing` callers;
+- `Refused`'s sentences;
+- `MemFiles::create`;
+- the web assertion;
+- the harness counts: 27 clauses, 24 mutations, and `OWNS` topping out at 26.
+
+**One blocker, accepted.** The phase claimed that *"the watch lists the file one
+debounce later"*, and it does not. The page's `openInPane` reaches
+`Session::set_edited`, whose `arm` drops the old watcher and its pending `tree` flag.
+The new watcher classifies the created file as the held path, and neither
+`Preview::set_edited` nor `load` calls `refresh_tree`, so for a clean buffer the row
+would never appear. **Resolved:** a new `Session::relist` (`refresh_tree`, then
+`on_render`), which `main.rs:create_file` calls after the write. Its precedent is the hand
+rebuild that `save_as` and `trash` already do. A new timing-free clause 5 checks it.
+Phase 3's *"one path"* sentence joins the `CORRECTED` list, and the close-out gains
+`rules/web-app.md` and `rules/desktop.md`.
+
+Non-blocking findings, all but the last folded in:
+- **Clause 1's method.** `walk` lists files only, so the clause now uses a recursive
+  `read_dir` that lists directories and clears a leftover `parts/` first.
+- **Citation.** *"genuinely unchanged"* is in `trash_file`'s doc comment, not
+  `trash_at`'s. Corrected.
+- **Doc comments.** Five more become false: `Disk::create`, `document::create_file`,
+  `confined`, `main.rs:create_file`, and `project/src/document.rs:create_file`. All are
+  now listed.
+- **The Phase 3 gate script would fail.** It asserts that `revision` and `edited` are
+  unchanged. It is now re-pointed by clause 10.
+- **The mutation target** must occur once. It is now `await openInPane(path)`.
+- **`rules/desktop-project.md` is at 196 lines, not 195.** Rejected as moot: spec-lint
+  counts 195, and the close-out raises the cap anyway.
+
 ### Round 2 — Phase 9 only — 2026-09-14 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking. Both blockers verified resolved **against the files rather than the

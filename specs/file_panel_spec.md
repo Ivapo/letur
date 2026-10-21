@@ -56,7 +56,7 @@ phases:
     cut: null
     by: null
   - name: "Phase 10 — a create makes the folders it names, and the pane takes what it made"
-    reviewed: null
+    reviewed: 2026-10-21
     shipped: null
     cut: null
     by: null
@@ -2555,12 +2555,14 @@ into (Phase 2). The menu item that reaches the field from the keyboard is
 inside a project to organize our files"*. The pane taking the new file came out of the
 same conversation, which set out what `⌘N` should feel like.
 
-- **Scope:**
+- **Scope:** `app/src/document.rs`, `app/src/preview.rs` (one method),
+  `app/src/main.rs` (one call), `app/dist/index.html`, `app/harness/checks.mjs`,
+  `app/harness/serve.mjs`, two gate scripts, and `README.md`.
 
   **`app/src/document.rs` — a third landing rule, and `landing` itself does not
   move.** `landing` canonicalizes the parent and refuses one that will not
   canonicalize. That refusal is what makes `newdir/x.md` fail today, and the doc
-  comment says so. It also has a second caller, `trash_at`, whose doc comment calls
+  comment says so. It also has a second caller, `trash_at`, and `trash_file`'s doc comment calls
   `landing` *"genuinely unchanged"* for the delete's first half. So the create gets a
   sibling, **`landing_with_folders`**, and `Disk::create` calls it instead. The delete
   keeps `landing` and its argument stays true. The new rule:
@@ -2602,6 +2604,32 @@ same conversation, which set out what `⌘N` should feel like.
     its check and `create_new`, in a single-user local app, and no new kind of race is
     introduced.
 
+  **The create lists what it made, because the watch will not.** Today the row
+  arrives as `watch::Change::Tree` one `watch::DEBOUNCE` later, which works only
+  because nothing re-arms the watch in between. This phase re-arms it at once: the
+  page's `openInPane` reaches `app/src/preview.rs:Session::set_edited`, whose `arm`
+  sets `self.watch = None` and drops the pending `tree` flag with the old watcher.
+  The new watcher classifies the created file as the held path, so it never reports a
+  `Tree` change, and `Preview::set_edited` and `load` never call `refresh_tree`. Left
+  alone, the row would never appear for a clean buffer, and for new folders it would
+  appear only if FSEvents happened to deliver to the new stream. The code already
+  records this hazard twice: `Session::save_as`'s doc comment (*"It rebuilds the tree
+  by hand, exactly as `Session::trash` does"*) and `Preview::trash`'s (*"The panel is
+  refreshed here and not by a watch"*). **So the create follows them.** A new
+  `Session::relist` in `app/src/preview.rs` calls
+  `letur_project::preview::Preview::refresh_tree` and then `(self.on_render)()`, so the
+  page fetches a status that already lists the new file. `app/src/main.rs:create_file`
+  calls it **after** `document::create_file` returns `Ok`, taking the lock again for
+  the purpose. The write still runs without the lock, for that command's existing
+  reason. Because the command returns only after the relist, the listing holds the file
+  before the page asks `set_edited`, and `set_edited` leaves the listing exactly as it
+  found it (its own doc comment). A master that already names the new path loses its
+  `missing: true` mark in the same refresh, through `document::merge`. **`Status` gains
+  no field**, and the web host already refreshes its own create, so it is untouched.
+  Phase 3's *"creation and an external `touch` reach the window by one path"* stops
+  being true: an external `touch` still arrives by the watch, and a create no longer
+  does.
+
   **No bare folder.** `newdir` and `newdir/` are still refused, by the kind rule
   (`document::kind_of` finds no extension), and that sentence does not change. A
   folder here exists to hold a file. An empty one would draw no row, and a create the
@@ -2621,11 +2649,10 @@ same conversation, which set out what `⌘N` should feel like.
 
   **`app/dist/index.html:createFile` — the pane takes what was made.** After a
   successful `invoke('create_file')` and the ancestor loop already there, the page
-  calls `openInPane(path)`. That is the route a row click takes (Phase 2): it hides a
+  runs `await openInPane(path)`. That is the route a row click takes (Phase 2): it hides a
   figure surface that is up and asks `set_edited`, and `set_edited` needs only
-  `confined`, which the file now satisfies. **It does not wait for the row.** The watch
-  lists the file one debounce later, and the pane does not need the listing to hold
-  it. **Over unsaved work the create still happens and the switch is refused** in
+  `confined`, which the file now satisfies. **The row is already there**, by
+  `Session::relist` above, and the pane would not need it anyway. **Over unsaved work the create still happens and the switch is refused** in
   `SWITCHING`'s words, in the divergence bar, the way a row click over unsaved work is
   refused. The new row appears and the pane stays where it was. That is the honest
   outcome, and the alternative of refusing the create too would lose a file the author
@@ -2652,9 +2679,12 @@ same conversation, which set out what `⌘N` should feel like.
 
   1. **Over a fresh `app/src/document.rs:scratch_dir`, a create makes its folders and
      nothing else.** A create of `parts/ch2/notes.md` under a root holding no `parts/`
-     produces that file, empty. Walking the root before and after finds exactly three
-     new paths: `parts`, `parts/ch2` and `parts/ch2/notes.md`. This is Phase 3 clause
-     1 with the folders counted.
+     produces that file, empty. A recursive `std::fs::read_dir` enumeration
+     **that lists directories as well as files** (`document::walk` lists files only, so
+     it cannot be the method here) finds exactly three new paths before and after:
+     `parts`, `parts/ch2` and `parts/ch2/notes.md`. The test first removes any `parts/`
+     left by a reused `scratch_dir`, the way Phase 3's test removes its
+     `sections/note.md`. This is Phase 3 clause 1 with the folders counted.
   2. **A `..` in a folder still to be made is refused before anything is made.** Over
      scratch, `newdir/../escape.md` and `newdir/../../escape.md` each get the
      *"would land outside this project"* sentence, and **`newdir` does not exist
@@ -2670,7 +2700,19 @@ same conversation, which set out what `⌘N` should feel like.
      create of `gone/x.md` gets *"would land outside this project"*. The link is still
      there afterwards and nothing is at its target. This is the clause that tells
      `symlink_metadata` from `exists` in step 2.
-  5. **Phase 3's five create tests pass unchanged**:
+  5. **A create lists its file before the pane moves to it, with no watch to wait
+     for.** In `app/src/preview.rs`'s tests, a `Session` from the suite's
+     `counted_with` helper opens a scratch project. The test runs `document::create_file` for
+     `parts/new.md` and then `Session::relist`, which is the command's sequence. It
+     reads `Session::status().entries` **immediately**, with no `wait_for`, and
+     requires a row for `parts/new.md`. The counter `counted_with` returns, which
+     counts announces, is read **between `relist` and `set_edited`** and must have
+     risen by one there. Reading it after `set_edited` could not tell the two announces
+     apart. The test then calls `Session::set_edited` on that path and requires the row
+     to still be there and `edited` to name it. **This is the clause that catches the hazard
+     above**, and it is timing-free: without `relist` the row is absent at the first
+     read, whatever FSEvents does.
+  6. **Phase 3's five create tests pass unchanged**:
      `a_create_puts_one_empty_file_in_the_project_and_nothing_else`,
      `a_create_that_would_land_outside_the_project_is_refused_by_name`,
      `a_create_through_a_link_out_of_the_project_is_refused`,
@@ -2679,7 +2721,7 @@ same conversation, which set out what `⌘N` should feel like.
      delete's suite, which still calls `landing` and is how the claim that `trash_at`
      is unchanged gets checked. **`cargo test --workspace` is otherwise unchanged**,
      including the web's `"a folder is not created by a create"` assertion.
-  6. `bun app/harness/checks.mjs` and `--webkit` each print **twenty-eight clauses,
+  7. `bun app/harness/checks.mjs` and `--webkit` each print **twenty-eight clauses,
      twenty-eight passed**. One clause is added: *a create puts what it made in the
      pane, and `Escape` from the field hands the caret to the text.* It is **clause
      27**, and the uncaught-error clause becomes 28, by that file's rule that the
@@ -2689,12 +2731,16 @@ same conversation, which set out what `⌘N` should feel like.
      after. It then presses `Escape` in the field and requires `#new-file` to be
      hidden and `document.activeElement` to be `#text`. `OWNS` gains
      `'create-stays-put': 27`, and no existing value moves.
-  7. `bun app/harness/checks.mjs --falsify` reports **twenty-five mutations, each
+  8. `bun app/harness/checks.mjs --falsify` reports **twenty-five mutations, each
      isolating the clause it owns**, in both engines. The mutation added is
-     **`create-stays-put`**, which drops the `openInPane(path)` call and nothing else.
+     **`create-stays-put`**, which drops the `await openInPane(path)` statement inside
+     `createFile` and nothing else. That exact text occurs once: the row's call is
+     `openInPane(entry.path)` and the definition is `async function openInPane(path) {`.
+     That uniqueness matters because `app/harness/serve.mjs`'s mutations die unless
+     their target occurs exactly once.
      The `Escape` half has no mutation of its own and the phase says so: it is one
      statement, and the clause reads it directly.
-  8. **At the window, on `tests/gates/mpdf-010-phase10.js`, over a copy of the fixture
+  9. **At the window, on `tests/gates/mpdf-010-phase10.js`, over a copy of the fixture
      made outside the repository** (`cp -R tests/fixtures/panel
      "$TMPDIR/mpdf-010-phase10"`), for Phase 3's reason: the fixture is enumerated
      row by row, so any create in it fails
@@ -2705,7 +2751,16 @@ same conversation, which set out what `⌘N` should feel like.
      a character into the pane so it holds unsaved work, and create
      `appendix/more.md`. The row appears, `edited` does **not** move, and the
      divergence bar carries `SWITCHING`'s sentence.
-  9. `git status` is clean after clauses 1–7. Clause 8 writes only under `$TMPDIR`.
+  10. **`tests/gates/mpdf-010-phase3.js` is updated, not left failing.** Its clause 2
+      (*"A create compiles nothing"*) asserts that `revision` and `edited` are
+      unchanged after a create. After this phase the pane takes the file and
+      `Preview::load` compiles, so both move. The clause is re-pointed in this phase's
+      second commit: `edited` names the created file, and the drawn page is the same
+      one, since the main still compiles and the new file is named by nothing. Its
+      header names this phase as the reason. A shipped gate that fails against the
+      shipped app checks nothing, which is the argument Phase 9 used to re-point a test.
+  11. `git status` is clean after clauses 1–8. Clauses 9 and 10 write only under
+      `$TMPDIR`.
 
 - **Close-out:**
 
@@ -2724,21 +2779,42 @@ same conversation, which set out what `⌘N` should feel like.
   `Escape`'s focus. **The cap is raised here as well, or the file is trimmed**, and
   the choice is written in the commit, not left for `spec-lint` to find.
 
+  **`rules/desktop.md`** — its file-I/O account of the create command gains the
+  relist, and *"the first write to one"* is otherwise unchanged.
+
+  **`rules/web-app.md`** — *"`create_file` refreshes the panel itself, where the
+  desktop leaves that to its watch"* becomes false in its second half. Now both hosts
+  refresh their own create; only the folder rule differs.
+
   **`rules/desktop-panes.md`** — the clause counts in `covers:` and the body,
   *"the twenty-seven clauses … the twenty-four broken pages"*, become twenty-eight
   and twenty-five. These are same-length substitutions.
 
   **The code's own doc comments** this phase makes false are rewritten in the same
-  pass. `app/src/document.rs:landing`'s *"which is how `newdir/x.md` is refused…
-  §1.2 makes folder creation a non-goal and this is the rule that keeps it one"*
-  moves to `landing_with_folders`, rewritten as what that rule refuses instead.
-  `createFile`'s doc comment in `app/dist/index.html` gains the pane. The header of
-  `app/harness/checks.mjs` gets its count.
+  pass. This is the full list, as measured against the tree at draft time:
+  - `app/src/document.rs:landing`: *"which is how `newdir/x.md` is refused… §1.2
+    makes folder creation a non-goal and this is the rule that keeps it one"* moves to
+    `landing_with_folders`, rewritten as what that rule refuses instead;
+  - `app/src/document.rs:confined`: *"A file being created goes through [`landing`]
+    instead"* names `landing_with_folders`;
+  - `Disk::create`'s *"[`landing`], then `create_new`"*;
+  - `app/src/document.rs:create_file`'s *"[`Disk`]'s `create` is [`landing`] and
+    `create_new`"*;
+  - `app/src/main.rs:create_file`'s *"Nothing is announced… Creation and an external
+    `touch` reach the window by one path"*, which now names `Session::relist`;
+  - `project/src/document.rs:create_file`'s *"the desktop canonicalizes the parent"*
+    gains the folders. **Its code is not edited**, which is what the scope's sentence
+    means: the doc comment is the only change in that file;
+  - `createFile`'s doc comment in `app/dist/index.html`, whose *"Nothing here draws
+    the new row"* stays true and which gains the pane;
+  - the header of `app/harness/checks.mjs`, which gets its count.
 
-  **This spec takes three dated `CORRECTED` notes**, each placed beside the text it
+  **This spec takes three dated `CORRECTED` notes** (the second covers two sentences
+  in one bullet), each placed beside the text it
   corrects, with the original kept:
   - §1.2's *"no folder creation"*;
-  - Phase 3's *"The created file does not go into the pane"*;
+  - Phase 3's *"The created file does not go into the pane"*, and in the same
+    bullet *"so creation and an external `touch` reach the window by one path"*;
   - §2's *"Phase 3 creates the file and stops"*, where the note says the marker half
     still holds and the pane half no longer does.
 
@@ -2747,9 +2823,10 @@ same conversation, which set out what `⌘N` should feel like.
 
 - **Commit plan.** The drafted phase lands first, on its own, once its review
   converges. Then one push, three commits:
-  1. `landing_with_folders` and `Disk::create`, with clauses 1–4;
-  2. the page's `openInPane` and `Escape`, harness clause 27, its mutation, and the
-     gate script;
+  1. `landing_with_folders`, `Disk::create` and `Session::relist` with the
+     command's call to it, with clauses 1–5;
+  2. the page's `openInPane` and `Escape`, harness clause 27, its mutation, the new
+     gate script and the Phase 3 script's re-pointed clause;
   3. the rules, the README, the three `CORRECTED` notes, the indexes and the
      `shipped` date.
 
