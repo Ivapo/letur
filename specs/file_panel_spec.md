@@ -7,7 +7,7 @@ note: >
   file is set as the main the app compiles, and clicking another edits it while
   the main still draws the page.
 status: accepted
-last_updated: 2026-09-14
+last_updated: 2026-10-21
 
 phases:
   - name: "Phase 1 — the project's files, and the main among them"
@@ -53,6 +53,11 @@ phases:
   - name: "Phase 9 — a PDF row draws its first page, and the row you are on is the way back"
     reviewed: 2026-09-14
     shipped: 2026-09-14
+    cut: null
+    by: null
+  - name: "Phase 10 — a create makes the folders it names, and the pane takes what it made"
+    reviewed: null
+    shipped: null
     cut: null
     by: null
 
@@ -2523,6 +2528,230 @@ back to their own text.*
 - **Commit plan.** One push, three commits: the CSS rule and the surface's PDF
   branch with `releaseFigure`; the row's button with its handler; then the gate
   script, the harness clause, the rules and the README.
+
+### Phase 10 — a create makes the folders it names, and the pane takes what it made
+
+*Produces the observable: **no**, and the argument is Phase 3's, finished.* A created
+file is still empty and still named by nothing, so no compile changes and no PDF
+differs. What this phase removes is the last two reasons the author leaves the window
+or reaches for the mouse to add a file: a folder that has to be made in Finder first,
+and a click on the new row to start writing in it. **The text pane does change**: it
+holds the new file the moment the create succeeds. That is the pane beside the page,
+not the page, and it is not counted as the observable.
+
+Appended 2026-10-21, per §6.1. **Step 0 says decision, on two counts.** §1.2 put folder
+creation out of scope (*"No rename, no move, no copy, no folder creation"*), and Phase
+3 decided *"The created file does not go into the pane"*. This phase reverses both.
+**Step 1 fires on prose and not on work.** Nothing shipped is removed: every refusal
+Phase 3's gate asserts stays a refusal, and the one it never asserted on the desktop —
+a folder that does not exist — is the one this phase turns into a create. Three
+sentences become misleading, so each gets a dated **CORRECTED** note in the close-out
+rather than an edit. **Step 2 puts it here**, because this spec owns the create (Phase
+3), the field (Phase 3), the folds a create expands (Phase 7) and the pane a row opens
+into (Phase 2). The menu item that reaches the field from the keyboard is
+`mpdf-003`'s, since that spec owns the menu, and it is that spec's Phase 26.
+
+**Asked for at the window**, 2026-10-21: *"we would like to be able to create folders
+inside a project to organize our files"*. The pane taking the new file came out of the
+same conversation, which set out what `⌘N` should feel like.
+
+- **Scope:**
+
+  **`app/src/document.rs` — a third landing rule, and `landing` itself does not
+  move.** `landing` canonicalizes the parent and refuses one that will not
+  canonicalize. That refusal is what makes `newdir/x.md` fail today, and the doc
+  comment says so. It also has a second caller, `trash_at`, whose doc comment calls
+  `landing` *"genuinely unchanged"* for the delete's first half. So the create gets a
+  sibling, **`landing_with_folders`**, and `Disk::create` calls it instead. The delete
+  keeps `landing` and its argument stays true. The new rule:
+
+  1. Join the path onto the root, as both siblings do.
+  2. **Climb to the nearest ancestor that has an entry**, judged by
+     `symlink_metadata` and not by `exists`. A dangling link partway down the path has
+     an entry and does not exist. `exists` would climb past it, and `create_dir_all`
+     would then fail on it as an unhelpful `Unwritten`. `symlink_metadata` stops at
+     the link, and step 3 refuses it in the confinement sentence.
+  3. **Canonicalize that ancestor and require that it sit under
+     `watch::resolve(root)`**, which is `landing`'s own test applied one level up. A
+     link out of the project is refused here, wherever on the path it sits.
+  4. **Every component between that ancestor and the file name must be
+     `Component::Normal`.** Nothing below the ancestor exists yet, so nothing there
+     can be canonicalized, and a `..` in the part still to be made is a climb no
+     resolution can check. So `newdir/../escape.md` is refused **even though it would
+     land inside the root**. That is deliberately conservative, and the sentence it
+     gets is the confinement sentence. An author who wanted `escape.md` types
+     `escape.md`.
+  5. Answer with the join, for `confined`'s reason: the write goes through the links
+     the author made.
+
+  When the parent already exists, the climb stops at once, step 4 has nothing to
+  check, and the rule *is* `landing`. That is why Phase 3's five refusal tests can run
+  unchanged against it.
+
+  **`Disk::create` makes the missing folders, then the file.** It calls
+  `std::fs::create_dir_all` on the landed path's parent, then `File::create_new` as
+  today. A failure making a folder is `Refused::Unwritten`, which already words it as
+  *"cannot create <path>: <reason>"*. **Two costs are accepted and stated:**
+
+  - If `create_new` fails after the folders were made, the folders stay. They are
+    empty, and the panel derives its folders from file entries (`rules/desktop-panel.md`),
+    so it draws no row for them. Rolling back would mean deleting folders the author
+    may have been racing to fill, in an app whose only delete is the Trash.
+  - The time between the canonical check and the `mkdir` is a window in which a link
+    could be planted. That is the same kind of window `landing` already leaves between
+    its check and `create_new`, in a single-user local app, and no new kind of race is
+    introduced.
+
+  **No bare folder.** `newdir` and `newdir/` are still refused, by the kind rule
+  (`document::kind_of` finds no extension), and that sentence does not change. A
+  folder here exists to hold a file. An empty one would draw no row, and a create the
+  author cannot see succeed looks the same at the window as one that failed. Phase 7
+  made that argument for folds.
+
+  **The web is untouched, and the two hosts now differ on purpose.**
+  `project/src/files.rs:MemFiles::create` goes on refusing a missing folder through
+  `self.folder(&key)`, and
+  `project/src/preview.rs`'s `"a folder is not created by a create"` assertion goes on
+  passing. That assertion is now the web's own claim, not a claim about both hosts.
+  The author decided on 2026-10-21 to leave the web version as it is.
+  `Refused::Landing`'s doc comment, *"outside the project, or in a folder that does not
+  exist"*, stays true as a description of the variant. Its sentence, *"would land
+  outside this project"*, is unchanged and is no longer reachable on the desktop for
+  a missing folder. `project/src/document.rs:create_file` is not edited.
+
+  **`app/dist/index.html:createFile` — the pane takes what was made.** After a
+  successful `invoke('create_file')` and the ancestor loop already there, the page
+  calls `openInPane(path)`. That is the route a row click takes (Phase 2): it hides a
+  figure surface that is up and asks `set_edited`, and `set_edited` needs only
+  `confined`, which the file now satisfies. **It does not wait for the row.** The watch
+  lists the file one debounce later, and the pane does not need the listing to hold
+  it. **Over unsaved work the create still happens and the switch is refused** in
+  `SWITCHING`'s words, in the divergence bar, the way a row click over unsaved work is
+  refused. The new row appears and the pane stays where it was. That is the honest
+  outcome, and the alternative of refusing the create too would lose a file the author
+  asked for in order to protect a buffer the create never touches.
+
+  **The field keeps Phase 3's decision and stays open with focus.** *"An author adding
+  sections adds several."* The pane ends up holding the last one made. **`Escape` in
+  the field now also puts focus in `#text`.** It still closes the field and still does
+  not stop the event, by the global handler's promise. Today, focus after `Escape` lands
+  on nothing the author asked for. After a create, the place the author is going is the
+  file now in the pane.
+
+  **`README.md`** — the paragraph beginning *"The `+` beside `Files` makes a new
+  one."*: *"creates it empty and lists it"* gains *"and opens it in the pane"*, and
+  *"Folders are not created — make the folder first, in Finder."* becomes a sentence
+  saying folders in the path are made.
+
+  **Deliberately not in this phase:** rename, move and copy (§1.2 still parks them, and
+  OQ-4 still carries rename), deleting a folder, writing the include marker
+  (*"Creating a file does not write the marker into the master"* stands), and any
+  change to the web host.
+
+- **Exit gate:**
+
+  1. **Over a fresh `app/src/document.rs:scratch_dir`, a create makes its folders and
+     nothing else.** A create of `parts/ch2/notes.md` under a root holding no `parts/`
+     produces that file, empty. Walking the root before and after finds exactly three
+     new paths: `parts`, `parts/ch2` and `parts/ch2/notes.md`. This is Phase 3 clause
+     1 with the folders counted.
+  2. **A `..` in a folder still to be made is refused before anything is made.** Over
+     scratch, `newdir/../escape.md` and `newdir/../../escape.md` each get the
+     *"would land outside this project"* sentence, and **`newdir` does not exist
+     afterwards**. That is the half that tells a rule run before `create_dir_all` from
+     one run after it.
+  3. **A link out of the project is refused wherever it sits on the path.** Over
+     `tests/fixtures/panel/`, `outside/sub/escape.md` goes through the committed
+     `outside` link one level deeper than Phase 3 clause 3. It is refused, and the
+     decoy gains no `sub`. The clause writes nothing, so it can run over the tracked
+     fixture, for that clause's reason.
+  4. **A dangling link on the path is refused in the confinement sentence**, not as
+     `Unwritten`. Over scratch, `gone` is a link to a path that does not exist, and a
+     create of `gone/x.md` gets *"would land outside this project"*. The link is still
+     there afterwards and nothing is at its target. This is the clause that tells
+     `symlink_metadata` from `exists` in step 2.
+  5. **Phase 3's five create tests pass unchanged**:
+     `a_create_puts_one_empty_file_in_the_project_and_nothing_else`,
+     `a_create_that_would_land_outside_the_project_is_refused_by_name`,
+     `a_create_through_a_link_out_of_the_project_is_refused`,
+     `a_create_over_an_existing_file_is_refused_without_truncating_it`, and
+     `a_create_takes_the_kinds_the_pipeline_reads_and_no_others`. So does the
+     delete's suite, which still calls `landing` and is how the claim that `trash_at`
+     is unchanged gets checked. **`cargo test --workspace` is otherwise unchanged**,
+     including the web's `"a folder is not created by a create"` assertion.
+  6. `bun app/harness/checks.mjs` and `--webkit` each print **twenty-eight clauses,
+     twenty-eight passed**. One clause is added: *a create puts what it made in the
+     pane, and `Escape` from the field hands the caret to the text.* It is **clause
+     27**, and the uncaught-error clause becomes 28, by that file's rule that the
+     error clause stays last. With a document open, the clause submits the field with
+     `parts/new.md` and reads `__harness.invokes()`. `create_file` must be followed by
+     `set_edited` with the same path, and the stub's `status.edited` must equal it
+     after. It then presses `Escape` in the field and requires `#new-file` to be
+     hidden and `document.activeElement` to be `#text`. `OWNS` gains
+     `'create-stays-put': 27`, and no existing value moves.
+  7. `bun app/harness/checks.mjs --falsify` reports **twenty-five mutations, each
+     isolating the clause it owns**, in both engines. The mutation added is
+     **`create-stays-put`**, which drops the `openInPane(path)` call and nothing else.
+     The `Escape` half has no mutation of its own and the phase says so: it is one
+     statement, and the clause reads it directly.
+  8. **At the window, on `tests/gates/mpdf-010-phase10.js`, over a copy of the fixture
+     made outside the repository** (`cp -R tests/fixtures/panel
+     "$TMPDIR/mpdf-010-phase10"`), for Phase 3's reason: the fixture is enumerated
+     row by row, so any create in it fails
+     `the_listing_is_the_disk_and_what_the_master_names`. Open
+     `<copy>/sections/text.md` and create `appendix/notes/extra.md`. After
+     `settled()`, the panel has a row for it under `appendix/notes`, and
+     `invoke('status')` reports `edited` as that path and `main` unchanged. Then type
+     a character into the pane so it holds unsaved work, and create
+     `appendix/more.md`. The row appears, `edited` does **not** move, and the
+     divergence bar carries `SWITCHING`'s sentence.
+  9. `git status` is clean after clauses 1–7. Clause 8 writes only under `$TMPDIR`.
+
+- **Close-out:**
+
+  **`rules/desktop-project.md`** (195 of 200). Its create paragraph says
+  *"which is how `newdir/x.md` is refused with no clause of its own and folder
+  creation stays a non-goal"*. That sentence becomes the rule above:
+  `landing_with_folders`, the climb, the `Normal` tail and the folders it leaves
+  behind. The paragraph also names the two hosts that now differ. The covers clause
+  *"the two further questions a create asks and the empty file it stops at"* gains the
+  folders. The text grows by five or six lines, so **this close-out raises the cap**
+  and does not quietly exceed it.
+
+  **`rules/desktop-panel.md`** (250 of 250, already full). *"the create that expands
+  what it would otherwise land behind"* gains *"and puts what it made in the pane"*,
+  and the field's paragraph gains `openInPane`, the `SWITCHING` outcome and
+  `Escape`'s focus. **The cap is raised here as well, or the file is trimmed**, and
+  the choice is written in the commit, not left for `spec-lint` to find.
+
+  **`rules/desktop-panes.md`** — the clause counts in `covers:` and the body,
+  *"the twenty-seven clauses … the twenty-four broken pages"*, become twenty-eight
+  and twenty-five. These are same-length substitutions.
+
+  **The code's own doc comments** this phase makes false are rewritten in the same
+  pass. `app/src/document.rs:landing`'s *"which is how `newdir/x.md` is refused…
+  §1.2 makes folder creation a non-goal and this is the rule that keeps it one"*
+  moves to `landing_with_folders`, rewritten as what that rule refuses instead.
+  `createFile`'s doc comment in `app/dist/index.html` gains the pane. The header of
+  `app/harness/checks.mjs` gets its count.
+
+  **This spec takes three dated `CORRECTED` notes**, each placed beside the text it
+  corrects, with the original kept:
+  - §1.2's *"no folder creation"*;
+  - Phase 3's *"The created file does not go into the pane"*;
+  - §2's *"Phase 3 creates the file and stops"*, where the note says the marker half
+    still holds and the pane half no longer does.
+
+  **`README.md`** as in scope. **`rules/INDEX.md` and `specs/INDEX.md` are
+  regenerated.** **No `CLAUDE.md` change.**
+
+- **Commit plan.** The drafted phase lands first, on its own, once its review
+  converges. Then one push, three commits:
+  1. `landing_with_folders` and `Disk::create`, with clauses 1–4;
+  2. the page's `openInPane` and `Escape`, harness clause 27, its mutation, and the
+     gate script;
+  3. the rules, the README, the three `CORRECTED` notes, the indexes and the
+     `shipped` date.
 
 <!--
 The review record is a sibling file, not a section: it lives at
