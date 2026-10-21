@@ -5,7 +5,7 @@ note: >
   A macOS desktop app that shows the PDF while you write: a Tauri window wraps
   the same core crate, watches the document and its images, and re-renders.
 status: accepted
-last_updated: 2026-09-22
+last_updated: 2026-10-21
 
 phases:
   - name: "Phase 1 — the window, and one compile on screen"
@@ -131,6 +131,11 @@ phases:
   - name: "Phase 25 — an image on the web, fetched when the author says so"
     reviewed: 2026-09-22
     shipped: 2026-09-22
+    cut: null
+    by: null
+  - name: "Phase 26 — File makes a new file and a new project"
+    reviewed: null
+    shipped: null
     cut: null
     by: null
 
@@ -1424,6 +1429,19 @@ list to one item.
   this phase in it leaves the machine**, by running the engine's
   `tools/third-party-licenses.py` over this workspace with its roots widened. Not a
   gate on building Phase 25, which is a local window until then.
+
+- **OQ-21** — should an open refuse over the pane's unsaved work? Raised 2026-10-21 by
+  Phase 26. *(design call, the author's)*
+
+  `Open…`, a document handed over by Finder and, from Phase 26, `New Project…` all
+  replace the pane and silently discard an unsaved edit. `specs/file_panel_spec.md` §2
+  records that as *"tolerable behind a menu item and a native dialog"*, and it was
+  refused for a row click, which is one click from every row. A third way in makes the
+  question worth asking again: `SWITCHING`'s shape (name both exits, take neither)
+  would serve all three, with a sentence of its own, since *"open the other file"* is
+  false for a project that does not exist yet. **Not blocking Phase 26**, which
+  repeats Open's behaviour on the author's instruction. A later phase answers it for
+  every open at once, or not at all.
 
 ## 4. Implementation phases
 
@@ -7688,6 +7706,289 @@ once its review converges. Then one push:
 3. the page's line, with harness clause 26;
 4. driver clause 6, its server and the two fixtures;
 5. the rule split, the rules, the README, the rigs' headers and the indexes.
+### Phase 26 — File makes a new file and a new project
+
+*Produces the observable: **yes**.* `New Project…` makes a document that did not exist
+and opens it, and **the page beside its text is drawn from the first compile**: the
+starter's title, its date and its one heading are set by the article template, with
+nothing typed yet. Without this phase an author who starts a document leaves the
+window, makes a folder and a file in Finder, and comes back to `Open…` an empty file
+that compiles to a blank sheet. `New File…` produces no observable of its own. It is
+`specs/file_panel_spec.md`'s field reached from the keyboard, and that spec's Phase 10
+argues the pane half.
+
+Appended 2026-10-21, per §6.1. **Step 0 says decision, on four counts:** what Letur
+writes when it makes a project, which two chords and where they sit, what `⌘N` does
+with no project open, and how a new project treats the pane's unsaved work. **Step 1
+does not fire.** Nothing shipped is removed or contradicted, and the one shipped
+behaviour this phase repeats, Open's silent discard, it repeats knowingly (below).
+**Step 2 puts it here**, because this spec owns the menu (Phases 1, 3, 17 and 21) and
+the open (Phases 1 and 5). The field `⌘N` reveals is `mpdf-010`'s, and this phase
+changes nothing about what it does.
+
+**Sequenced after `mpdf-010` Phase 10.** `⌘N` works without that phase, but this
+phase's window gate expects the new file to land in the pane. The clause counts below
+also assume that phase has shipped first, and say so where they are given.
+
+**Asked for at the window**, 2026-10-21: *"we dont have a 'new file' or 'new project'
+option, i guess new project creates a new folder with a 'main.md' which includes a
+header which includes all default values, and 'new file' just creates a new .md file
+in the current folder.. i guess it makes no sense to create a new file if we havent
+opened a folder yet"*. In the same conversation the author settled four more things:
+the drift risk below is accepted for now, folders may be created inside a project
+(`mpdf-010` Phase 10), unsaved changes get Open's treatment, and the web version stays
+as it is.
+
+- **Scope:**
+
+  **`app/src/main.rs` — two ids, two items, two names in the filter.**
+  `NEW_FILE = "new-file"` and `NEW_PROJECT = "new-project"`, each with a doc comment
+  in the shape of its neighbours. `New File…` takes `CmdOrCtrl+N` and `New Project…`
+  takes `Shift+CmdOrCtrl+N`. **They head `File`, above `Open…`, with a separator
+  between `Open…` and `Save`**, which is the order every macOS document app uses:
+  make, open, then act on what is open. `on_menu_event`'s filter grows from six names
+  to eight. **The items ask and do not act**, by `OPEN`'s rule: the item emits, and
+  the page runs the code path its own gestures run. `main.rs:menu`'s doc comment is
+  rewritten for the new chords in the same pass, since Phase 21 left it enumerating
+  them.
+
+  **`⇧⌘N` is spent knowingly.** In Finder it is *New Folder*, and in a few editors it
+  is *New Window*. Letur has neither a folder command nor a second window, and
+  a project *is* a new folder, so the reading a reader brings from Finder is close to
+  this one. Nothing in this window has the chord today.
+
+  **`create_project(folder, date) -> Result<PathBuf, String>`, in `app/src/document.rs`.**
+  It makes `folder` with `std::fs::create_dir` (not `_all`, because the dialog chose
+  an existing parent), then writes `folder/main.md` with `File::create_new`, holding
+  `starter(title, date)`. It answers with the path of `main.md`. **A folder that is
+  already there is refused** as *"<folder> already exists"*. Any other failure is
+  *"cannot create <folder>: <reason>"*, in `Refused::Unwritten`'s shape. **Nothing is
+  ever replaced.** macOS's save panel asks *"Replace?"* about a name that exists, and
+  answering yes reaches this refusal, not a delete. **It is not confined**, and that is
+  Phase 18's decision applied again: the dialog is the author naming a place, and a
+  project made where the author did not point is not the gesture its name denotes.
+  It is a plain function and not the command, for `asset_bytes`' reason.
+
+  **`starter(title, date) -> String`, in `app/src/document.rs` — what a project
+  starts as.** The author asked for a header holding every default value. The text is:
+
+  ```markdown
+  ---
+  title: <the folder's name>
+  author:
+  affiliation:
+  date: <today, YYYY-MM-DD>
+  # article | press-release
+  template: article
+  # 1 | 2; left out, it follows the template
+  # columns: 1
+  # plain | numbered
+  equations: plain
+  # flat | sectioned
+  figures: flat
+  # plain | 1 to 6
+  headings: plain
+  # numeric | author-date
+  citations: numeric
+  bibliography:
+  ---
+
+  # Introduction
+
+  Start writing here.
+  ```
+
+  Four facts from `md2pdf-core`'s `core/src/frontmatter.rs` decide the shape, and are
+  cited so a reviewer can check them:
+  - **A comment is a whole line.** `parse` skips a line whose trimmed text starts with
+    `#`, and reads everything after a key's colon as its value. A comment after a value
+    on the same line would become part of the value and be refused, so each key's
+    choices sit on the line above it.
+  - **An empty value is the key absent.** `non_empty` means the blank `author:`,
+    `affiliation:` and `bibliography:` cost nothing and show the author where each goes.
+  - **`columns` is the one default the struct cannot hold alone.**
+    `Frontmatter::default`'s own doc comment says it follows the template. Written out,
+    it would pin one column under a template change, so it is a comment.
+  - **The title is the folder's name and the date is today.** Both are `None` in
+    `Frontmatter::default`, and a starter that left them empty would draw a page with
+    no title block. That is the one place this departs from "every default", and it
+    departs so the first page shows something.
+
+  **The body is `# Introduction` and not `# <name>`**, because the article template
+  already sets the title block from `title:`, and a heading of the same words would
+  print the name twice.
+
+  **The date comes from the page**: `newProject` composes it from the local
+  `getFullYear`, `getMonth` and `getDate`. The app links no date crate, and adding one
+  to format today would be the largest dependency this phase adds for its smallest
+  job. The page's clock is the same machine's clock.
+
+  **The drift risk is the author's call, and it is recorded here.** The defaults live
+  in `md2pdf-core`'s `Frontmatter::default` and in its `parse` match. This copy will go
+  stale if the engine changes a default or adds a key. A test comparing the parsed
+  starter with `Frontmatter::default()` was proposed and **declined on 2026-10-21**:
+  the guard the author wants is the engine supplying the header itself, which is a
+  spec in `Ivapo/md2pdf` and a version bump here. That is done when the engine is next
+  changed, not now. What this phase does assert (clause 3) is narrower: the starter
+  compiles, so a key the engine refuses fails the suite.
+
+  **`new_project(window, session, path, date)`, in `app/src/main.rs` — the
+  twentieth command.** It calls `document::create_project` and then opens the `main.md` it
+  answers. **The open is `open_document`'s own body**, factored into a plain
+  `fn open_path(window, session, PathBuf)` that both commands call, so a new project
+  is titled, rooted, discovered and armed by the one path every open takes.
+  `document::project_root`'s climb runs over it like any open. A new folder holds only
+  `main.md`, so `discover_main` answers it unless the parent's markdown names it as a
+  section, which is Open's behaviour too and not a new case.
+
+  **`app/dist/index.html` — two listeners, one new function, and the open's shape
+  shared.**
+  - `newProject()` asks `save({ title: 'New Project' })`, with no filters and no
+    default path (macOS's own last-used location is the right default). A cancel
+    returns. Otherwise it runs **`openDocument`'s sequence**: `clear()`,
+    `folds.clear()`, then `invoke('new_project', { path, date })`, and `fail` on a
+    throw. `openDocument`, `takePendingOpen` and `newProject` then share that sequence
+    as one function, `openWith(command, args)`. There are three copies, and
+    `takePendingOpen`'s comment already argues that the copies must not differ.
+  - **`clear()` runs before the create, and the order is chosen.** A refusal therefore
+    lands in an empty window, where `fail` marks nothing stale, because nothing is on
+    the page. The cost is stated: **a refused New Project has closed the project that
+    was open**, exactly as a refused Open does today. The alternative, creating first
+    and clearing after, keeps the old project but would have to report its refusal
+    over a page it would wrongly mark `stale`. That is `mpdf-010` Phase 5 round 1's
+    blocking finding.
+  - `newFile()` is the `new-file` listener. **With no document open it calls
+    `newProject()`**, using the same `files.hidden` reading `toggleFold` uses. A new
+    file needs a project to land in, and `⌘N` in an empty window should start one
+    rather than do nothing. With a document open it **unfolds a folded panel**
+    (`folded = false; showFold()`), because `#files.collapsed` is `display: none` and
+    the field is inside it. Then it shows the field with `nameFile(true)` if it is
+    hidden, or **only focuses it** if it is already open, so a second `⌘N` does not
+    empty a half-typed path. **Unfolding overrides the reader's fold** on a create's
+    behalf, and `mpdf-010` Phase 7 already made that argument for folders: a create
+    whose field cannot be seen is no create.
+  - `listen('new-file', newFile)` and `listen('new-project', newProject)` join the
+    others. The page keeps no `keydown` for either, by Phase 21's argument.
+
+  **Unsaved work is silently discarded, as Open does it, and that is the author's call
+  for now.** `specs/file_panel_spec.md` §2 (*"Switching files refuses while the buffer
+  is dirty"*) records that Open discards an unsaved edit and calls it *"tolerable
+  behind a menu item and a native dialog"*. New Project is both. A refusal for opens
+  only would make New Project stricter than Open for no reason the author would see.
+  **OQ-21** carries the question for every open at once.
+
+  **No capability is added.** `dialog:allow-save` already covers `Save as…` and the
+  export, and that is the only dialog this phase uses.
+
+  **The rigs:** `app/harness/stub.mjs` gains a `new_project` case returning `null`,
+  and `__harness.answerSave(path)`, so the next `dialog.save` answers a path instead
+  of cancelling. Today the stub's `save` is `async () => null`, which no clause could
+  drive past.
+
+  **`README.md`** — *Use* gains `⇧⌘N` beside `⌘O` and says what a new project holds.
+  The `+` paragraph gains `⌘N`.
+
+  **Deliberately not in this phase:** a template picker (the header names
+  `press-release`, and switching is one word), a new project in the web version, a
+  starter for anything but markdown, a recent-projects list (still parked by
+  `mpdf-010` §1.2), and any change to how Open treats unsaved work (OQ-21).
+
+- **Exit gate:**
+
+  1. `bun app/typecheck.mjs` exits 0.
+  2. `cargo build -p letur` compiles the menu. **No test is added over `main.rs:menu`**,
+     for Phase 21's reason: labels and accelerators are declarations, and the event
+     reaching the page is clause 6's to check.
+  3. **The starter compiles.** In `app/src/document.rs`'s tests,
+     `md2pdf_core::md_to_pdf(&starter(name, "2026-10-21"), &[])` returns bytes that
+     begin `%PDF`. It runs for `My Paper` and for `Notes: draft 2`: the second has a
+     colon inside the value, and `parse` splits at the first colon only. This catches
+     an unknown key, a refused value, and a comment on a value's line.
+  4. **A project is one folder holding one file.** Over a fresh `scratch_dir`,
+     `create_project(<scratch>/My Paper, date)` answers `<scratch>/My Paper/main.md`.
+     The folder holds exactly that entry, and its bytes equal
+     `starter("My Paper", date)`.
+  5. **An existing folder is refused and left as it was.** Over scratch, a folder
+     already holding `keep.md` with known bytes gets *"… already exists"*. Afterwards
+     it holds `keep.md` with the same bytes and no `main.md`.
+  6. **The project opens as its own.** Over scratch, with a parent holding no
+     markdown, `document::project_root(main)` is the new folder and
+     `document::discover_main` answers `main.md`. This is the half that would catch an
+     open landing above the new project.
+  7. `cargo test --workspace` passes, with the additions above and nothing else moved.
+  8. `bun app/harness/checks.mjs` and `--webkit` each print **twenty-nine clauses,
+     twenty-nine passed**. That count assumes `mpdf-010` Phase 10 has shipped; it is
+     one more than the count at the time this lands. One clause is added: *the two
+     new items reach the page, and `⌘N` with no project starts one.* It is clause 28,
+     and the error clause becomes 29. The clause:
+     - asserts registration for both names through `__harness.listening()`, for Phase
+       21's reason;
+     - with a document open and the panel folded, fires `new-file` and requires
+       `#files` not to be collapsed, `#new-file` shown, and `#new-name` focused;
+     - types `parts/` and fires `new-file` again, and requires the field to still read
+       `parts/`;
+     - after `__harness.reset()` and a `rendered`, which give the empty state, calls
+       `answerSave('/tmp/Fresh')`, fires `new-file`, and requires `invokes()` to end
+       with `new_project` whose `path` is `/tmp/Fresh` and whose `date` matches
+       `^\d{4}-\d{2}-\d{2}$`.
+
+     `OWNS` gains `'news-deaf': 28`.
+  9. `--falsify` reports **twenty-six mutations, each isolating the clause it owns**,
+     in both engines. The mutation added is **`news-deaf`**, which drops the two
+     `listen` registrations, Phase 21's `views-deaf` in the same shape.
+  10. **The chords are a person's reading**, since neither rig can press a native
+      accelerator (Phase 21 clause 5). At the window:
+      - `⇧⌘N`, named `Gate Paper` under `$TMPDIR`: the window is titled `main.md`, the
+        panel lists `main.md` marked main, and the page shows the title *Gate Paper*,
+        today's date and an *Introduction* heading.
+      - `⌘N` with the panel folded unfolds it with the field focused. `chapters/one.md`
+        then makes the row and the pane holds the new file.
+      - `⇧⌘N` again, naming `Gate Paper` and answering *Replace*, gives an empty window
+        whose error bar says *already exists*, and `Gate Paper/main.md` is unchanged.
+      - `⌘N` in that empty window opens the save dialog.
+      - **No chord puts a character in the pane**, which is checked with the caret
+        placed in the text first.
+  11. `bun app/driver/drive.mjs` and `--falsify` pass, **unchanged**.
+  12. `git status` is clean after clauses 1–9 and 11. Clause 10 writes only under
+      `$TMPDIR`.
+
+- **Close-out:**
+
+  **`rules/desktop.md`** (580 of 600). Its menu paragraph changes: `File` carries the
+  two new items at the head, the *"six ids the one filter enumerates"* in both
+  `covers:` and the body becomes eight, *"registers nineteen commands"* becomes
+  twenty, and `open_path` is now the body both opens share. The covers clause
+  *"the second writer of a path the author did name"* gains `create_project` as the
+  third, unconfined for the same reason.
+
+  **`rules/desktop-project.md`** — a paragraph for the project Letur makes: one
+  folder, one `main.md`, the starter's four shaping facts, the declined drift guard
+  and the day it will be built. **This file's cap is raised**, since `mpdf-010` Phase
+  10 has already spent its margin.
+
+  **`rules/desktop-panel.md`** — the field gains its second way in, and the unfold
+  `⌘N` makes. It is at its cap, and is raised or trimmed in the commit, by `mpdf-010`
+  Phase 10's rule.
+
+  **`rules/desktop-panes.md`** — the clause and mutation counts in `covers:` and the
+  body, which are same-length substitutions.
+
+  **This spec's §3 gains OQ-21** at draft time, since a question raised by a phase
+  belongs to the spec from the moment it is raised. No earlier phase takes a
+  `CORRECTED` note: Phase 21's account of the menu is extended, not contradicted.
+
+  **`README.md`**, as in scope. The header of `app/harness/checks.mjs` gets its
+  counts. **`specs/INDEX.md` and `rules/INDEX.md` are regenerated.** **No `CLAUDE.md`
+  change.**
+
+- **Commit plan.** The drafted phase and OQ-21 land first, on their own, once review
+  converges. Then one push, three commits:
+  1. `starter`, `create_project`, `new_project`, `open_path`, and the two items with
+     their ids, with clauses 3–6;
+  2. the page's `newProject`, `newFile` and `openWith`, the stub's `answerSave`, and
+     harness clause 28 with its mutation;
+  3. the rules, the README, the rig's header, the indexes and the `shipped` date.
+
 <!--
 The review record is a sibling file, not a section: it lives at
 specs/reviews/mpdf-003.md, append-only, one heading per round. See §7 of the
