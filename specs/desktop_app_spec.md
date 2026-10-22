@@ -7774,6 +7774,10 @@ as it is.
   expectation is not measured; gate clause 10 reads it. If the panel does not ask, the
   refusal is the same.
 
+  **CORRECTED 2026-10-21, measured:** gate clause 10 read it at the window. The panel
+  does ask *Replace?* about an existing folder name, and answering yes gave the *already
+  exists* sheet over an unchanged window. The expectation is now an observation.
+
   **A failure after the folder is made takes the folder back.** If `create_new` or
   the write fails once `create_dir` has succeeded, the function calls
   `std::fs::remove_dir` on the folder before it answers the refusal. `remove_dir`
