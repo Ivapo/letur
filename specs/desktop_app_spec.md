@@ -134,7 +134,7 @@ phases:
     cut: null
     by: null
   - name: "Phase 26 — File makes a new file and a new project"
-    reviewed: null
+    reviewed: 2026-10-21
     shipped: null
     cut: null
     by: null
@@ -7763,8 +7763,21 @@ as it is.
   `starter(title, date)`. It answers with the path of `main.md`. **A folder that is
   already there is refused** as *"<folder> already exists"*. Any other failure is
   *"cannot create <folder>: <reason>"*, in `Refused::Unwritten`'s shape. **Nothing is
-  ever replaced.** macOS's save panel asks *"Replace?"* about a name that exists, and
-  answering yes reaches this refusal, not a delete. **It is not confined**, and that is
+  ever replaced.** The phase expects macOS's save panel to ask *"Replace?"* about a
+  folder name that exists, and answering yes reaches this refusal, not a delete. That
+  expectation is not measured; gate clause 10 reads it. If the panel does not ask, the
+  refusal is the same.
+
+  **A failure after the folder is made takes the folder back.** If `create_new` or
+  the write fails once `create_dir` has succeeded, the function calls
+  `std::fs::remove_dir` on the folder before it answers the refusal. `remove_dir`
+  removes only an empty directory, so it cannot take anything the author put there.
+  It can fail only if something appeared in the folder in between, and then the folder
+  stays. Without this step, a retry with the same name would be refused as *"already
+  exists"* over an empty folder Letur made itself. **No gate clause provokes it, and
+  that is priced, not overlooked**: making the write fail inside a folder just made
+  needs a fault seam `app/src/document.rs` does not have for writes (Phase 3 of
+  `mpdf-010` chose plain `std::fs` for the create), and the step is two lines. **It is not confined**, and that is
   Phase 18's decision applied again: the dialog is the author naming a place, and a
   project made where the author did not point is not the gesture its name denotes.
   It is a plain function and not the command, for `asset_bytes`' reason.
@@ -7832,32 +7845,60 @@ as it is.
   changed, not now. What this phase does assert (clause 3) is narrower: the starter
   compiles, so a key the engine refuses fails the suite.
 
-  **`new_project(window, session, path, date)`, in `app/src/main.rs` — the
-  twentieth command.** It calls `document::create_project` and then opens the `main.md` it
-  answers. **The open is `open_document`'s own body**, factored into a plain
-  `fn open_path(window, session, PathBuf)` that both commands call, so a new project
-  is titled, rooted, discovered and armed by the one path every open takes.
+  **A `create_project` command in `app/src/main.rs`, the twentieth: it creates, and
+  it does not open.** It takes `path` and `date`, calls `document::create_project`, and
+  answers the `main.md` path as a `String`. This is `create_file`'s pattern, a command
+  and a `document::` function sharing one name. **It touches no session and holds no
+  lock**, so a refusal leaves Rust exactly where it was. It is synchronous like
+  `create_file`, since it compiles nothing. **The open is then the page's ordinary
+  `open_document`**, asked with the path this command returned, so a new project is
+  titled, rooted, discovered and armed by the path every open takes, on the async
+  command that keeps the compile off the window's thread.
   `document::project_root`'s climb runs over it like any open. A new folder holds only
   `main.md`, so `discover_main` answers it unless the parent's markdown names it as a
   section, which is Open's behaviour too and not a new case.
+
+  **Why two commands and not one (decision, recorded in round 1).** The first draft
+  had one `new_project` command that created and opened, and had the page `clear()`
+  before calling it. Review found that a refused create then left two halves that
+  disagree. The page had emptied `#text`, but Rust never reached `Session::open`, so
+  it still held the old project with `edited` set. `Save` is always enabled and
+  `saveDocument` sends `text.value` with no guard, so the next `⌘S` would have written
+  an empty file over the document that had been open. Splitting the create from the
+  open puts the only refusal **before** the page changes anything. The open that
+  follows is one that has already succeeded once, the same as Open's.
 
   **`app/dist/index.html` — two listeners, one new function, and the open's shape
   shared.**
   - `newProject()` asks `save({ title: 'New Project' })`, with no filters and no
     default path (macOS's own last-used location is the right default). A cancel
-    returns. Otherwise it runs **`openDocument`'s sequence**: `clear()`,
-    `folds.clear()`, then `invoke('new_project', { path, date })`, and `fail` on a
-    throw. `openDocument`, `takePendingOpen` and `newProject` then share that sequence
-    as one function, `openWith(command, args)`. There are three copies, and
-    `takePendingOpen`'s comment already argues that the copies must not differ.
-  - **`clear()` runs before the create, and the order is chosen.** A refusal therefore
-    lands in an empty window, where `fail` marks nothing stale, because nothing is on
-    the page. The cost is stated: **a refused New Project has closed the project that
-    was open**, exactly as a refused Open does today. The alternative, creating first
-    and clearing after, keeps the old project but would have to report its refusal
-    over a page it would wrongly mark `stale`. That is `mpdf-010` Phase 5 round 1's
-    blocking finding.
-  - `newFile()` is the `new-file` listener. **With no document open it calls
+    returns. Otherwise:
+    1. It calls `invoke('create_project', { path, date })` **while the window is
+       untouched**.
+    2. **On a refusal** it shows the sentence in a native sheet, with
+       `message(problem, { title: 'New Project', kind: 'error' })` from the dialog
+       plugin, and returns. The page, the pane and Rust's session are as they were.
+    3. **On success** it runs **`openDocument`'s sequence** on the path returned:
+       `clear()`, `folds.clear()`, then `invoke('open_document', { path })`, and `fail`
+       on a throw.
+
+    `openDocument`, `takePendingOpen` and `newProject` then share that last sequence as
+    one function, `openAt(path)`. There are three copies, and `takePendingOpen`'s
+    comment already argues that the copies must not differ.
+  - **Why the refusal is a sheet and not the error bar.** `fail` adds `stale` to a
+    page that is still current, which `mpdf-010` Phase 5 round 1 made a blocking
+    finding. The panel's field, where the create refusal of `mpdf-010` Phase 3 goes,
+    does not exist with no project open. The gesture began in a native dialog, and the
+    sheet is the native answer to it. **It costs one capability**, below.
+  - **The date is composed exactly**, so two implementations cannot differ:
+    `` `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` ``,
+    over one `const d = new Date()`. The `+ 1` and the two pads are the ones a hand
+    composition gets wrong, and clause 8 compares the whole string, so either mistake
+    fails it.
+  - `revealNewFile()` is the `new-file` listener. **It is not called `newFile`**:
+    that name is already the module-scope `const` for the `#new-file` form, which
+    `nameFile` and the submit listener use, and a function of the same name is a
+    redeclaration error. **With no document open it calls
     `newProject()`**, using the same `files.hidden` reading `toggleFold` uses. A new
     file needs a project to land in, and `⌘N` in an empty window should start one
     rather than do nothing. With a document open it **unfolds a folded panel**
@@ -7867,8 +7908,8 @@ as it is.
     empty a half-typed path. **Unfolding overrides the reader's fold** on a create's
     behalf, and `mpdf-010` Phase 7 already made that argument for folders: a create
     whose field cannot be seen is no create.
-  - `listen('new-file', newFile)` and `listen('new-project', newProject)` join the
-    others. The page keeps no `keydown` for either, by Phase 21's argument.
+  - `listen('new-file', revealNewFile)` and `listen('new-project', newProject)` join
+    the others. The page keeps no `keydown` for either, by Phase 21's argument.
 
   **Unsaved work is silently discarded, as Open does it, and that is the author's call
   for now.** `specs/file_panel_spec.md` §2 (*"Switching files refuses while the buffer
@@ -7877,13 +7918,21 @@ as it is.
   only would make New Project stricter than Open for no reason the author would see.
   **OQ-21** carries the question for every open at once.
 
-  **No capability is added.** `dialog:allow-save` already covers `Save as…` and the
-  export, and that is the only dialog this phase uses.
+  **One capability is added: `dialog:allow-message`**, in
+  `app/capabilities/default.json`, for the refusal sheet. `dialog:allow-save` already
+  covers the save panel. The capability file's `description`, *"the core defaults, and
+  the two file dialogs"*, gains the sheet. The page's
+  `const { open, save } = window['__TAURI__'].dialog` gains `message`.
 
-  **The rigs:** `app/harness/stub.mjs` gains a `new_project` case returning `null`,
-  and `__harness.answerSave(path)`, so the next `dialog.save` answers a path instead
-  of cancelling. Today the stub's `save` is `async () => null`, which no clause could
-  drive past.
+  **The rigs:** `app/harness/stub.mjs` gains three things:
+  - a `create_project` case. It answers `` `${path}/main.md` ``, and **rejects with
+    `` `${path} already exists` `` when the path's last component is `Exists`**, so a
+    clause can reach the refusal;
+  - `__harness.answerSave(path)`, so the next `dialog.save` answers a path instead of
+    cancelling. Today the stub's `save` is `async () => null`, which no clause could
+    drive past;
+  - `dialog.message`, which records its arguments, read back through a new
+    `__harness.messages()`.
 
   **`README.md`** — *Use* gains `⇧⌘N` beside `⌘O` and says what a new project holds.
   The `+` paragraph gains `⌘N`.
@@ -7898,7 +7947,7 @@ as it is.
   1. `bun app/typecheck.mjs` exits 0.
   2. `cargo build -p letur` compiles the menu. **No test is added over `main.rs:menu`**,
      for Phase 21's reason: labels and accelerators are declarations, and the event
-     reaching the page is clause 6's to check.
+     reaching the page is clause 8's to check.
   3. **The starter compiles.** In `app/src/document.rs`'s tests,
      `md2pdf_core::md_to_pdf(&starter(name, "2026-10-21"), &[])` returns bytes that
      begin `%PDF`. It runs for `My Paper` and for `Notes: draft 2`: the second has a
@@ -7927,10 +7976,18 @@ as it is.
        `#files` not to be collapsed, `#new-file` shown, and `#new-name` focused;
      - types `parts/` and fires `new-file` again, and requires the field to still read
        `parts/`;
-     - after `__harness.reset()` and a `rendered`, which give the empty state, calls
-       `answerSave('/tmp/Fresh')`, fires `new-file`, and requires `invokes()` to end
-       with `new_project` whose `path` is `/tmp/Fresh` and whose `date` matches
-       `^\d{4}-\d{2}-\d{2}$`.
+     - **the refusal half, with a document open**: it puts a known string in `#text`,
+       calls `answerSave('/tmp/Exists')` and fires `new-project`. It requires:
+       `messages()` to hold `/tmp/Exists already exists`, no `open_document` in
+       `invokes()` after the `create_project`, `#text.value` still the known string,
+       `#files` not hidden, and `#pages` without `stale`. **This is the half that pins
+       round 1's decision.** A page that cleared before creating fails it on
+       `#text.value`;
+     - after `__harness.reset()` and a `rendered`, which give the empty state, it calls
+       `answerSave('/tmp/Fresh')` and fires `new-file`. It requires `invokes()` to end
+       with `create_project` (`path` `/tmp/Fresh`, `date` equal to the same
+       composition computed in the clause from its own `new Date()`), followed by
+       `open_document` with `path` `/tmp/Fresh/main.md`.
 
      `OWNS` gains `'news-deaf': 28`.
   9. `--falsify` reports **twenty-six mutations, each isolating the clause it owns**,
@@ -7943,9 +8000,15 @@ as it is.
         today's date and an *Introduction* heading.
       - `⌘N` with the panel folded unfolds it with the field focused. `chapters/one.md`
         then makes the row and the pane holds the new file.
-      - `⇧⌘N` again, naming `Gate Paper` and answering *Replace*, gives an empty window
-        whose error bar says *already exists*, and `Gate Paper/main.md` is unchanged.
-      - `⌘N` in that empty window opens the save dialog.
+      - Click the `main.md` row so the pane holds it, type a known line, and `⌘S`.
+        Then `⇧⌘N` again, naming `Gate Paper`: whether the panel asks *Replace?* is read
+        and written down. Answering yes gives a sheet saying *already exists*, and the
+        window **still holds `Gate Paper` with `main.md` in the pane, its text and page
+        as they were**. `⌘S` straight after leaves `main.md` holding the known line, not
+        zero bytes. **The pane must hold `main.md` for this reading**: holding
+        `chapters/one.md` from the bullet above, `⌘S` would write that file instead,
+        and the reading would pass under the design round 1 refused.
+      - `⌘N` at a fresh launch, with no document open, opens the save dialog.
       - **No chord puts a character in the pane**, which is checked with the caret
         placed in the text first.
   11. `bun app/driver/drive.mjs` and `--falsify` pass, **unchanged**.
@@ -7956,10 +8019,15 @@ as it is.
 
   **`rules/desktop.md`** (580 of 600). Its menu paragraph changes: `File` carries the
   two new items at the head, the *"six ids the one filter enumerates"* in both
-  `covers:` and the body becomes eight, *"registers nineteen commands"* becomes
-  twenty, and `open_path` is now the body both opens share. The covers clause
-  *"the second writer of a path the author did name"* gains `create_project` as the
-  third, unconfined for the same reason.
+  `covers:` and the body becomes eight, and **every count of the commands moves**:
+  *"registers nineteen commands"*, *"Seventeen of the nineteen commands are
+  wrappers…"* (becoming eighteen of twenty, since `create_project` is a wrapper over
+  a plain function), *"the newest of the nineteen"*, and `covers:`'s *"the nineteenth
+  command"*. The implementer re-greps for `nineteen` before the commit rather than
+  trusting this list. The covers clause *"the second writer of a path the author did
+  name"* gains `create_project` as the third, unconfined for the same reason. The
+  account of the capability file gains `dialog:allow-message` and the sheet it is
+  for.
 
   **`rules/desktop-project.md`** — a paragraph for the project Letur makes: one
   folder, one `main.md`, the starter's four shaping facts, the declined drift guard
@@ -7974,8 +8042,14 @@ as it is.
   body, which are same-length substitutions.
 
   **This spec's §3 gains OQ-21** at draft time, since a question raised by a phase
-  belongs to the spec from the moment it is raised. No earlier phase takes a
-  `CORRECTED` note: Phase 21's account of the menu is extended, not contradicted.
+  belongs to the spec from the moment it is raised. Phase 21's account of the menu is
+  extended, not contradicted, and takes no note. **§2's *"Why an external change waits
+  for a clean buffer"* takes a dated `CORRECTED` note** beside its sentence that asking
+  needs *"a modal dialog — a UI class this app does not have, and a permission its
+  capability file does not carry"*. After this phase the app has both, for the refusal
+  sheet. The decision that section records still stands on its other ground, that the
+  two-part rule decides the case without losing anything. The note says so, so that a
+  reader does not take the stale premise for a reopened decision.
 
   **`README.md`**, as in scope. The header of `app/harness/checks.mjs` gets its
   counts. **`specs/INDEX.md` and `rules/INDEX.md` are regenerated.** **No `CLAUDE.md`
@@ -7983,10 +8057,11 @@ as it is.
 
 - **Commit plan.** The drafted phase and OQ-21 land first, on their own, once review
   converges. Then one push, three commits:
-  1. `starter`, `create_project`, `new_project`, `open_path`, and the two items with
-     their ids, with clauses 3–6;
-  2. the page's `newProject`, `newFile` and `openWith`, the stub's `answerSave`, and
-     harness clause 28 with its mutation;
+  1. `starter`, both halves of `create_project`, the two items with their ids, and the
+     capability, with clauses 3–6;
+  2. the page's `newProject`, `revealNewFile` and `openAt`, the stub's
+     `create_project`, `answerSave` and `message`, and harness clause 28 with its
+     mutation;
   3. the rules, the README, the rig's header, the indexes and the `shipped` date.
 
 <!--

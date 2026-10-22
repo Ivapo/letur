@@ -2,6 +2,83 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 43 — Phase 26 only — 2026-10-21 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. Both blockers were verified resolved against the working-tree file and
+the code:
+- `Preview::open` and `load` are reached only through `open_document`, and nothing on
+  the refusal path empties `#text`.
+- `tauri-plugin-dialog` 2.7.2 ships `message(message, { title, kind })` and a
+  `message.toml` permission, so `dialog:allow-message` is real.
+- The capability description is quoted exactly.
+- The page's untyped `window['__TAURI__']` read needs no new declarations for gate 1.
+- `revealNewFile` is used consistently.
+
+Three non-blocking findings, all folded in:
+- **Gate 10's `⌘S` reading could not see the hazard.** The pane held
+  `chapters/one.md` from the bullet before, so the save wrote that file. The reading
+  now puts `main.md` in the pane and saves a known line first, and says why.
+- **§2's "Why an external change waits for a clean buffer" rests partly on a premise
+  this phase removes**: that the app has no modal and no `dialog:allow-message`. The
+  close-out now gives it a dated `CORRECTED` note, which says the decision stands on
+  its other ground.
+- **The `remove_dir` rollback is ungated.** That is now priced in place: no write seam
+  exists, and the step is two lines.
+
+### Round 42 — Phase 26 only — 2026-10-21 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0**, answered by the author: Phase 26 produces the observable. `New Project…`
+makes a document and draws its page from the first compile, with the title, date and
+heading from the starter. Without it, the author leaves the window to make a folder
+and opens an empty file that compiles to a blank sheet. Right thing to build. Proceeded.
+
+The reviewer took `mpdf-010` Phase 10 as the baseline and re-derived the counts: 27/24
+clauses and mutations today, 28/25 after Phase 10, 29/26 after this phase. It also
+checked:
+- the six-id filter and the nineteen commands;
+- the page functions this phase reuses;
+- `scratch_dir`, `project_root` and `discover_main` over a folder holding only
+  `main.md`;
+- that `md2pdf-core` 0.4.0's `frontmatter.rs` in the registry is byte-identical to the
+  checkout, and the four starter facts and all eleven keys against it;
+- OQ-21's quote.
+
+**Two blockers, both accepted:**
+- **A refused New Project left the two halves disagreeing.** The draft cleared the page
+  and then called one `new_project` command that created and opened. A refused create
+  never reached `Session::open`, so Rust still held the old project with `edited` set,
+  while `#text` was empty. `Save` is always enabled and `saveDocument` sends
+  `text.value` unguarded, so the next `⌘S` would have written zero bytes over the
+  document that had been open.
+  **Resolved by a design change**, recorded in the phase as *"Why two commands and not
+  one"*:
+  - a `create_project` command creates only, touches no session, and runs before the
+    page changes anything;
+  - a refusal is a native `message` sheet, which costs `dialog:allow-message`;
+  - success runs the ordinary open.
+
+  Clause 28 gained a refusal half that pins the order, through `#text.value`.
+- **`function newFile` collided with `const newFile`**, the form, at module scope.
+  Resolved by renaming the listener `revealNewFile`.
+
+Non-blocking findings:
+- **The date was underspecified**, and the regex could not catch a missing `+ 1` or
+  pad. The exact composition is now given, and the clause compares the whole string.
+- **`new_project` was not said to be async.** Moot after the split: `create_project`
+  compiles nothing, and the open is the existing async command.
+- **A failure after `create_dir` left an empty folder** that would block a retry. Fixed
+  with `remove_dir`, which removes only an empty directory.
+- **`rules/desktop.md` has four command counts, not one.** All are listed, with an
+  instruction to re-grep.
+- **"Replace?" for a folder was asserted, not measured.** It is now stated as an
+  expectation that gate 10 reads.
+- **The stub case was redundant.** Moot: the stub now answers a path and rejects
+  `Exists`.
+
+The author also fixed two things the review did not raise: gate 2's stale pointer
+(clause 6, which should have been clause 8) and a gate-10 line that assumed
+`Close Window` empties the state.
+
 ### Round 41 — Phase 25 only — 2026-09-22 — both reviewers, resumed — **READY (converged)**
 
 Zero blocking from both lenses, at the second round. Both verified against the file rather
