@@ -346,6 +346,17 @@ const MUTATIONS = {
     return page.replace(block, '')
   },
 
+  /* `File`'s two news, heard by nothing: `views-deaf` in the same shape. Both
+     items still exist in the menu and still emit; the page is deaf to them.
+     `mpdf-003` Phase 26. */
+  'news-deaf': (page) => {
+    const block =
+      "      listen('new-file', revealNewFile)\n" +
+      "      listen('new-project', newProject)\n"
+    if (page.split(block).length !== 2) die('the mutation news-deaf found no single pair of new listens')
+    return page.replace(block, '')
+  },
+
   /* The row's delete draws its mark and names nothing explicitly. **The
      `aria-label` write and nothing else**: the mark still resolves, still wears
      its two inks, still deletes, and the button is left with `title` alone —

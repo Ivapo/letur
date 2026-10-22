@@ -2032,7 +2032,10 @@
         that line the preceding `}` turns the object literal above into a call
         — which is what this check reported the first time it was tried.
       */
-      const { open, save } = window['__TAURI__'].dialog
+      // **`message` is renamed on the way in**, because `message` is already the
+      // `#message` element below and a second binding of it is a redeclaration.
+      // `sheet` is what it draws: the native sheet a refused new project shows.
+      const { open, save, message: sheet } = window['__TAURI__'].dialog
       const { invoke } = window['__TAURI__'].core
       const { listen } = window['__TAURI__'].event
 
@@ -2244,13 +2247,25 @@
         })
         if (path === null) return // the user cancelled
 
+        await openAt(path)
+      }
+
+      /*
+        Open the document at `path`: what the dialog, a document Finder handed
+        over and a new project all do once they have a path. **One function and
+        not three copies**, since `takePendingOpen` below argues that the copies
+        must not differ, and `mpdf-003` Phase 26 made the third.
+
+        @param {string} path
+      */
+      async function openAt(path) {
         // The page on screen belongs to the document being replaced, so it
         // goes before the new one is asked for. Rust clears its own bytes for
         // the same reason.
         clear()
         /* **The folds go beside `clear()` and not inside it.** An open is a new
            project, and a fold held across one would hide rows of a tree the
-           reader has never seen — but `clear()` has a third caller, `setMain`,
+           reader has never seen — but `clear()` has another caller, `setMain`,
            which goes through it because Rust rebuilds the preview and restarts
            its counters. Emptying the folds in there would unfold the reader's
            whole tree every time they pressed a `main` button, on a tree that
@@ -2265,6 +2280,46 @@
       }
 
       /*
+        Start a project: a folder where the author points, holding a `main.md`
+        whose header names every default, opened at once. `mpdf-003` Phase 26.
+
+        **The create comes before anything on the page changes**, and that is
+        the phase's round-1 decision. A `clear()` before a refused create would
+        leave an empty pane over a Rust session still holding the old project,
+        and the next `Save` — always enabled, sending `text.value` unguarded —
+        would write that emptiness over it. So `create_project` only creates,
+        and the open that follows is `openAt`, as Open's is.
+
+        **A refusal is a native sheet and not `fail`.** `fail` adds `stale` to a
+        page that is still current, and the panel's field, where a file
+        create's refusal goes, does not exist with nothing open. The gesture
+        began in a native dialog, and the sheet is the native answer to it.
+
+        **The date is the page's**, composed exactly so two implementations
+        cannot differ: the app links no date crate, and this is the same
+        machine's clock. **Unsaved work is discarded, as Open discards it**;
+        OQ-21 carries that question for every open at once.
+      */
+      async function newProject() {
+        const path = await save({ title: 'New Project' })
+        if (path === null) return // the user cancelled
+
+        const d = new Date()
+        const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+        /** @type {string} */
+        let main
+        try {
+          main = await invoke('create_project', { path, date })
+        } catch (problem) {
+          await sheet(String(problem), { title: 'New Project', kind: 'error' })
+          return
+        }
+
+        await openAt(main)
+      }
+
+      /*
         Take the document Finder handed the app, if one is waiting.
 
         A file association only launches the app; the path arrives in Rust as a
@@ -2273,8 +2328,8 @@
         signal. The take empties the slot, so whichever of the two runs second
         gets nothing and does nothing, and the document opens once.
 
-        It goes through `clear()` and `open_document` exactly as the dialog
-        does. That is not tidiness: `clear()` is where this page resets the two
+        It goes through `openAt`, exactly as the dialog does. That is not
+        tidiness: `clear()` is where this page resets the two
         counters it compares Rust's against, and Rust restarts both at 0 for
         every document, so an open that skipped it would leave both panes
         showing the old document under a new title.
@@ -2289,14 +2344,7 @@
         }
         if (path === null) return // nothing was waiting
 
-        clear()
-        folds.clear() // beside `clear()` and not inside it, per `openDocument`
-
-        try {
-          await invoke('open_document', { path })
-        } catch (problem) {
-          fail(problem)
-        }
+        await openAt(path)
       }
 
       /*
@@ -2681,6 +2729,34 @@
       }
 
       newToggle.addEventListener('click', () => nameFile(newFile.hidden))
+
+      /*
+        `File`'s `New File…`, at `⌘N`: the `+`'s field, reached from the
+        keyboard. **Not called `newFile`**, which is the form above.
+
+        **With nothing open it starts a project instead**, read off the same
+        `files.hidden` `toggleFold` reads: a new file needs a project to land
+        in, and `⌘N` in an empty window should start one rather than do nothing.
+
+        With a project open it **unfolds a folded panel**, since the field sits
+        inside `#files` and `.collapsed` is `display: none` — overriding the
+        reader's fold on a create's behalf, which `mpdf-010` Phase 7 already
+        argued for folders: a create whose field cannot be seen is no create.
+        An open field is **only focused**, so a second `⌘N` does not empty a
+        half-typed path. `mpdf-003` Phase 26.
+      */
+      function revealNewFile() {
+        if (files.hidden) {
+          newProject()
+          return
+        }
+        if (folded) {
+          folded = false
+          showFold()
+        }
+        if (newFile.hidden) nameFile(true)
+        else newName.focus()
+      }
 
       // **Not in the global handler at the figure surface below**, and it does
       // not stop the event: `Escape` goes on meaning *no figure* as well, which
@@ -6093,6 +6169,9 @@
       // `textarea` needs and what a page handler would have to reproduce.
       listen('view-files', toggleFold)
       listen('view-lines', toggleLines)
+      // `File`'s two news, by the same argument: no `keydown` for either.
+      listen('new-file', revealNewFile)
+      listen('new-project', newProject)
 
       /*
         These two run last, and the ordering above them is load-bearing though

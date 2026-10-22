@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all twenty-five. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all twenty-six. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -81,7 +81,8 @@ const OWNS = {
   'ink-captions-anywhere': 24,
   'ink-math-per-line': 25,
   'web-button-always': 26,
-  'create-stays-put': 27
+  'create-stays-put': 27,
+  'news-deaf': 28
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -2323,6 +2324,136 @@ const aCreateTakesThePane = async (browser, url) => {
   return errors
 }
 
+/* 28. **The two new items reach the page, and `⌘N` with no project starts one.**
+       `mpdf-003` Phase 26.
+
+       **Registration is asserted through `listening()`**, for clause 15's
+       reason: a fired event reaches nothing the page did not register, so a
+       page deaf to both would otherwise pass every half that asserts an
+       absence.
+
+       **The panel is folded through the bar's control and not through
+       `view-files`**, which `views-deaf` drops; driven by the event, that
+       mutation would fail this clause too and lose its isolation. `pressLines`
+       is the precedent.
+
+       **The refusal half is the one that pins the phase's round-1 decision.**
+       A page that cleared before it created would empty `#text` on a refused
+       create, and Rust would still hold the old project, so the next `Save`
+       would write the empty pane over it. The known string surviving is what
+       tells the two orders apart. The rest of that half reads the other things
+       a wrong order or a `fail` would have moved: no open after the refusal, the
+       panel still drawn, and the page not marked `stale`.
+
+       **The date is composed here from its own `new Date()`**, inside the page,
+       and the whole string is compared, so a missing `+ 1` or pad fails it. */
+const theNewItemsReachThePage = async (browser, url) => {
+  const page = await opened(browser, url)
+  const KNOWN = 'the words a refused create must not take\n'
+
+  const heard = await page.evaluate(() => window.__harness.listening())
+
+  const read = () =>
+    page.evaluate(() => ({
+      folded: document.getElementById('files').classList.contains('collapsed'),
+      shown: !document.getElementById('new-file').hidden,
+      focus: document.activeElement?.id ?? null,
+      value: /** @type {HTMLInputElement} */ (document.getElementById('new-name')).value
+    }))
+  const fire = async (name) => {
+    await page.evaluate((n) => window.__harness.fire(n), name)
+    await settle(page)
+  }
+
+  /* With a project open and the panel folded: the field comes out. */
+  await page.evaluate(() => document.getElementById('views-files').click())
+  await settle(page)
+  const before = await read()
+  await fire('new-file')
+  const revealed = await read()
+
+  /* A second `⌘N` keeps what was typed. */
+  await page.keyboard.type('parts/')
+  await fire('new-file')
+  const kept = await read()
+
+  /* The refusal, with a document open. */
+  await page.evaluate((known) => {
+    /** @type {HTMLTextAreaElement} */ (document.getElementById('text')).value = known
+    window.__harness.answerSave('/tmp/Exists')
+    window.__harness.forget()
+  }, KNOWN)
+  await fire('new-project')
+  const refused = await page.evaluate(() => ({
+    messages: window.__harness.messages().map((m) => m.text),
+    sent: window.__harness.invokes().map((i) => i.name),
+    text: /** @type {HTMLTextAreaElement} */ (document.getElementById('text')).value,
+    absent: document.getElementById('files').hidden,
+    stale: document.getElementById('pages').classList.contains('stale')
+  }))
+
+  /* The empty state: `⌘N` starts a project, and opens what it made. */
+  await page.evaluate(() => {
+    window.__harness.reset()
+    window.__harness.fire('rendered')
+  })
+  await settle(page)
+  const date = await page.evaluate(() => {
+    window.__harness.answerSave('/tmp/Fresh')
+    window.__harness.forget()
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
+  await fire('new-file')
+  const started = await page.evaluate(() => window.__harness.invokes())
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const listening = heard.includes('new-file') && heard.includes('new-project')
+  const unfolded = before.folded && !revealed.folded && revealed.shown && revealed.focus === 'new-name'
+  const keeps = kept.shown && kept.value === 'parts/' && kept.focus === 'new-name'
+
+  const created = refused.sent.indexOf('create_project')
+  const untouched =
+    refused.messages.includes('/tmp/Exists already exists') &&
+    created >= 0 &&
+    !refused.sent.slice(created + 1).includes('open_document') &&
+    refused.text === KNOWN &&
+    !refused.absent &&
+    !refused.stale
+
+  const at = started.findIndex((i) => i.name === 'create_project')
+  const opens =
+    at >= 0 &&
+    started[at].args.path === '/tmp/Fresh' &&
+    started[at].args.date === date &&
+    started[at + 1]?.name === 'open_document' &&
+    started[at + 1].args.path === '/tmp/Fresh/main.md'
+
+  note(`the page is listening for: ${heard.join(', ')}`)
+  note(`new-file over a folded panel: ${JSON.stringify(before)} → ${JSON.stringify(revealed)}; again: ${JSON.stringify(kept)}`)
+  note(`a refused new-project: ${JSON.stringify(refused)}`)
+  note(`new-file with nothing open sent ${JSON.stringify(started.map((i) => `${i.name} ${JSON.stringify(i.args)}`))}`)
+
+  ok(
+    28,
+    'the two new items reach the page, a refused project leaves the window as it was, and ⌘N with nothing open starts one',
+    listening && unfolded && keeps && untouched && opens,
+    [
+      listening ? null : `the page registered [${heard.join(', ')}] and the new events are not both among them`,
+      unfolded ? null : `new-file over a folded panel gave ${JSON.stringify(revealed)} from ${JSON.stringify(before)}`,
+      keeps ? null : `a second new-file left ${JSON.stringify(kept)}`,
+      untouched ? null : `a refused new-project left ${JSON.stringify(refused)}`,
+      opens ? null : `new-file with nothing open sent ${JSON.stringify(started)}, wanting the date ${date}`
+    ]
+      .filter(Boolean)
+      .join('; ') ||
+      'both registered, the field unfolded and kept, the refusal a sheet over an untouched window, and the empty window started a project'
+  )
+  return errors
+}
+
 const run = async ({ engine, headed, rev, doc, mutate }) => {
   passed = 0
   failed = 0
@@ -2369,7 +2500,8 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       aGroupACaptionAndAName,
       displayMathIsOneInk,
       theWebLineAndWhatWrapsInThePane,
-      aCreateTakesThePane
+      aCreateTakesThePane,
+      theNewItemsReachThePage
     ]) {
       gather(await check(browser, held.url))
     }
@@ -2384,7 +2516,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    28,
+    29,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +

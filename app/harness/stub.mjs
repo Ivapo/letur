@@ -97,6 +97,15 @@ const listeners = {}
    look identical. So the boundary is recorded and asserted against. */
 const invokes = []
 
+/* **The next path `dialog.save` answers, once**, and `null` after — the cancel
+   every other caller of the dialog meets in this rig. `mpdf-003` Phase 26 is the
+   first clause that has to drive past the dialog, so the answer is a one-shot a
+   check arms rather than a standing value another check could inherit. */
+let saveAnswer = null
+
+/* Every native sheet the page asked for, oldest first, as `{ text, options }`. */
+const messages = []
+
 const fire = (name, payload = null) => {
   for (const fn of listeners[name] ?? []) fn({ event: name, id: 0, payload })
 }
@@ -153,10 +162,17 @@ const invoke = async (name, args = {}) => {
     /* **A save answers its receipt**, which the page places in the footer and
        clears on a timer of its own. `app/src/preview.rs:SAVED` is the word;
        `save_as` composes the other sentence and is not answered here, `dialog.save`
-       below returning `null` so the page never reaches that command in this rig.
-       `mpdf-003` Phase 19. */
+       below returning `null` unless a check arms it, and none arms it for a
+       save-as. `mpdf-003` Phase 19. */
     case 'save':
       return 'saved'
+
+    /* `app/src/main.rs:create_project` answers the `main.md` it made. **A last
+       component of `Exists` is refused** in `document::create_project`'s
+       sentence, so a clause can reach the refusal. `mpdf-003` Phase 26. */
+    case 'create_project':
+      if (args.path.split('/').pop() === 'Exists') throw `${args.path} already exists`
+      return `${args.path}/main.md`
 
     case 'open_document':
     case 'export':
@@ -201,7 +217,17 @@ const invoke = async (name, args = {}) => {
 
 window.__TAURI__ = {
   core: { invoke },
-  dialog: { open: async () => null, save: async () => null },
+  dialog: {
+    open: async () => null,
+    save: async () => {
+      const answer = saveAnswer
+      saveAnswer = null
+      return answer
+    },
+    message: async (text, options = {}) => {
+      messages.push({ text, options: JSON.parse(JSON.stringify(options)) })
+    }
+  },
   event: {
     listen: async (name, fn) => {
       ;(listeners[name] ??= []).push(fn)
@@ -283,5 +309,13 @@ window.__harness = {
   /** Forget them, so a check can say "since here" rather than "ever". */
   forget: () => {
     invokes.length = 0
-  }
+  },
+
+  /** Arm the next `dialog.save` to answer `path` instead of cancelling. */
+  answerSave: (path) => {
+    saveAnswer = path
+  },
+
+  /** Every sheet `dialog.message` was asked for, as a copy. */
+  messages: () => JSON.parse(JSON.stringify(messages))
 }
