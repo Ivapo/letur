@@ -334,6 +334,105 @@ pub fn create_file(root: &Path, path: &str) -> Result<(), String> {
     letur_project::document::create_file(&mut Disk::new(root), path)
 }
 
+/// What a project Letur makes starts as: a header naming every default, and
+/// one heading to write under.
+///
+/// Four facts from `md2pdf-core`'s `core/src/frontmatter.rs` decide the shape:
+/// - **A comment is a whole line.** `parse` skips a line whose trimmed text
+///   starts with `#` and reads everything after a key's colon as its value, so
+///   each key's choices sit on the line above it rather than after it.
+/// - **An empty value is the key absent**, by `non_empty`, so the blank
+///   `author:`, `affiliation:` and `bibliography:` cost nothing and show where
+///   each goes.
+/// - **`columns` is the one default the struct cannot hold alone**: it follows
+///   the template, and written out it would pin one column under a template
+///   change. So it is a comment.
+/// - **The title and the date are filled in**, which is the one departure from
+///   "every default": both are `None` in `Frontmatter::default`, and a starter
+///   that left them empty would draw a page with no title block.
+///
+/// **The body is `# Introduction` and not `# <title>`**, because the article
+/// template already sets the title block from `title:`.
+///
+/// **This copy of the defaults will drift** if the engine changes one or adds a
+/// key. A test comparing it with `Frontmatter::default()` was declined on
+/// 2026-10-21: the guard wanted is the engine supplying the header itself, a
+/// spec in `Ivapo/md2pdf`. What the suite asserts is narrower — the starter
+/// compiles. `mpdf-003` Phase 26.
+pub fn starter(title: &str, date: &str) -> String {
+    format!(
+        "---
+title: {title}
+author:
+affiliation:
+date: {date}
+# article | press-release
+template: article
+# 1 | 2; left out, it follows the template
+# columns: 1
+# plain | numbered
+equations: plain
+# flat | sectioned
+figures: flat
+# plain | 1 to 6
+headings: plain
+# numeric | author-date
+citations: numeric
+bibliography:
+---
+
+# Introduction
+
+Start writing here.
+"
+    )
+}
+
+/// Make a new project where the New Project dialog pointed: one folder, holding
+/// one `main.md` that is [`starter`] titled by the folder's name. It answers the
+/// path of that `main.md`.
+///
+/// **Nothing is ever replaced.** `create_dir` and not `create_dir_all`, because
+/// the dialog chose a parent that exists, and a folder already at the name is
+/// refused as *already exists* — so answering yes to the panel's *Replace?*
+/// reaches this refusal and not a delete. `create_new` makes the file, for
+/// [`Disk`]'s `create`'s reason.
+///
+/// **A failure after the folder is made takes the folder back.** The file goes
+/// first, since a write that fails after `create_new` has left it there, and
+/// then `remove_dir`, which removes only an empty directory and so cannot take
+/// anything the author put there. Without it a retry under the same name would
+/// be refused over an empty folder Letur made itself.
+///
+/// **It is not confined**, which is `mpdf-003` Phase 18's decision applied
+/// again: the dialog is the author naming a place. A plain function and not the
+/// command, for [`asset_bytes`]' reason. `mpdf-003` Phase 26.
+pub fn create_project(folder: &Path, date: &str) -> Result<PathBuf, String> {
+    use std::io::Write;
+
+    let refused = |e: io::Error| format!("cannot create {}: {e}", folder.display());
+
+    match std::fs::create_dir(folder) {
+        Ok(()) => {}
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+            return Err(format!("{} already exists", folder.display()));
+        }
+        Err(e) => return Err(refused(e)),
+    }
+
+    let main = folder.join("main.md");
+    let title = title(folder);
+    let written = std::fs::File::create_new(&main)
+        .and_then(|mut file| file.write_all(starter(&title, date).as_bytes()));
+
+    if let Err(e) = written {
+        let _ = std::fs::remove_file(&main);
+        let _ = std::fs::remove_dir(folder);
+        return Err(refused(e));
+    }
+    Ok(main)
+}
+
 /// Move one file under `root` to the Trash, named by the panel.
 ///
 /// **A third confinement question, and neither shipped rule serves it.**
@@ -1750,5 +1849,81 @@ mod tests {
                 "a refused trash called the OS anyway for {path}"
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // The project Letur makes. `mpdf-003` Phase 26's clauses 3 to 6.
+    // -----------------------------------------------------------------------
+
+    /// Clause 3. **The starter compiles**, which catches an unknown key, a
+    /// refused value and a comment on a value's line. `Notes: draft 2` has a
+    /// colon inside the value, and `parse` splits at the first colon only.
+    #[test]
+    fn the_starter_compiles() {
+        for title in ["My Paper", "Notes: draft 2"] {
+            let pdf = md2pdf_core::md_to_pdf(&starter(title, "2026-10-21"), &[])
+                .unwrap_or_else(|e| panic!("the starter titled {title:?} did not compile: {e}"));
+            assert!(pdf.starts_with(b"%PDF"), "the starter titled {title:?} is not a PDF");
+        }
+    }
+
+    /// Clause 4. A project is one folder holding one file, and the file is the
+    /// starter titled by the folder's name.
+    #[test]
+    fn a_project_is_one_folder_holding_one_file() {
+        let scratch = scratch_dir("project-new");
+        let folder = scratch.join("My Paper");
+        // A reused scratch directory would refuse on *already exists*, which is
+        // not this clause.
+        let _ = std::fs::remove_dir_all(&folder);
+
+        let main = create_project(&folder, "2026-10-21").unwrap();
+
+        assert_eq!(main, folder.join("main.md"));
+        let held: Vec<_> = std::fs::read_dir(&folder)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(held, ["main.md"], "the project holds something besides main.md");
+        assert_eq!(
+            std::fs::read_to_string(&main).unwrap(),
+            starter("My Paper", "2026-10-21")
+        );
+    }
+
+    /// Clause 5. **An existing folder is refused and left as it was**: what the
+    /// author keeps there is untouched and no `main.md` appears beside it.
+    #[test]
+    fn an_existing_folder_is_refused_and_left_as_it_was() {
+        let folder = scratch_dir("project-exists").join("Held");
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("keep.md"), b"the author's own words").unwrap();
+
+        assert_eq!(
+            create_project(&folder, "2026-10-21").err(),
+            Some(format!("{} already exists", folder.display()))
+        );
+        assert_eq!(
+            std::fs::read(folder.join("keep.md")).unwrap(),
+            b"the author's own words"
+        );
+        assert!(!folder.join("main.md").exists(), "a refused create wrote main.md");
+    }
+
+    /// Clause 6. **The project opens as its own**: with a parent holding no
+    /// markdown, the climb stops at the new folder and discovery answers its
+    /// one file. This is the half that would catch an open landing above it.
+    #[test]
+    fn a_new_project_opens_as_its_own() {
+        let scratch = scratch_dir("project-opens");
+        let folder = scratch.join("Fresh");
+        let _ = std::fs::remove_dir_all(&folder);
+
+        let main = create_project(&folder, "2026-10-21").unwrap();
+        let root = project_root(&main);
+
+        assert_eq!(crate::watch::resolve(&root), crate::watch::resolve(&folder));
+        assert_eq!(discover_main(&root, &main), "main.md");
     }
 }

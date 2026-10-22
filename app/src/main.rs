@@ -30,6 +30,20 @@ const MAIN: &str = "main";
 /// menu item and the button in the page run one code path and not two.
 const OPEN: &str = "open";
 
+/// The id of the New File menu item, and the event it sends the page.
+///
+/// It follows [`OPEN`]: the item emits, and the page runs what its own `+`
+/// runs — the panel's field, unfolded and focused. **With no document open the
+/// page starts a project instead**, since a new file needs a project to land in.
+/// `mpdf-003` Phase 26.
+const NEW_FILE: &str = "new-file";
+
+/// The id of the New Project menu item, and the event it sends the page.
+///
+/// It follows [`OPEN`] too: the page owns the dialog, then asks
+/// [`create_project`] and opens what it answers. `mpdf-003` Phase 26.
+const NEW_PROJECT: &str = "new-project";
+
 /// The id of the Save-a-copy menu item, and the event it sends the page.
 ///
 /// It follows [`OPEN`] exactly: the item emits, and the page owns the dialog.
@@ -127,7 +141,9 @@ fn main() {
             app.set_menu(menu(app.handle())?)?;
             app.on_menu_event(|app, event| {
                 let id = event.id();
-                if (id == OPEN
+                if (id == NEW_FILE
+                    || id == NEW_PROJECT
+                    || id == OPEN
                     || id == SAVE
                     || id == SAVE_AS
                     || id == EXPORT
@@ -216,6 +232,7 @@ fn main() {
             fetch_images,
             asset_bytes,
             create_file,
+            create_project,
             trash_file,
             document_text,
             edit,
@@ -450,6 +467,25 @@ fn create_file(session: tauri::State<'_, Mutex<Session>>, path: String) -> Resul
         .expect("the session lock was poisoned")
         .relist();
     Ok(())
+}
+
+/// Make a new project where the New Project dialog pointed, and answer the path
+/// of its `main.md`.
+///
+/// **It creates, and it does not open.** It touches no session and holds no
+/// lock, so a refusal leaves Rust exactly where it was; the page then opens the
+/// path through [`open_document`], the route every open takes. **Two commands
+/// and not one is `mpdf-003` Phase 26's round-1 decision**: a single command
+/// that created and opened had the page clear before calling it, so a refused
+/// create left an empty pane over a session still holding the old project, and
+/// the next `Save` would have written that emptiness over it. Split, the only
+/// refusal comes before the page changes anything.
+///
+/// The rule is [`document::create_project`]'s, for [`asset_bytes`]' reason.
+#[tauri::command]
+fn create_project(path: String, date: String) -> Result<String, String> {
+    document::create_project(Path::new(&path), &date)
+        .map(|main| main.to_string_lossy().into_owned())
 }
 
 /// Move one of the project's files to the Trash, named from a row.
@@ -730,8 +766,16 @@ fn export(session: tauri::State<'_, Mutex<Session>>, path: String) -> Result<(),
 /// The window's menu.
 ///
 /// macOS draws no menu of its own, so every item the keyboard needs is named
-/// here — `Cmd-O`, `Cmd-S`, `Shift-Cmd-S`, `Cmd-B` and `Cmd-L`, which are the
-/// five accelerators the app has. `Save a Copy…` is the one item with none.
+/// here — `Cmd-N`, `Shift-Cmd-N`, `Cmd-O`, `Cmd-S`, `Shift-Cmd-S`, `Cmd-B` and
+/// `Cmd-L`, which are the seven accelerators the app has. `Save a Copy…` is the
+/// one item with none.
+///
+/// **The two news head `File`, above `Open…`**, with a separator between `Open…`
+/// and `Save`: make, open, then act on what is open, the order every macOS
+/// document app uses. **`Shift-Cmd-N` is spent knowingly**: in Finder it is
+/// *New Folder* and in some editors *New Window*. This app has neither a folder
+/// command nor a second window, and a project *is* a new folder, so the reading
+/// a Finder user brings is close to this one. `mpdf-003` Phase 26.
 ///
 /// `Cmd-S` saves the document and `Shift-Cmd-S` saves it wherever the author
 /// points. **Phase 3 gave `Shift-Cmd-S` to the export and Phase 17 took it
@@ -747,6 +791,12 @@ fn export(session: tauri::State<'_, Mutex<Session>>, path: String) -> Result<(),
 /// one ever arrives the named alternative is `Alt+Cmd+F` and `Alt+Cmd+L`, and
 /// moving to it is a phase that says so. `mpdf-003` Phase 21.
 fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    let new_file = MenuItemBuilder::with_id(NEW_FILE, "New File…")
+        .accelerator("CmdOrCtrl+N")
+        .build(app)?;
+    let new_project = MenuItemBuilder::with_id(NEW_PROJECT, "New Project…")
+        .accelerator("Shift+CmdOrCtrl+N")
+        .build(app)?;
     let open = MenuItemBuilder::with_id(OPEN, "Open…")
         .accelerator("CmdOrCtrl+O")
         .build(app)?;
@@ -786,7 +836,10 @@ fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
                 .quit()
                 .build()?,
             &SubmenuBuilder::new(app, "File")
+                .item(&new_file)
+                .item(&new_project)
                 .item(&open)
+                .separator()
                 .item(&save)
                 .item(&save_as)
                 .item(&export)
