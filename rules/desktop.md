@@ -21,12 +21,12 @@ sources:
 covers: >
   the desktop app: the crate and its files, the second crate the rules left for
   and the door every file goes through, the window and its menu, the five
-  submenus and the six ids the one filter enumerates, the two items that name a
+  submenus and the eight ids the one filter enumerates, the two items that name a
   view and carry no state, the two
   titles an open sets, the commands and the signal between them, the file I/O the
   app owns and the two read passes one closure serves, the fourth reader of a
   path the author did not name in a dialog, the first write to one and the first
-  delete of one, the second writer of a path the author did name, the confinement
+  delete of one, the second and third writers of a path the author did name, the confinement
   it does not share and the one its caller asks after the fact, the receipt the
   two saves answer with and the field it deliberately is not, the three answers the
   asset list gives and the filter reads, the URL whose bytes come from memory and
@@ -36,7 +36,7 @@ covers: >
   and the two of them that are now two files, the second file beside the store and
   the one thing in it that is not about a folder, the third beside them for the
   sites a folder allows, the nineteenth command and the two halves one of them is,
-  the second
+  the twentieth that creates and does not open, the second
   setter called where capabilities do not apply, the field composed in two places
   and the seam that holds them, the buffer that compiles and the closure it rides,
   the export and its two
@@ -165,7 +165,8 @@ path a sentence spells, `Disk`'s being `root.join`, so only the tail a host's
 
 `capabilities/default.json` grants
 `core:default` to the window labelled `main`, plus **one entry per dialog** —
-`dialog:allow-open` and `dialog:allow-save`.
+`dialog:allow-open` and `dialog:allow-save` — and `dialog:allow-message`, since
+`mpdf-003` Phase 26, for the one native sheet the page shows: a refused new project.
 
 **What that withholds is worth stating beside what it carries.** `core:window:default`
 is the window's *getters* — `allow-scale-factor`, `allow-inner-size`, `allow-title`,
@@ -227,12 +228,13 @@ capability added for either. `app/gen/` is generated and is not committed.
 
 `app/src/main.rs` holds only what needs a window. `main` registers the dialog
 plugin, builds the menu, manages one `Mutex<Session>` and one
-`app/src/main.rs:Pending`, registers nineteen commands, and — since the bundle —
+`app/src/main.rs:Pending`, registers twenty commands, and — since the bundle —
 **builds the app rather than running it**, so that it can hand `App::run` a
 callback and see the run events a `.run(generate_context!())` never surfaces.
 
 The menu is built by hand, because macOS draws none of its own: an app submenu,
-a `File` submenu carrying `Open…` at `CmdOrCtrl+O`, `Save` at `CmdOrCtrl+S`,
+a `File` submenu carrying `New File…` at `CmdOrCtrl+N`, `New Project…` at
+`Shift+CmdOrCtrl+N` and `Open…` at `CmdOrCtrl+O`, then a separator, `Save` at `CmdOrCtrl+S`,
 `Save as…` at `Shift+CmdOrCtrl+S` and `Save a Copy…` at no accelerator at all,
 an `Edit` submenu, a `View` submenu carrying `Files` at `CmdOrCtrl+B` and `Lines`
 at `CmdOrCtrl+L`, and a `Window`
@@ -251,8 +253,9 @@ drawn marks. `core:default` already carries
 `core:event:allow-listen`, so neither those events nor the `rendered` signal
 below needs an entry either.
 
-**Six ids, and the enumeration is the load-bearing half.** `on_menu_event` filters
-on `open`, `save`, `save-as`, `export`, `view-files` and `view-lines` by name
+**Eight ids, and the enumeration is the load-bearing half.** `on_menu_event` filters
+on `new-file`, `new-project`, `open`, `save`, `save-as`, `export`, `view-files` and
+`view-lines` by name
 before it emits, so an item whose id is missing from that list builds, draws with
 its accelerator, and does nothing at all. **The two view items are plain
 `MenuItem`s and carry no checkmark**: the state one would place is the page's —
@@ -303,10 +306,10 @@ therefore cross the IPC boundary and the debounce is Rust's**, which is what put
 the interval on the testable side of the window: a debounce in the page would be
 logic reachable only by typing at one.
 
-Seventeen of the nineteen commands are wrappers over a plain function.
+Eighteen of the twenty commands are wrappers over a plain function.
 `app/src/main.rs:pending_open` is the odd one and is not: it reads no session
 and **takes** a slot the run event filled, which the section on the bundle below
-explains. `app/src/main.rs:fetch_images` is the newest of the nineteen and the
+explains. `app/src/main.rs:create_project` is the newest of the twenty, and the
 split is load-bearing rather than tidy: this file has no test module, the crate
 is bin-only and `tauri::State` has a private field and no public constructor, so
 a rule written into a command is a rule nothing in this repository can reach.
@@ -435,6 +438,14 @@ it is aimed. **`project/src/preview.rs:Preview::download` is where the two hosts
 part**: the web session's Save-as is a download, never reaches `Files::save_as`, and
 takes `&self` — the buffer's bytes and `downloaded <name>`, with `saved`, `divergence`
 and `edited` left as a save outside the project leaves them (`rules/web-app.md`).
+
+**`app/src/document.rs:create_project` is the third**, `mpdf-003` Phase 26, and
+unconfined for Save-as's reason: the New Project dialog is the author naming a
+place. **`app/src/main.rs:create_project` creates and does not open** — it touches
+no session and holds no lock, so a refusal leaves Rust where it was, and the page
+then opens the path through `open_document` like any open. One command that did
+both was the round-1 draft, and it let a refused create empty a pane over a session
+still holding the old project. `rules/desktop-project.md` has what it writes.
 
 **`app/src/document.rs:trash_file` is the first *destructive* one, and it moves
 to the Trash rather than unlinking.** There is no undo anywhere in this app —

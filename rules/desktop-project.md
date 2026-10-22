@@ -20,10 +20,11 @@ covers: >
   differently and the third a delete asks, the rule a create lands by and the
   folders it makes, the two further questions it asks, the empty file it stops
   at and the listing it refreshes itself, the row a delete acts on by name and the
-  panel it refreshes itself, the two
+  panel it refreshes itself, the project Letur makes and the starter it holds,
+  the copy of the defaults that will drift and the guard declined for it, the two
   facts this app remembers about a folder and where it refuses to keep them, and
   the second file beside them for the fact that is about no folder at all
-max_lines: 210
+max_lines: 225
 generated: 2026-09-22
 ---
 
@@ -169,6 +170,22 @@ hand**: the create command calls `app/src/preview.rs:Session::relist`, which
 refreshes the tree and announces, because the page then moves the pane to the
 file and `Session::arm` drops the watcher whose `Change::Tree` would have listed
 it. A `touch` from outside still arrives by the watch.
+
+**`app/src/document.rs:create_project` makes a project**, `mpdf-003` Phase 26:
+one folder where the New Project dialog pointed, holding one `main.md` that is
+`document::starter` titled by the folder's name. It is unconfined, the dialog
+being the author naming a place. `create_dir` and not `_all`, and **nothing is
+ever replaced**: a folder already there is *"<folder> already exists"*, any other
+failure *"cannot create <folder>: <reason>"*. A write that fails after the folder
+is made takes it back — the file it made, then `remove_dir`, which cannot take
+what the author put there. The starter's shape is four facts of `md2pdf-core`'s
+`parse`: a comment is a whole line, so each key's choices sit above it; an empty
+value is the key absent; `columns` follows the template, so it is a comment; and
+the title and today's date are filled in, so the first page has a title block.
+**The copy of the defaults will drift** from `Frontmatter::default`; a test
+comparing them was declined on 2026-10-21 for the engine supplying the header
+itself, a spec in `Ivapo/md2pdf` built when the engine next changes. The suite
+asserts only that the starter compiles.
 
 **A delete asks a third question, neither of the other two serving it.**
 `confined` opens on `is_file`, refusing a `missing: true` row and a dangling

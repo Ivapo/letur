@@ -61,7 +61,11 @@ $ cargo tauri dev
 
 That opens a window. Press `⌘O`, or the Open button, and pick a markdown file: the
 window finds the document that file belongs to, puts its text in the left pane, lists the
-project's files beside it and draws the page on the right. `cargo tauri dev`
+project's files beside it and draws the page on the right. Or press `⇧⌘N` to start
+one: name a folder, and the app makes it with a `main.md` inside, whose header lists
+every setting at its default — the title is the folder's name and the date is today —
+and opens it, so the first page is already drawn. It will not make a folder that
+is already there. `cargo tauri dev`
 needs the Tauri CLI (`cargo install tauri-cli`); without it,
 `cargo run --release -p letur` opens the same window and skips the
 rebuild-on-change.
@@ -199,7 +203,8 @@ Application Support folder and writes nothing into yours. The `Files` mark in th
 own, and pressing it folds just what is under it — the mark beside the name says which
 way it is set, and the panel gives the width it was using back to the pages.
 
-**The `+` beside `Files` makes a new one.** Type the path you want it at, relative to
+**The `+` beside `Files` makes a new one**, and so does `⌘N`, which unfolds the panel
+if it is folded. With nothing open, `⌘N` starts a project instead. Type the path you want it at, relative to
 the project — `sections/discussion.md` — and the app creates it empty, lists it and
 opens it in the pane. It takes markdown and bibliographies, `.md`, `.bib`, `.yml` and `.yaml`, and it will not
 write outside the project or over a file that is already there; it says so beside the

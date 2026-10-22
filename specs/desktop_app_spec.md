@@ -135,7 +135,7 @@ phases:
     by: null
   - name: "Phase 26 — File makes a new file and a new project"
     reviewed: 2026-10-21
-    shipped: null
+    shipped: 2026-10-21
     cut: null
     by: null
 
@@ -572,6 +572,12 @@ without losing anything. That permission is `dialog:allow-message`, which is
 where a two-choice prompt lives too: `tauri-plugin-dialog` 2.7.2 registers
 exactly `open`, `save` and `message`, and its `ask` and `confirm` both route
 through the last of those.
+
+**CORRECTED 2026-10-21:** since Phase 26 the app has both. `dialog:allow-message`
+is in the capability file, and the page shows one native sheet, for a refused new
+project. **The decision above is not reopened by it.** It stands on its other
+ground: the two-part rule decides the case without losing anything, so a prompt
+would ask a question that already has an answer.
 
 **The app does not merge**, and that is recorded rather than deferred. A
 three-way merge is an editor project, and §1.1 keeps this spec from being one.
@@ -7777,7 +7783,14 @@ as it is.
   exists"* over an empty folder Letur made itself. **No gate clause provokes it, and
   that is priced, not overlooked**: making the write fail inside a folder just made
   needs a fault seam `app/src/document.rs` does not have for writes (Phase 3 of
-  `mpdf-010` chose plain `std::fs` for the create), and the step is two lines. **It is not confined**, and that is
+  `mpdf-010` chose plain `std::fs` for the create), and the step is two lines.
+
+  **CORRECTED 2026-10-21, at build:** a write that fails after `create_new` has
+  left `main.md` in the folder, so a bare `remove_dir` would always fail on that
+  path. The rollback therefore removes the file it just made first, then the
+  folder. It still cannot take anything the author put there.
+
+  **It is not confined**, and that is
   Phase 18's decision applied again: the dialog is the author naming a place, and a
   project made where the author did not point is not the gesture its name denotes.
   It is a plain function and not the command, for `asset_bytes`' reason.
@@ -7923,6 +7936,11 @@ as it is.
   covers the save panel. The capability file's `description`, *"the core defaults, and
   the two file dialogs"*, gains the sheet. The page's
   `const { open, save } = window['__TAURI__'].dialog` gains `message`.
+
+  **CORRECTED 2026-10-21, at build:** it gains `message: sheet`. `message` is
+  already the page's `#message` element (`const message = document.getElementById('message')`),
+  so a second binding of the name would be a redeclaration error. This is the same
+  trap `revealNewFile`'s name avoids.
 
   **The rigs:** `app/harness/stub.mjs` gains three things:
   - a `create_project` case. It answers `` `${path}/main.md` ``, and **rejects with

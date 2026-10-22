@@ -13,19 +13,19 @@ covers: >
   that has to reach the rows, the three gestures on a file row and the two marks
   it may carry, the fourth that is the held row's own and the fifth that is a
   folder row's, and the invariant neither breaks, the mark that says which way a disclosure is set and where it is
-  drawn, the two opens that empty the folds and the third caller that is why
+  drawn, the one open that empties the folds and the other caller that is why
   they are not emptied lower, the create that expands what it would otherwise
   land behind and puts what it made in the pane, the two rows the delete is not on and the edge two buttons share,
   the one refusal here that reaches `fail` and the two that keep their own
   surfaces, the two kinds a row's body puts in the pane and the second kind test
   that has to move with the first, the panel's own gesture that is on no row and
-  the two things the page holds, the surface over the text pane and the three boxes that place it,
+  the two things the page holds, its second way in and the fold it overrides, the surface over the text pane and the three boxes that place it,
   the ink layer placed off the same reading, the box measurement it holds for a
   keystroke that must not take one and the timer it arms where it hides,
   the two elements it draws a figure with and the sentence left where one will
   not parse, the sequence its read carries and the four ways back, and the disk half that is walked twice beside
   the missing half that follows the text
-max_lines: 260
+max_lines: 266
 generated: 2026-09-03
 ---
 
@@ -88,8 +88,9 @@ of it, headings included, so `parts` folded takes `parts/ch1/deep.md` **and the
 `ch1` heading**; a parent test would leave that heading standing above nothing.
 The collapsed folder's own row is still drawn, or there is no way back, and
 `panelRows`' shared-segment bookkeeping advances on the entries Rust sent rather
-than on the rows it drew. **The two opens empty the set and `clear()`
-deliberately does not**: `clear()` has a third caller, `setMain`, which goes
+than on the rows it drew. **Every open empties the set and `clear()`
+deliberately does not**: the dialog, Finder's hand-over and a new project share
+`openAt`, and `clear()` has one other caller, `setMain`, which goes
 through it because Rust rebuilds the preview and restarts its counters, so
 emptying there would unfold the whole tree on a `main` press against a tree that
 did not change. **A create expands every ancestor of its new file** — the field
@@ -194,7 +195,11 @@ route, and Rust has already listed it (`Session::relist`). Over unsaved work the
 create stands and the switch is refused in `SWITCHING`'s words in the divergence
 bar, as a row click's is. The field stays open with focus, so the pane holds the
 last file made; `Escape` in it closes it and puts focus in `#text`, without
-stopping the event.
+stopping the event. **`⌘N` is the field's second way in** (`revealNewFile`,
+`mpdf-003` Phase 26): it unfolds a folded panel, overriding the reader's fold,
+since a field inside a `display: none` panel is no create; it shows the field, or
+only focuses it if open, so a half-typed path survives. With nothing open it
+starts a project instead (`rules/desktop-project.md`).
 
 **The figure is a view over the text pane and not a third pane**, the way `Lines`
 is a view: `#viewer` is a `<figure>` positioned absolutely over `#text`'s own
