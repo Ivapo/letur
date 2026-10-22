@@ -413,6 +413,27 @@ impl Session {
         }
     }
 
+    /// List the project again and say so: a file was made under it.
+    ///
+    /// **The create does not wait for the watch, because the watch will not
+    /// come.** The page moves the pane to the new file at once, and
+    /// [`Session::set_edited`]'s [`Session::arm`] sets `self.watch = None`,
+    /// which drops the pending `Change::Tree` with the old watcher. The new one
+    /// classifies the created file as the held path, so it never reports a
+    /// `Tree` change, and neither `Preview::set_edited` nor `Preview::load`
+    /// refreshes the listing. Left alone, the row would never appear. So the
+    /// create rebuilds the tree by hand, exactly as [`Session::save_as`] and
+    /// [`Session::trash`] do.
+    ///
+    /// **It announces**, so the page fetches a status that already lists the
+    /// file before it asks `set_edited` — which then leaves the listing as it
+    /// found it. `crate::main::create_file` calls this after the write returns.
+    /// `mpdf-010` Phase 10.
+    pub fn relist(&self) {
+        self.preview().refresh_tree();
+        (self.on_render)();
+    }
+
     /// Write the pane to a path the author picked, and hold that file after.
     ///
     /// **Three duties the watch will not do for this command**, which is what
@@ -535,10 +556,11 @@ impl Session {
     /// section the master names is already in the asset list the compile builds
     /// — so deleting one answers `Change::Asset`, never `Change::Tree`, and
     /// [`Session::on_change`] refreshes the listing only under `changed.tree`.
-    /// **The asymmetry with the create is real rather than an inconsistency**: a
-    /// *created* file is not in the asset list, so the watch classifies that one
-    /// correctly. This app made the change and knows it; the watch is for
-    /// changes it did not make.
+    /// **The create is refreshed by hand as well since `mpdf-010` Phase 10**,
+    /// through [`Session::relist`], though for a different reason: the watch
+    /// would classify a created file correctly, but the pane moves to it at once
+    /// and [`Session::arm`] drops the watcher before it reports. This app made
+    /// the change and knows it; the watch is for changes it did not make.
     ///
     /// `mpdf-010` Phase 4.
     pub fn trash(
@@ -3417,6 +3439,52 @@ mod tests {
             error.contains("sections/text.md"),
             "the refusal does not name the file: {error:?}"
         );
+    }
+
+    /// `mpdf-010` Phase 10, clause 5. **A create lists its file before the pane
+    /// moves to it, with no watch to wait for**, which is
+    /// `crate::main::create_file`'s sequence followed by the page's.
+    ///
+    /// **Timing-free on purpose**: the listing is read immediately and with no
+    /// [`wait_for`], so without [`Session::relist`] the row is absent at the
+    /// first read whatever FSEvents does. The counter is read between `relist`
+    /// and `set_edited`, because read after it the two announces could not be
+    /// told apart.
+    #[test]
+    fn a_create_lists_its_file_before_the_pane_moves_to_it() {
+        let root = scratch_dir("phase10-relist");
+        std::fs::write(root.join("main.md"), "# Main\n\nThe master.\n").unwrap();
+        let (mut session, compiles) =
+            counted_with(document::store_file(&scratch_dir("phase10-relist-store")));
+        session.open(root.join("main.md")).unwrap();
+        assert_eq!(wait_for(&compiles, 1), 1);
+
+        let listed = |session: &Session| {
+            session
+                .status()
+                .entries
+                .iter()
+                .any(|entry| entry.path == "parts/new.md")
+        };
+
+        document::create_file(&root, "parts/new.md").unwrap();
+        let before = compiles.load(Ordering::SeqCst);
+        session.relist();
+        let announced = compiles.load(Ordering::SeqCst) - before;
+
+        assert!(
+            listed(&session),
+            "the create's file is not listed when the command returns"
+        );
+        assert_eq!(announced, 1, "the relist did not announce exactly once");
+
+        session.set_edited("parts/new.md".to_string()).unwrap();
+        let status = session.status();
+        assert!(
+            listed(&session),
+            "moving the pane to the new file lost its row"
+        );
+        assert_eq!(status.edited.as_deref(), Some("parts/new.md"));
     }
 
     /// The `@property` names of one `@typedef {object} …` block in the page.

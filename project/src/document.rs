@@ -761,11 +761,12 @@ pub fn creatable(path: &str) -> Result<(), String> {
 /// the Save-as shares.
 ///
 /// **Where the file lands and whether it is there already are the store's**,
-/// through [`Files::create`]: the desktop canonicalizes the parent and makes the
-/// file with `create_new`, so *already exists* is the filesystem's own answer
-/// and a dangling symlink at that name is refused rather than written through;
-/// a map answers the same two questions of its keys. The words are
-/// [`crate::files::Refused`]'s either way. `mpdf-010` Phase 3.
+/// through [`Files::create`]: the desktop canonicalizes the nearest ancestor
+/// that exists, makes the folders the path names below it, and makes the file
+/// with `create_new`, so *already exists* is the filesystem's own answer and a
+/// dangling symlink at that name is refused rather than written through; a map
+/// answers the same two questions of its keys and makes no folder. The words
+/// are [`crate::files::Refused`]'s either way. `mpdf-010` Phases 3 and 10.
 pub fn create_file(files: &mut impl Files, path: &str) -> Result<(), String> {
     creatable(path)?;
     files

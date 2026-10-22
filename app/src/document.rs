@@ -15,7 +15,7 @@
 
 use std::collections::HashSet;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub use letur_project::document::{Kind, kind_of, spell};
 #[cfg(test)]
@@ -227,7 +227,7 @@ pub fn relative(root: &Path, path: &Path) -> Option<String> {
 /// it, and `crate::preview::Preview::status` goes on spelling it with [`spell`]
 /// the way the row is spelled.
 ///
-/// **A file being created goes through [`landing`] instead**, and the line
+/// **A file being created goes through [`landing_with_folders`] instead**, and the line
 /// above is why: this refuses every path that is not already a file, which is
 /// the whole input domain of a create. An implementer who reads "the one
 /// confinement rule" and reuses it here would refuse every one.
@@ -267,10 +267,11 @@ pub fn asset_bytes(root: &Path, path: &str) -> Result<Vec<u8>, String> {
 /// `starts_with` textually, `..` and all.
 ///
 /// **So the parent is canonicalized, which does exist, and the final component
-/// is joined onto it.** A parent that will not canonicalize is a refusal too,
-/// which is how `newdir/x.md` is refused with no clause of its own —
-/// `specs/file_panel_spec.md` §1.2 makes folder creation a non-goal and this is
-/// the rule that keeps it one.
+/// is joined onto it.** A parent that will not canonicalize is a refusal too.
+///
+/// **It is the delete's rule now and not the create's**: a create may name
+/// folders that do not exist yet, and [`landing_with_folders`] is the rule it
+/// asks instead. [`trash_at`] goes on asking this one, unchanged.
 ///
 /// It answers with the **join and not the resolution**, for [`confined`]'s own
 /// reason: the write goes through the link the author made, and the sentence a
@@ -283,10 +284,52 @@ fn landing(root: &Path, path: &str) -> Option<PathBuf> {
         .then_some(landed)
 }
 
+/// Where a create would land, when the folders on its path may not exist yet.
+///
+/// **[`landing`]'s test applied to the nearest ancestor that has an entry**,
+/// since nothing below that one exists to be canonicalized. The climb asks
+/// `symlink_metadata` and not `exists`: a dangling link partway down the path
+/// has an entry and does not exist, so `exists` would climb past it and
+/// `create_dir_all` would then fail on it as an unhelpful `Unwritten`. Stopping
+/// at the link instead leaves it to the canonicalize, which refuses it in the
+/// confinement sentence. A link out of the project is refused by the same
+/// comparison, wherever on the path it sits.
+///
+/// **Every component climbed past must be a plain name.** A `..` in the part
+/// still to be made is a climb no resolution can check, so `newdir/../escape.md`
+/// is refused **even though it would land inside the root**. That is
+/// deliberately conservative: an author who wanted `escape.md` types
+/// `escape.md`.
+///
+/// When the parent already exists the climb stops at once and this *is*
+/// [`landing`], which is why Phase 3's refusals hold unchanged. What it does
+/// not refuse is a missing folder, which [`Disk`]'s `create` then makes.
+/// `mpdf-010` Phase 10.
+fn landing_with_folders(root: &Path, path: &str) -> Option<PathBuf> {
+    let landed = root.join(path);
+    let mut ancestor = landed.parent()?;
+    while ancestor.symlink_metadata().is_err() {
+        if !matches!(
+            ancestor.components().next_back(),
+            Some(Component::Normal(_))
+        ) {
+            return None;
+        }
+        ancestor = ancestor.parent()?;
+    }
+
+    ancestor
+        .canonicalize()
+        .ok()?
+        .starts_with(crate::watch::resolve(root))
+        .then_some(landed)
+}
+
 /// Make one empty file under `root`, named by the panel:
 /// `letur_project::document::create_file` over the disk. The kind is refused
-/// there, before anything here is asked; [`Disk`]'s `create` is [`landing`] and
-/// `create_new`. `mpdf-010` Phase 3.
+/// there, before anything here is asked; [`Disk`]'s `create` is
+/// [`landing_with_folders`], `create_dir_all` and `create_new`. `mpdf-010`
+/// Phases 3 and 10.
 pub fn create_file(root: &Path, path: &str) -> Result<(), String> {
     letur_project::document::create_file(&mut Disk::new(root), path)
 }
@@ -316,7 +359,7 @@ pub fn create_file(root: &Path, path: &str) -> Result<(), String> {
 /// **The call is a parameter, and that is deliberately not [`create_file`]'s
 /// answer.** That one writes with a plain `std::fs::File::create_new` because
 /// [`tests::scratch_dir`] can check the result and this file's rule already
-/// canonicalizes a real parent. Neither holds here: this call's whole effect is
+/// canonicalizes the nearest real ancestor. Neither holds here: this call's whole effect is
 /// **outside the repository**, in the developer's own `~/.Trash`, which nothing
 /// cleans and *"the repository stays clean"* has no reach over. So the suite
 /// hands in a double and [`move_to_trash`] is what `crate::main` hands in.
@@ -624,7 +667,7 @@ impl Files for Disk {
         std::fs::write(self.root.join(path), bytes)
     }
 
-    /// [`landing`], then `create_new`.
+    /// [`landing_with_folders`], then the folders it names, then `create_new`.
     ///
     /// **The file is made with `create_new` rather than checked and then
     /// written.** `O_EXCL` makes *already exists* the filesystem's own answer, so
@@ -632,8 +675,19 @@ impl Files for Disk {
     /// that name, which an `exists()` test would have reported absent and then
     /// written straight through, out of the project the parent was canonicalized
     /// to keep it in.
+    ///
+    /// **Two costs of making the folders are accepted.** If `create_new` fails
+    /// after them, they stay: they are empty, the panel derives its folders from
+    /// its files and so draws no row for them, and rolling back would delete
+    /// folders the author may be racing to fill, in an app whose only delete is
+    /// the Trash. And the time between the check and the `mkdir` is a window a
+    /// link could be planted in — the same kind [`landing`] always left before
+    /// `create_new`, in a single-user local app. `mpdf-010` Phase 10.
     fn create(&mut self, path: &str) -> Result<(), Refused> {
-        let landed = landing(&self.root, path).ok_or(Refused::Landing)?;
+        let landed = landing_with_folders(&self.root, path).ok_or(Refused::Landing)?;
+        if let Some(parent) = landed.parent() {
+            std::fs::create_dir_all(parent).map_err(Refused::Unwritten)?;
+        }
         match std::fs::File::create_new(&landed) {
             Ok(_) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Err(Refused::Exists),
@@ -1374,6 +1428,139 @@ mod tests {
                 "{path} was accepted and not made"
             );
         }
+    }
+
+    // -- a create that makes the folders it names --------------------------
+    //
+    // `mpdf-010` Phase 10. Phase 3's five clauses above run unchanged against
+    // [`landing_with_folders`], which is [`landing`] wherever the parent exists.
+    // The writes go to [`scratch_dir`] and the link clause runs over the
+    // committed fixture, for Phase 3's reasons.
+
+    /// Every path under `root`, **directories as well as files**, root-relative.
+    ///
+    /// [`walk`] lists files only, so a folder made with nothing in it — which is
+    /// exactly what a stray `create_dir_all` leaves — is invisible to it.
+    fn everything(root: &Path) -> Vec<String> {
+        fn into(root: &Path, here: &Path, found: &mut Vec<String>) {
+            let Ok(entries) = std::fs::read_dir(here) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                found.push(spell(root, &path).unwrap());
+                if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                    into(root, &path, found);
+                }
+            }
+        }
+        let mut found = Vec::new();
+        into(root, root, &mut found);
+        found.sort_unstable();
+        found
+    }
+
+    /// Clause 1. Phase 3's clause 1 with the folders counted.
+    #[test]
+    fn a_create_makes_the_folders_it_names_and_nothing_else() {
+        let root = scratch_dir("create-folders");
+        // For Phase 3's clause 1's reason: a reused scratch directory would
+        // refuse on *already exists*, which is not this clause.
+        let _ = std::fs::remove_dir_all(root.join("parts"));
+
+        let before = everything(&root);
+        create_file(&root, "parts/ch2/notes.md").unwrap();
+        let after = everything(&root);
+
+        let appeared: Vec<&str> = after
+            .iter()
+            .filter(|path| !before.contains(path))
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            appeared,
+            ["parts", "parts/ch2", "parts/ch2/notes.md"],
+            "the create made something other than its folders and its file"
+        );
+        assert_eq!(
+            after.len(),
+            before.len() + 3,
+            "the tree lost a path the create was not asked to touch"
+        );
+        assert_eq!(
+            std::fs::read(root.join("parts/ch2/notes.md")).unwrap(),
+            Vec::<u8>::new(),
+            "the created file is not empty"
+        );
+    }
+
+    /// Clause 2. **`newdir` absent afterwards is the half that matters**: it
+    /// tells a rule run before `create_dir_all` from one run after it.
+    #[test]
+    fn a_climb_in_a_folder_still_to_be_made_is_refused_before_anything_is_made() {
+        let root = scratch_dir("create-climb");
+        let _ = std::fs::remove_dir_all(root.join("newdir"));
+
+        for path in ["newdir/../escape.md", "newdir/../../escape.md"] {
+            assert_eq!(
+                create_file(&root, path).err().as_deref(),
+                Some(format!("{path} would land outside this project").as_str()),
+                "{path} was not refused as leaving the project"
+            );
+            assert!(
+                root.join("newdir").symlink_metadata().is_err(),
+                "{path} was refused only after newdir was made"
+            );
+        }
+        assert!(!root.join("escape.md").exists());
+        assert!(!root.parent().unwrap().join("escape.md").exists());
+    }
+
+    /// Clause 3. Phase 3's clause 3 one level deeper: the link is no longer
+    /// the parent but an ancestor of a folder still to be made.
+    #[test]
+    fn a_link_out_of_the_project_is_refused_wherever_it_sits_on_the_path() {
+        let root = fixture("panel");
+
+        assert!(
+            root.join("outside").is_dir(),
+            "the link must resolve, or the ancestor never canonicalizes and this proves nothing"
+        );
+        assert_eq!(
+            create_file(&root, "outside/sub/escape.md").err().as_deref(),
+            Some("outside/sub/escape.md would land outside this project")
+        );
+        assert!(
+            !root.join("outside/sub").exists(),
+            "a refused create made a folder in the decoy"
+        );
+    }
+
+    /// Clause 4. **The clause that tells `symlink_metadata` from `exists`**:
+    /// climbing past the link would reach the root, pass, and then fail in
+    /// `create_dir_all` as `Unwritten`.
+    #[test]
+    fn a_dangling_link_on_the_path_is_refused_as_outside() {
+        let root = scratch_dir("create-dangling");
+        let target = root.join("nowhere");
+        let gone = root.join("gone");
+        let _ = std::fs::remove_file(&gone);
+        let _ = std::fs::remove_dir_all(&target);
+        std::os::unix::fs::symlink(&target, &gone).unwrap();
+
+        assert_eq!(
+            create_file(&root, "gone/x.md").err().as_deref(),
+            Some("gone/x.md would land outside this project")
+        );
+        assert!(
+            gone.symlink_metadata()
+                .is_ok_and(|meta| meta.file_type().is_symlink()),
+            "the link is not there afterwards"
+        );
+        assert!(
+            target.symlink_metadata().is_err(),
+            "a refused create made something at the link's target"
+        );
     }
 
     // -- a file moved to the Trash ------------------------------------------

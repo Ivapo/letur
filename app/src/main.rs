@@ -425,10 +425,11 @@ fn asset_bytes(
 /// path the author did not choose in a native dialog, which is the reason that
 /// division matters most here.
 ///
-/// **Nothing is announced.** The file lands under the watched root, so
-/// `crate::watch::classify` answers `Change::Tree` and
-/// `crate::preview::Session::on_change` refreshes the listing without
-/// compiling. Creation and an external `touch` reach the window by one path.
+/// **The listing is refreshed here and not by the watch**, through
+/// `crate::preview::Session::relist`, before the command returns. The page
+/// moves the pane to the new file next, and that re-arm drops the watcher
+/// whose `Change::Tree` would have listed it — so an external `touch` still
+/// arrives by the watch, and a create no longer does. `mpdf-010` Phase 10.
 #[tauri::command]
 fn create_file(session: tauri::State<'_, Mutex<Session>>, path: String) -> Result<(), String> {
     let root = {
@@ -442,7 +443,13 @@ fn create_file(session: tauri::State<'_, Mutex<Session>>, path: String) -> Resul
 
     // The lock is dropped before the write, for [`asset_bytes`]'s reason: a
     // create on a slow volume is unbounded in a way nothing else here is.
-    document::create_file(&root, &path)
+    document::create_file(&root, &path)?;
+
+    session
+        .lock()
+        .expect("the session lock was poisoned")
+        .relist();
+    Ok(())
 }
 
 /// Move one of the project's files to the Trash, named from a row.
