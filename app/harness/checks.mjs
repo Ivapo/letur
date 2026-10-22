@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all twenty-four. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all twenty-five. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -80,7 +80,8 @@ const OWNS = {
   'ink-anchor-is-a-link': 23,
   'ink-captions-anywhere': 24,
   'ink-math-per-line': 25,
-  'web-button-always': 26
+  'web-button-always': 26,
+  'create-stays-put': 27
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -2255,6 +2256,72 @@ const theWebLineAndWhatWrapsInThePane = async (browser, url) => {
   return errors
 }
 
+/* 27. **A create puts what it made in the pane, and `Escape` from the field
+       hands the caret to the text.** `mpdf-010` Phase 10.
+
+       **Read off the invokes and not off the DOM**: the claim is that the page
+       *asked* for the pane to move, so `create_file` must be followed by
+       `set_edited` naming the same path, and the stub's `edited` must hold it
+       after. A page that redrew a row without asking Rust would pass a DOM
+       reading. Neither command needs the row to exist first, so the stub's
+       entries not growing is no gap: Rust's relist is `cargo test`'s clause 5.
+
+       **The `Escape` half has no mutation of its own**, and that is said
+       rather than left to be found: it is one statement, and this reads it
+       directly. `create-stays-put` reaches only the first half, which no other
+       clause submits the field for. */
+const aCreateTakesThePane = async (browser, url) => {
+  const page = await opened(browser, url)
+  const PATH = 'parts/new.md'
+
+  await page.evaluate((path) => {
+    window.__harness.forget()
+    document.getElementById('new-toggle').click()
+    document.getElementById('new-name').value = path
+    document.getElementById('new-file').requestSubmit()
+  }, PATH)
+  await settle(page)
+
+  const sent = await page.evaluate(() =>
+    window.__harness
+      .invokes()
+      .filter((i) => i.name === 'create_file' || i.name === 'set_edited')
+      .map((i) => `${i.name} ${i.args.path}`)
+  )
+  const edited = await page.evaluate(() => window.__harness.status().edited)
+
+  await page.focus('#new-name')
+  await page.keyboard.press('Escape')
+  await settle(page)
+  const after = await page.evaluate(() => ({
+    hidden: document.getElementById('new-file').hidden,
+    focus: document.activeElement?.id ?? null
+  }))
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const at = sent.indexOf(`create_file ${PATH}`)
+  const asked = at >= 0 && sent[at + 1] === `set_edited ${PATH}`
+  const holds = edited === PATH
+  const handed = after.hidden && after.focus === 'text'
+
+  note(`sent ${JSON.stringify(sent)}; edited ${edited}; after Escape the field is ${after.hidden ? 'hidden' : 'shown'}, focus on #${after.focus}`)
+
+  ok(
+    27,
+    'a create puts what it made in the pane, and Escape from the field hands the caret to the text',
+    asked && holds && handed,
+    [
+      asked ? null : `the page sent ${JSON.stringify(sent)}`,
+      holds ? null : `the stub's edited is ${JSON.stringify(edited)}`,
+      handed ? null : `after Escape the field is ${after.hidden ? 'hidden' : 'shown'} and focus is on #${after.focus}`
+    ]
+      .filter(Boolean)
+      .join('; ') || `create_file then set_edited ${PATH}, and Escape left the caret in #text`
+  )
+  return errors
+}
 
 const run = async ({ engine, headed, rev, doc, mutate }) => {
   passed = 0
@@ -2301,7 +2368,8 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       theBracketFamilyReadsFiveWays,
       aGroupACaptionAndAName,
       displayMathIsOneInk,
-      theWebLineAndWhatWrapsInThePane
+      theWebLineAndWhatWrapsInThePane,
+      aCreateTakesThePane
     ]) {
       gather(await check(browser, held.url))
     }
@@ -2316,7 +2384,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    27,
+    28,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +

@@ -516,6 +516,19 @@ const MUTATIONS = {
     const guard = 'fetchButton.hidden = !state.web?.action'
     if (page.split(guard).length !== 2) die('the mutation web-button-always found no single button guard')
     return page.replace(guard, 'fetchButton.hidden = false')
+  },
+
+  /* The create stops where Phase 3 left it: the file is made and the pane
+     stays where it was. **The statement and nothing else is dropped** — the
+     row's own call is `openInPane(entry.path)` and the definition is
+     `async function openInPane(path) {`, so this text occurs once.
+
+     **`Escape`'s hand-off to the text has no mutation**, and `mpdf-010` Phase
+     10 says so: it is one statement, which clause 27 reads directly. */
+  'create-stays-put': (page) => {
+    const statement = '        await openInPane(path)\n'
+    if (page.split(statement).length !== 2) die('the mutation create-stays-put found no single openInPane after a create')
+    return page.replace(statement, '')
   }
 }
 

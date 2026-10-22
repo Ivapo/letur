@@ -5,10 +5,15 @@
    the rule: the file appears and nothing else does, both spellings of *outside*
    are refused by name, a link out of the project is refused, an existing file
    keeps its bytes, and the kinds are the pipeline's own. What only a window can
-   say is that **the row arrives on its own** — nothing tells the panel about
-   the create, the file lands under the watched root and comes back as
-   `watch::Change::Tree` one debounce later — and that **a create compiles
-   nothing**, so the drawn page does not move and is not marked out of date.
+   say is that **the row arrives without the page drawing it**, and that **the
+   drawn page does not move and is not marked out of date**.
+
+   **Re-pointed by `mpdf-010` Phase 10**, because a shipped gate that fails
+   against the shipped app checks nothing. Since that phase the row comes from
+   the create command's own relist rather than from `watch::Change::Tree`, and
+   the pane takes the created file, so clause 2 no longer asserts that `edited`
+   and `revision` stand still: `edited` names the new file, and the page is the
+   same one, since the main still compiles and the new file is named by nothing.
 
    ONE SETUP STEP, in a terminal, before you start:
 
@@ -60,11 +65,10 @@
   const spoken = []
   const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
-  /* The panel is refreshed by the watch and not by the command's return, so the
-     row lands one `app/src/watch.rs:DEBOUNCE` (100 ms) after the write plus
-     whatever the platform took to report it. A second is some tens of times
-     that, and this script is read by a person rather than by a timer. The same
-     wait after an open is the compile's, matching Phase 2's `settled`. */
+  /* The panel is refreshed by the command's relist before it returns, and the
+     pane's move to the new file then loads it, so a second is many times what
+     either takes; this script is read by a person rather than by a timer. The
+     same wait after an open is the compile's, matching Phase 2's `settled`. */
   const settled = () => wait(1000)
 
   let pass = 0
@@ -192,13 +196,13 @@
       await askFor('sections/discussion.md')
       const now = drawn()
 
-      /* Clause 1. **The row arrives on its own and in Rust's order.** Nothing
-         told the panel about the create: the file landed under the watched
-         root, came back as `Change::Tree`, and the panel was rebuilt off the
-         status that followed. `discussion.md` sorts byte-wise before
-         `mark.svg`, so it is the first row under the `sections` heading — which
-         is the order asserted where it can be wrong, rather than the row merely
-         being present somewhere. */
+      /* Clause 1. **The row arrives in Rust's order, and the page did not draw
+         it.** The create command relisted the project and announced, and the
+         panel was rebuilt off the status that followed (`mpdf-010` Phase 10;
+         until then it was the watch's `Change::Tree`). `discussion.md` sorts
+         byte-wise before `mark.svg`, so it is the first row under the
+         `sections` heading — which is the order asserted where it can be wrong,
+         rather than the row merely being present somewhere. */
       const at = now.indexOf('discussion.md@1')
       ok(
         1,
@@ -210,21 +214,23 @@
         `${was.length} rows → ${now.length}; around it: ${now.slice(Math.max(at - 1, 0), at + 2).join(' ')}`
       )
 
-      /* Clause 2. **A create compiles nothing.** `revision` standing still is
-         what "does not compile" means as an assertion; `edited` unmoved is
-         §2's *"Phase 3 creates the file and stops"* — the new file does not go
-         into the pane; and the drawn page is the one that was there, neither
-         redrawn nor marked out of date. */
+      /* Clause 2. **The pane takes the file and the page stays the page.**
+         Re-pointed by `mpdf-010` Phase 10: until then this asserted that
+         `revision` and `edited` stood still, which was Phase 3's *"the created
+         file does not go into the pane"*. Now `edited` names the new file and
+         `Preview::load` compiles, so `revision` moves and is not asserted. What
+         stays is the main, unmoved, and the drawn page — the same count of
+         pages and not marked out of date, since the main still compiles and the
+         new file is named by nothing. */
       const after = await invoke('status')
       ok(
         2,
-        'nothing compiled: the revision, the pane and the drawn page are all where they were',
-        after.revision === before.revision &&
-          after.edited === before.edited &&
+        'the pane holds the new file, the main is unmoved, and the drawn page is the one that was there',
+        after.edited === 'sections/discussion.md' &&
           after.main === before.main &&
           pages.children.length === page.pages &&
           pages.classList.contains('stale') === page.stale,
-        `revision ${after.revision} (was ${before.revision}), edited ${after.edited}, ` +
+        `edited ${after.edited}, main ${after.main} (was ${before.main}), ` +
           `${pages.children.length} pages (was ${page.pages}), ` +
           `stale ${pages.classList.contains('stale')} (was ${page.stale})`
       )

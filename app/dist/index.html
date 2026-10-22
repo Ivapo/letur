@@ -2685,8 +2685,14 @@
       // **Not in the global handler at the figure surface below**, and it does
       // not stop the event: `Escape` goes on meaning *no figure* as well, which
       // is that handler's own promise that nothing else loses the key.
+      //
+      // **The caret goes to the text**, since after a create that is the file
+      // the author is going to write in; left alone, focus lands on nothing
+      // they asked for. `mpdf-010` Phase 10.
       newName.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') nameFile(false)
+        if (e.key !== 'Escape') return
+        nameFile(false)
+        text.focus()
       })
 
       /**
@@ -2701,13 +2707,22 @@
        * draw a `Discard` beside it, which means nothing for a create. The
        * sentence is Rust's — this places it, as every status sentence is placed.
        *
-       * **Nothing here draws the new row.** The file lands under the watched
-       * root, so it arrives as `watch::Change::Tree` one debounce later and the
-       * panel is rebuilt off the status that follows, which is the same path an
-       * external `touch` takes.
+       * **Nothing here draws the new row.** Rust lists the file and announces
+       * before the command returns, and the panel is rebuilt off the status
+       * that follows. It is not left to the watch: the pane moves to the file
+       * next, and that re-arm drops the watcher whose `Change::Tree` would have
+       * listed it.
+       *
+       * **The pane takes what was made**, by `openInPane` — the route a row
+       * click takes. Over unsaved work the create still happens and the switch
+       * is refused in `SWITCHING`'s words, in the divergence bar, the way a row
+       * click over unsaved work is: refusing the create too would lose a file
+       * the author asked for to protect a buffer the create never touches.
+       * `mpdf-010` Phase 10.
        *
        * The field stays open on success and takes focus again: an author adding
-       * sections adds several, and the `+` is what says they are done.
+       * sections adds several, and the `+` is what says they are done. The pane
+       * ends up holding the last one made.
        *
        * @param {SubmitEvent} event
        */
@@ -2735,6 +2750,7 @@
            re-expands; a fold is otherwise the reader's own until they undo it. */
         const segments = path.split('/')
         for (let at = 1; at < segments.length; at++) folds.delete(segments.slice(0, at).join('/'))
+        await openInPane(path)
         newName.value = ''
         newName.focus()
       }
@@ -3518,8 +3534,8 @@
 
         **Nothing here redraws the panel either.** A deleted section is already
         in the asset list, so the watch answers `Change::Asset` and never the
-        listing refresh a create rides on — Rust re-walks and announces, and
-        `refresh` draws what comes back.
+        listing refresh — Rust re-walks and announces, as it does for a create,
+        and `refresh` draws what comes back.
 
         A refusal comes back as a throw and lands in the error bar, exactly as
         `openInPane`'s does. None of the three is reachable from a row: the
