@@ -32,9 +32,9 @@ the files are different. A project lives in the tab, and it is gone when the tab
 **Save** keeps your edits for as long as the tab is open. **Save as…** (⇧⌘S) downloads
 the text. ⇧⌘E downloads the PDF. **Open…** (⌘O) reads one markdown file of your own; your
 images and bibliographies cannot reach it yet. Deleting a file in the panel is permanent,
-whatever the button says. Images named by a URL are not fetched in a browser. The
-compiler is `md2pdf-core` compiled to WebAssembly, and it runs in your browser: no server
-sees your text.
+whatever the button says, and a new file's folder has to exist already. Images named by
+a URL are not fetched in a browser. The compiler is `md2pdf-core` compiled to
+WebAssembly, and it runs in your browser: no server sees your text.
 
 ## Install
 
@@ -200,12 +200,14 @@ own, and pressing it folds just what is under it — the mark beside the name sa
 way it is set, and the panel gives the width it was using back to the pages.
 
 **The `+` beside `Files` makes a new one.** Type the path you want it at, relative to
-the project — `sections/discussion.md` — and the app creates it empty and lists it. It
-takes markdown and bibliographies, `.md`, `.bib`, `.yml` and `.yaml`, and it will not
+the project — `sections/discussion.md` — and the app creates it empty, lists it and
+opens it in the pane. It takes markdown and bibliographies, `.md`, `.bib`, `.yml` and `.yaml`, and it will not
 write outside the project or over a file that is already there; it says so beside the
 field if you ask for either. It does **not** add the include marker to your master:
 where a new section belongs in a document is your decision, so write `[](…)` where you
-want it. Folders are not created — make the folder first, in Finder.
+want it. Folders in the path are made — `appendix/notes/extra.md` makes `appendix` and
+`notes` if they are not there. If the pane holds unsaved work, the file is still made
+and the pane stays where it is until you save or discard.
 
 **Hover any other row and a small basket appears beside it: it moves that file
 to the Trash.** It goes red under the pointer and is quiet the rest of the time.

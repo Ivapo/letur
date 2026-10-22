@@ -15,7 +15,7 @@ covers: >
   folder row's, and the invariant neither breaks, the mark that says which way a disclosure is set and where it is
   drawn, the two opens that empty the folds and the third caller that is why
   they are not emptied lower, the create that expands what it would otherwise
-  land behind, the two rows the delete is not on and the edge two buttons share,
+  land behind and puts what it made in the pane, the two rows the delete is not on and the edge two buttons share,
   the one refusal here that reaches `fail` and the two that keep their own
   surfaces, the two kinds a row's body puts in the pane and the second kind test
   that has to move with the first, the panel's own gesture that is on no row and
@@ -25,7 +25,7 @@ covers: >
   the two elements it draws a figure with and the sentence left where one will
   not parse, the sequence its read carries and the four ways back, and the disk half that is walked twice beside
   the missing half that follows the text
-max_lines: 250
+max_lines: 260
 generated: 2026-09-03
 ---
 
@@ -189,6 +189,12 @@ Rust's words and placed as every status sentence is, reaching neither `fail`,
 which would mark the compiled page stale for a gesture that compiled nothing,
 nor the divergence bar, whose `Discard` names nothing to discard. It is
 `saySoInstead`'s exception, and the one refusal here a reader reaches by typing.
+**A create then puts its file in the pane** through `openInPane`, a row click's
+route, and Rust has already listed it (`Session::relist`). Over unsaved work the
+create stands and the switch is refused in `SWITCHING`'s words in the divergence
+bar, as a row click's is. The field stays open with focus, so the pane holds the
+last file made; `Escape` in it closes it and puts focus in `#text`, without
+stopping the event.
 
 **The figure is a view over the text pane and not a third pane**, the way `Lines`
 is a view: `#viewer` is a `<figure>` positioned absolutely over `#text`'s own

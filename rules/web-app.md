@@ -74,7 +74,8 @@ calls `Preview::open` and `load`. With nothing staged it reopens the open projec
 the desktop's Open of a file in the folder already open does. `set_main` is
 `Preview::ask_main`, then — granted — the same files reopened on that main, which
 resets the counters as the window's `setMain` `clear()` expects. `create_file` refreshes
-the panel itself, where the desktop leaves that to its watch. `trash_file` hands
+the panel itself, as the desktop's now does; only the folder rule differs, the
+desktop making missing folders and `MemFiles::create` refusing them. `trash_file` hands
 `document::remove_file` to `Preview::trash`, and **the removal is permanent**; the
 window still says "Move … to the Trash", which `ltr-001` OQ-7 holds.
 

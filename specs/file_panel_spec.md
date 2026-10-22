@@ -57,7 +57,7 @@ phases:
     by: null
   - name: "Phase 10 — a create makes the folders it names, and the pane takes what it made"
     reviewed: 2026-10-21
-    shipped: null
+    shipped: 2026-10-21
     cut: null
     by: null
 
@@ -176,6 +176,11 @@ worth reading.
 
 - **Not a general file manager.** Four kinds of file are listed and nothing else
   (§2). No rename, no move, no copy, no folder creation. OQ-4 carries rename.
+
+  **CORRECTED 2026-10-21:** Phase 10 reverses *"no folder creation"* for the
+  desktop: a create makes the folders its path names, because a folder exists
+  here to hold a file. A bare folder is still refused, by the kind rule, and the
+  web host still refuses a missing one. Rename, move and copy stay out.
 - **No project file, no manifest.** Nothing is written into the author's folder.
   The one remembered fact lives in the app's own support directory (§2), which is
   what keeps `mpdf-003` §1.1's *manifests* clause true.
@@ -469,6 +474,11 @@ The cost is that adding a section is two actions rather than one. Accepted, and
 OQ-1 carries the shape that would close it: an insert-at-caret gesture that would
 serve images and new sections through one mechanism, which is a better answer
 than a special case for one of them.
+
+**CORRECTED 2026-10-21:** the opening *"Phase 3 creates the file and stops"* is
+half true since Phase 10. **The marker half still holds**: the panel writes no
+include marker, and the cost above is unchanged. **The pane half does not**: the
+pane takes the created file the moment the create succeeds.
 
 **CORRECTED 2026-08-28:** OQ-1 no longer carries that shape. It was built,
 tried at the window and **refused** — a figure wants looking at rather than a
@@ -1127,6 +1137,14 @@ Phase 2 is the larger half and produces the observable for both.*
   `app/src/preview.rs:the_page_typedefs_name_exactly_the_fields_status_serializes`'s
   `declared.len() == 11` does not move — named because Phase 5 named its own
   knock-on and this phase's answer is that there isn't one.
+
+  **CORRECTED 2026-10-21:** Phase 10 reverses both halves of the bullet above.
+  *"The created file does not go into the pane"* is no longer true: the page
+  runs `openInPane` on what it made. And *"creation and an external `touch`
+  reach the window by one path"* is no longer true either: the pane's move
+  re-arms the watch and drops the `Change::Tree` that would have listed the
+  file, so the create command lists it itself through `Session::relist`. An
+  external `touch` still arrives by the watch. `Status` still gains no field.
 
 - **Exit gate:** In the Rust suite, and **each clause says where it runs**,
   because this is the first phase of this spec whose gate writes:

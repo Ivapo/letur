@@ -415,8 +415,10 @@ buffer, no `Status` field. The bytes cross as a `tauri::ipc::Response` for
 blob of them, which wants neither Tauri's asset protocol, nor a scope in
 `app/tauri.conf.json`, nor a capability. **`app/src/document.rs:create_file` is
 the first write to such a path**, `write_override`'s being into Application
-Support: it makes an empty file and stops, `rules/desktop-project.md` has the
-three rules it obeys, and the row arrives by the watch rather than by a return.
+Support: it makes the folders the path names and an empty file, and
+`rules/desktop-project.md` has the rules it obeys. The command then calls
+`Session::relist` before it returns, so the row arrives by the command and not by
+the watch, which the pane's move to the new file would have dropped.
 
 **`app/src/document.rs:Disk::save_as` is the second writer of a path the author
 *did* name in a dialog**, `export` being the first, and **it is the one write in this

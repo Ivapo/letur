@@ -17,12 +17,13 @@ covers: >
   are two functions rather than one, the filter that is each channel's own
   comparison, the total order the panel cannot reorder itself against, the
   confinement the walk and the commands now share, the one a write obeys
-  differently and the third a delete asks, the two further questions a create
-  asks and the empty file it stops at, the row a delete acts on by name and the
+  differently and the third a delete asks, the rule a create lands by and the
+  folders it makes, the two further questions it asks, the empty file it stops
+  at and the listing it refreshes itself, the row a delete acts on by name and the
   panel it refreshes itself, the two
   facts this app remembers about a folder and where it refuses to keep them, and
   the second file beside them for the fact that is about no folder at all
-max_lines: 200
+max_lines: 210
 generated: 2026-09-22
 ---
 
@@ -141,20 +142,33 @@ canonicalizes the **parent**, which does exist, joins the final component onto
 it, and answers with the join for the reason above. `watch::resolve` is no help:
 it answers with its *input* when canonicalization fails, so
 `root.join("../escape.md")` would survive a `starts_with` textually. A parent
-that will not canonicalize is a refusal too, which is how `newdir/x.md` is
-refused with no clause of its own and folder creation stays a non-goal.
-`Disk`'s `create` is one of its two callers — `trash_file` is the
-other — and `project/src/document.rs:create_file` asks two more, the kind first:
+that will not canonicalize is a refusal too; `trash_file` is its caller.
+
+**A create may name folders that do not exist, so it lands by a sibling.**
+`app/src/document.rs:landing_with_folders` climbs to the nearest ancestor that
+has an entry — `symlink_metadata` and not `exists`, so a dangling link on the path
+stops the climb and is refused when it will not canonicalize — and holds that
+ancestor to the root by `landing`'s own test, which refuses a link out of the
+project wherever it sits. Every component climbed past must be
+`Component::Normal`: nothing below the ancestor can be canonicalized, so
+`newdir/../escape.md` is refused even though it would land inside. Where the
+parent exists the climb stops at once and the rule *is* `landing`. `Disk`'s
+`create` then runs `create_dir_all` on the parent, and folders a failed
+`create_new` leaves behind stay: they are empty, so no row draws them. **The web
+host makes no folder** — `MemFiles::create` refuses a missing one — so the two
+hosts differ on purpose. `project/src/document.rs:create_file` asks two more, the kind first:
 `document::kind_of` is the predicate, so the extension decides the kind and
 `.md`, `.bib`, `.yml` and `.yaml` are the panel's own filter minus the images it
 does not make; and `File::create_new` makes *already exists* the filesystem's
 answer rather than a check the write races with, which refuses a **dangling
 symlink** an existence test would have written straight through.
 
-It makes the file empty and stops — where an include marker sits is a
-document-order decision no file list can make — and nothing announces the row:
-it lands under the watched root, arrives as `watch::Change::Tree`, and the panel
-is rebuilt off the status that follows, one path for a create and a `touch`.
+It makes the file empty and writes no include marker — where one sits is a
+document-order decision no file list can make. **The listing is refreshed by
+hand**: the create command calls `app/src/preview.rs:Session::relist`, which
+refreshes the tree and announces, because the page then moves the pane to the
+file and `Session::arm` drops the watcher whose `Change::Tree` would have listed
+it. A `touch` from outside still arrives by the watch.
 
 **A delete asks a third question, neither of the other two serving it.**
 `confined` opens on `is_file`, refusing a `missing: true` row and a dangling
