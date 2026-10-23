@@ -5,7 +5,7 @@ note: >
   A macOS desktop app that shows the PDF while you write: a Tauri window wraps
   the same core crate, watches the document and its images, and re-renders.
 status: accepted
-last_updated: 2026-10-21
+last_updated: 2026-10-23
 
 phases:
   - name: "Phase 1 — the window, and one compile on screen"
@@ -136,6 +136,11 @@ phases:
   - name: "Phase 26 — File makes a new file and a new project"
     reviewed: 2026-10-21
     shipped: 2026-10-21
+    cut: null
+    by: null
+  - name: "Phase 27 — the page is saved from the header, and the timing goes"
+    reviewed: null
+    shipped: null
     cut: null
     by: null
 
@@ -1448,6 +1453,24 @@ list to one item.
   false for a project that does not exist yet. **Not blocking Phase 26**, which
   repeats Open's behaviour on the author's instruction. A later phase answers it for
   every open at once, or not at all.
+
+- **OQ-22** — ~~what does the export's mark say, and does the menu item change with
+  it?~~ **RESOLVED 2026-10-23, by the author: `Export PDF…`, on the item and the mark
+  both.** It landed in Phase 27's scope, its harness clause 4 and its close-out. The
+  question as it was raised:
+
+  Raised 2026-10-23 by Phase 27. *(design call, the author's)*
+
+  The header's marks are named in the menu's own words (Phase 16), so the third one
+  would say `Save a Copy…`. Two buttons apart, that reads close to `Save as…`, and
+  Phase 19's receipt calls a Save-as outside the project a copy as well, so the window
+  would have two things a reader could call "a copy". Two answers: **keep `Save a
+  Copy…`** on both the item and the mark, which follows the rule unchanged; or **rename
+  both to `Export PDF…`**, which names what it writes and makes the two saves
+  impossible to confuse. Renaming one and not the other would break Phase 16's rule
+  that a mark and its item share one name. **Blocking Phase 27's harness clause 4**,
+  which asserts the name. ~~Phase 27 is drafted with `Save a Copy…` and its review
+  round settles the name.~~
 
 ## 4. Implementation phases
 
@@ -8085,6 +8108,191 @@ as it is.
      `create_project`, `answerSave` and `message`, and harness clause 28 with its
      mutation;
   3. the rules, the README, the rig's header, the indexes and the `shipped` date.
+
+### Phase 27 — the page is saved from the header, and the timing goes
+
+*Produces the observable: **no**, and the argument is made here rather than inherited.*
+No Rust compiles differently, so the PDF is byte-identical across the phase. **What it
+buys is reaching the page.** The PDF is what this app exists to produce, and after
+Phase 16 the only way to save it on the desktop is a `File` item with no chord. The
+author had to ask how to do it, and that is the measurement: an app whose output is
+hidden one menu deep has hidden the reason to use it.
+
+Appended 2026-10-23, per §6.1. **Step 0 says decision, on four counts:** the export
+gets a chord, it gets a mark back in the header, it is renamed `Export PDF…` (OQ-22), and
+the compile time stops being drawn.
+**Step 1 does not fire as a removal.** No shipped phase is cut. The phase reverses two
+recorded arguments, Phase 16's (*"a reader who wants it knows to look in `File`"*) and
+Phase 17's (*"an accelerator nobody guesses is not better than the menu item it
+duplicates"*), and part of Phase 3's status line. Each takes a dated `CORRECTED` note at
+close-out rather than an edit, which is the precedent Phases 18 and 19 set. **Step 2
+puts it here**, because this spec owns the header (Phases 11, 16 and 17), the menu
+(Phases 3, 17, 21 and 26) and the status line (Phase 3).
+
+**Asked for at the window**, 2026-10-23: *"draft the phase with both the shortcut and
+the icon, i would say the icon goes in the top right, where we currently show the timing
+i.e. 'current 15ms', this information is not really needed"*.
+
+**Why each reversal is now right:**
+
+- **The chord is no longer one nobody guesses.** `web/host/host.mjs` has bound ⇧⌘E to
+  `export` since `ltr-001`, because a tab has no menu. The two windows are the same
+  page, so the desktop now carrying no chord for it is a difference between them and no
+  longer a choice. ⇧⌘E is free in this app's menu and in macOS's standard items.
+- **The mark is not "the header acts" stretched.** Phase 16's argument was that the
+  export writes a derived artifact, so it is not one of the two actions on the document
+  the author is editing. That still holds, and it is why the mark sits **apart** from
+  `#open` and `#save`, at the far end, rather than as a third button beside them. What
+  Phase 16 did not weigh is that this derived artifact is the product.
+- **The timing is a developer's number.** `current · 15 ms` answers *"how fast was the
+  compile"*, which matters to whoever is tuning the engine and not to someone writing.
+  **The state word goes with it, because the window already shows each state another
+  way**: *stale* dims the page (`#pages.stale`) and puts the error in `#error`, *failed*
+  shows `#error` alone, and *empty* shows the empty message. *current* is the absence of
+  all three. The line said each thing a second time.
+
+- **Scope:**
+
+  **`app/dist/index.html` — the header.** Its children become `#open`, `#save`,
+  `#export`. `#status` leaves the markup, its two CSS rules go, and `report` stops
+  writing it, along with `clear`'s two lines that empty it. **`margin-left: auto` moves
+  to `#export`**, so the mark takes the place the line ends at now. The header's right
+  padding goes from 12 to 8. A 4px-padded button then puts its ink at 12px from the
+  edge, which mirrors the left side and the footer's brand, as the existing padding
+  comment says it should. The comment above `<header>` is rewritten: the header is two
+  actions on the edited document and, apart, the one that saves the page. The rewrite
+  also drops its stale claim that the export keeps `Shift+CmdOrCtrl+S`. That chord has
+  been Save as…'s since Phase 17.
+
+  **The mark is drawn by Phase 16's rule**: 14px, `currentColor`, a 1px stroke, every
+  coordinate on a half pixel, at most two shapes. It must not read as the floppy beside
+  it. A page with a folded corner and an arrow down out of it is the starting point:
+  `M2.5 1.5 H8.5 L11.5 4.5 V12.5 H2.5 Z` with the fold `M8.5 1.5 V4.5 H11.5`, and the
+  arrow `M6.5 5.5 V10.5 M4.5 8.5 L6.5 10.5 L8.5 8.5`. **It is prototyped at the window
+  before review round 0**, which is this repo's order for UI work, and the numbers that
+  survive the prototype replace these ones.
+
+  **The mark carries `title` and `aria-label` both**, saying `Export PDF…`,
+  the menu item's words (OQ-22).
+  Its handler is `exportDocument`, unchanged. That is the function `listen('export',
+  …)` already runs.
+
+  **It dims when the export would be refused, and stays pressable.** `report` sets
+  `aria-disabled="true"` on `#export` whenever `state.state !== 'current'` and removes
+  it otherwise. A CSS rule on `[aria-disabled="true"]` draws it in `--quiet`. **Not the
+  `disabled` attribute**, because a disabled button takes no click, and the click is
+  what gets the reader Rust's sentence. `export_path` already refuses a pane that is not
+  current, and `fail` puts that refusal in `#error`. So the dim says *not now* and the
+  click says why. **This is the one job the status word did that nothing else does**:
+  it said whether the page could be saved, and the mark now says that where the saving
+  is.
+
+  **`app/src/main.rs` — one accelerator and one name.** The item `Save a Copy…` becomes
+  `Export PDF…` and gains `.accelerator("Shift+CmdOrCtrl+E")`. `EXPORT`'s id stays
+  `"export"`, so the event the page listens for does not move. **The rename is OQ-22's
+  answer**: `Save a Copy…` read too close to `Save as…` two marks away, and Phase 19's
+  receipt already calls a Save-as outside the project a copy. `Export PDF…` names what
+  it writes. The comment above it and `menu`'s doc comment
+  (*"the seven accelerators the app has. `Save a Copy…` is the one item with none"*)
+  are rewritten to eight, and the second one keeps Phase 17's history in a sentence:
+  the chord was given up there, and Phase 27 took a different one back.
+
+  **`web/host/host.mjs` — a comment and nothing else.** The binding stays, because a
+  tab still has no menu. The comment *"⇧⌘E is this host's own, and the one chord here
+  the desktop menu does not carry"* is no longer true and is rewritten. The web window
+  gets the mark for free, because it is the same page.
+
+  **`app/harness/`:**
+  - **Clause 4 is replaced, not withdrawn**, so no clause is renumbered. It asserted
+    that the status line places Rust's words, and the line is gone. The new clause 4:
+    *the header's third mark saves the page, says so, and dims when it cannot.* It
+    asserts that the header's children are exactly `open`, `save`, `export`, in that
+    order, and that `#status` does not exist. It asserts both of `#export`'s names are `Export PDF…`, and
+    no text. For each of the four `STATES` the clause already sets, it asserts that
+    `aria-disabled` is `"true"` exactly when the state is not `current`. Last, it clicks
+    the mark in the `current` state and requires `invokes()` to contain `export_path`.
+  - **Mutation `export-deaf`**, owned by clause 4: the mark's `click` listener is
+    dropped. `OWNS` gains `'export-deaf': 4`.
+  - **Mutation `header-wraps` is re-keyed** from the `#status` span to the `#export`
+    button, so it still inserts its wide child before the header's last element. It
+    still belongs to clause 3.
+
+  **`app/driver/drive.mjs`** — `INK_ROWS` drops its `status` field, and the failure
+  message that printed it reads `invoke('status')`'s `state` instead. No driver clause
+  changes its claim.
+
+  **No change to `app/src/preview.rs`.** `Status::time` stays. Nothing draws it after
+  this phase, but `the_page_typedefs_name_exactly_the_fields_status_serializes` holds
+  the typedef and the serialization to each other, and the four state tests read it.
+  Removing a field nothing draws is a code-only change for later (§6.1 step 0), not this
+  phase's decision.
+
+- **Deliberately not in this phase:** a chord or mark for printing; any change to what
+  the export writes or when it refuses (Phase 3); moving the `saved` receipt, which is
+  the footer's (Phase 19); renaming the web host's download prompt (*"Save a copy
+  as"*), which Save-as shares and which names a filename, not the command.
+
+- **Exit gate:**
+
+  1. `bun app/typecheck.mjs` exits 0.
+  2. `cargo build -p letur` compiles the menu. No test is added over `main.rs:menu`,
+     for Phase 21's reason.
+  3. `cargo test --workspace` passes **unchanged**. No Rust test moves, and that is the
+     check that the status *value* survived the line going.
+  4. `bun app/harness/checks.mjs` and `--webkit` each print **twenty-nine clauses,
+     twenty-nine passed**, with clause 4 as above.
+  5. `--falsify` reports **twenty-seven mutations, each isolating the clause it owns**,
+     in both engines.
+  6. `bun app/driver/drive.mjs` and `--falsify` pass.
+  7. `bun web/check.mjs` passes. The web window is the same page, and the check would
+     catch a header that broke the tab.
+  8. **A person's reading at the window**, since neither rig can press a native
+     accelerator or see a native tooltip:
+     - The header's right end shows the mark and no text. Hovering it shows `Export
+       PDF…`, and `File` lists `Export PDF…` with ⇧⌘E beside it.
+     - With a document that compiles, `⇧⌘E` opens the save panel offering
+       `<main>.pdf`, and saving writes a PDF that `cmp` finds identical to the file
+       the menu item writes for the same document.
+     - Clicking the mark does the same.
+     - Break the document (an unclosed fence is enough): the page dims, the mark dims,
+       and clicking it puts the export's refusal in the error bar and opens no panel.
+     - In the web app, `⇧⌘E` and the mark both download the PDF.
+  9. `git status` is clean after clauses 1–7.
+
+- **Close-out:**
+
+  **`CORRECTED 2026-10-23, by Phase 27` notes**, each beside the text it corrects, with
+  the original kept:
+  - Phase 3, beside *"the window then shows what the loop knows: the state, the compile
+    time"*. The state and the time are still computed, and the window shows the state
+    by other means.
+  - Phase 16, beside *"`#export` is neither …"*. The mark is back, apart from the two
+    actions, and the argument for the split still holds.
+  - Phase 17, beside the chord's surrender. The export took ⇧⌘E rather than its old
+    chord.
+
+  **`rules/desktop-panes.md`** — the header's children and the paragraph on
+  `#status`'s auto margin; the mark's dim and why it is not `disabled`; clause and
+  mutation counts. **`rules/desktop.md`** — the menu paragraph: eight accelerators,
+  and the export item is `Export PDF…` with ⇧⌘E. **`rules/web-app.md`** — the *"⇧⌘E is the host's
+  own"* paragraph: the desktop menu now carries the same chord. At drafting they stand
+  at 802/820, 593/600 and 195/220. **`rules/desktop.md` has seven lines of margin**, so
+  its edit is a substitution, or it is trimmed or has its cap raised in the commit, by
+  `mpdf-010` Phase 10's rule.
+
+  **`README.md`** — the paragraph *"The header says where the page stands — `current`
+  with the time the compile took…"* is rewritten. The header's right end saves the
+  page, and the mark dims when the page cannot be saved. *"`File → Save a Copy…` writes
+  the PDF"* becomes `File → Export PDF…` and gains the chord and the mark. The web section's ⇧⌘E stands.
+
+  **`specs/INDEX.md` and `rules/INDEX.md` are regenerated.** **No `CLAUDE.md` change.**
+
+- **Commit plan.** The drafted phase and OQ-22's resolution land first, on their own,
+  ahead of review. Then one push, two commits:
+  1. the header, the mark, `report`'s dim, the accelerator, the host's comment, and
+     harness clause 4 with its two mutations and the driver's field;
+  2. the three `CORRECTED` notes, the rules, the README, the indexes and the `shipped`
+     date.
 
 <!--
 The review record is a sibling file, not a section: it lives at
