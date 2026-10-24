@@ -8168,9 +8168,10 @@ i.e. 'current 15ms', this information is not really needed"*.
   coordinate on a half pixel, at most two shapes. It must not read as the floppy beside
   it. A page with a folded corner and an arrow down out of it is the starting point:
   `M2.5 1.5 H8.5 L11.5 4.5 V12.5 H2.5 Z` with the fold `M8.5 1.5 V4.5 H11.5`, and the
-  arrow `M6.5 5.5 V10.5 M4.5 8.5 L6.5 10.5 L8.5 8.5`. **It is prototyped at the window
-  before review round 0**, which is this repo's order for UI work, and the numbers that
-  survive the prototype replace these ones.
+  arrow `M6.5 5.5 V10.5 M4.5 8.5 L6.5 10.5 L8.5 8.5`. **It was prototyped at the window
+  before review round 0**, which is this repo's order for UI work, on the throwaway
+  branch `proto/phase-27`, in the desktop window and the web tab. The author read it on
+  2026-10-23 and these numbers stood unchanged.
 
   **The mark carries `title` and `aria-label` both**, saying `Export PDF…`,
   the menu item's words (OQ-22).
@@ -8179,13 +8180,24 @@ i.e. 'current 15ms', this information is not really needed"*.
 
   **It dims when the export would be refused, and stays pressable.** `report` sets
   `aria-disabled="true"` on `#export` whenever `state.state !== 'current'` and removes
-  it otherwise. A CSS rule on `[aria-disabled="true"]` draws it in `--quiet`. **Not the
-  `disabled` attribute**, because a disabled button takes no click, and the click is
-  what gets the reader Rust's sentence. `export_path` already refuses a pane that is not
-  current, and `fail` puts that refusal in `#error`. So the dim says *not now* and the
-  click says why. **This is the one job the status word did that nothing else does**:
-  it said whether the page could be saved, and the mark now says that where the saving
-  is.
+  it otherwise. A CSS rule on `[aria-disabled="true"]` draws it at `opacity: 0.4`, as
+  read at the window. `--quiet` would not dim it, since every header mark is already
+  drawn in `--quiet`. **Not the `disabled` attribute**, because a disabled button takes
+  no click, and with nothing in the bar the click is what gets the reader Rust's
+  sentence. `export_path` already refuses a pane that is not current, and `fail` puts
+  that refusal in `#error`. So the dim says *not now* and the click says why. **This is
+  the one job the status word did that nothing else does**: it said whether the page
+  could be saved, and the mark now says that where the saving is.
+
+  **An export over a compile error does nothing, and leaves the error standing.**
+  `exportDocument` returns before it asks Rust when `#error` is shown and `refusing` is
+  false, which is exactly when the bar holds a compile error and not a refusal. Without
+  this, the refusal replaces the error: *"unknown key 'colour'"*, with its line, gives
+  way to `project/src/preview.rs:exportable`'s *"the last compile failed, so the page is
+  out of date"*, and the reader loses the sentence that says what to fix. **Found at
+  the prototype**, 2026-10-23. It sits in `exportDocument` and not in the mark's click,
+  so the mark, ⇧⌘E and the menu item all behave the same. A refusal with an empty bar
+  (no document open) still reaches the bar as before.
 
   **`app/src/main.rs` — one accelerator and one name.** The item `Save a Copy…` becomes
   `Export PDF…` and gains `.accelerator("Shift+CmdOrCtrl+E")`. `EXPORT`'s id stays
@@ -8211,8 +8223,14 @@ i.e. 'current 15ms', this information is not really needed"*.
     no text. For each of the four `STATES` the clause already sets, it asserts that
     `aria-disabled` is `"true"` exactly when the state is not `current`. Last, it clicks
     the mark in the `current` state and requires `invokes()` to contain `export_path`.
+    **The error half**: in the `stale` state, with the harness's sentence in `#error`,
+    it clicks the mark and fires `export`. It requires no `export_path` in `invokes()`
+    after either, and `#error`'s text still the harness's sentence.
   - **Mutation `export-deaf`**, owned by clause 4: the mark's `click` listener is
     dropped. `OWNS` gains `'export-deaf': 4`.
+  - **Mutation `export-overwrites`**, owned by clause 4: `exportDocument`'s early return
+    is dropped, so the refusal replaces the compile error. `OWNS` gains
+    `'export-overwrites': 4`.
   - **Mutation `header-wraps` is re-keyed** from the `#status` span to the `#export`
     button, so it still inserts its wide child before the header's last element. It
     still belongs to clause 3.
@@ -8241,7 +8259,7 @@ i.e. 'current 15ms', this information is not really needed"*.
      check that the status *value* survived the line going.
   4. `bun app/harness/checks.mjs` and `--webkit` each print **twenty-nine clauses,
      twenty-nine passed**, with clause 4 as above.
-  5. `--falsify` reports **twenty-seven mutations, each isolating the clause it owns**,
+  5. `--falsify` reports **twenty-eight mutations, each isolating the clause it owns**,
      in both engines.
   6. `bun app/driver/drive.mjs` and `--falsify` pass.
   7. `bun web/check.mjs` passes. The web window is the same page, and the check would
@@ -8254,8 +8272,13 @@ i.e. 'current 15ms', this information is not really needed"*.
        `<main>.pdf`, and saving writes a PDF that `cmp` finds identical to the file
        the menu item writes for the same document.
      - Clicking the mark does the same.
-     - Break the document (an unclosed fence is enough): the page dims, the mark dims,
-       and clicking it puts the export's refusal in the error bar and opens no panel.
+     - Break the document with an unknown front-matter key (`colour: red`). An
+       unclosed fence does not break it: CommonMark runs the block to the end of the
+       file. The page dims, the mark dims, and the error bar names the key and its
+       line. Clicking the mark and pressing `⇧⌘E` open no panel and leave that
+       sentence as it was.
+     - With no document open, clicking the mark puts *"no document is open"* in the
+       bar.
      - In the web app, `⇧⌘E` and the mark both download the PDF.
   9. `git status` is clean after clauses 1–7.
 
@@ -8290,7 +8313,7 @@ i.e. 'current 15ms', this information is not really needed"*.
 - **Commit plan.** The drafted phase and OQ-22's resolution land first, on their own,
   ahead of review. Then one push, two commits:
   1. the header, the mark, `report`'s dim, the accelerator, the host's comment, and
-     harness clause 4 with its two mutations and the driver's field;
+     harness clause 4 with its mutations and the driver's field;
   2. the three `CORRECTED` notes, the rules, the README, the indexes and the `shipped`
      date.
 
