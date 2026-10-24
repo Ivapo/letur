@@ -139,7 +139,7 @@ phases:
     cut: null
     by: null
   - name: "Phase 27 — the page is saved from the header, and the timing goes"
-    reviewed: null
+    reviewed: 2026-10-23
     shipped: null
     cut: null
     by: null
@@ -8160,20 +8160,24 @@ i.e. 'current 15ms', this information is not really needed"*.
 
   **`app/dist/index.html` — the header.** Its children become `#open`, `#save`,
   `#export`. `#status` leaves the markup, its two CSS rules go, and `report` stops
-  writing it, along with `clear`'s two lines that empty it. **`margin-left: auto` moves
-  to `#export`**, so the mark takes the place the line ends at now. The header's right
-  padding goes from 12 to 8. A 4px-padded button then puts its ink at 12px from the
-  edge, which mirrors the left side and the footer's brand, as the existing padding
+  writing it. **`clear`'s two lines that empty it become one that dims the mark**,
+  `aria-disabled="true"`, and the markup carries `aria-disabled="true"` from the start:
+  a window holding no document has nothing to export, and the mark must not keep a
+  stale *current* through a refused open until the next `report`. **`margin-left: auto`
+  moves to `#export`**, so the mark takes the place the line ends at now. The header's
+  right padding goes from 12 to 8. A 4px-padded button then puts its svg box, not its
+  ink, at 12px from the edge (the outline ends at x=11.5 of 14), which mirrors the left side and the footer's brand, as the existing padding
   comment says it should. The comment above `<header>` is rewritten: the header is two
   actions on the edited document and, apart, the one that saves the page. The rewrite
   also drops its stale claim that the export keeps `Shift+CmdOrCtrl+S`. That chord has
   been Save as…'s since Phase 17.
 
   **The mark is drawn by Phase 16's rule**: 14px, `currentColor`, a 1px stroke, every
-  coordinate on a half pixel, at most two shapes. It must not read as the floppy beside
-  it. A page with a folded corner and an arrow down out of it is the starting point:
-  `M2.5 1.5 H8.5 L11.5 4.5 V12.5 H2.5 Z` with the fold `M8.5 1.5 V4.5 H11.5`, and the
-  arrow `M6.5 5.5 V10.5 M4.5 8.5 L6.5 10.5 L8.5 8.5`. **It was prototyped at the window
+  coordinate on a half pixel, and two `<path>` elements, the floppy's count (Phase 16
+  states it for the floppy; this mark follows it). It must not read as the floppy beside
+  it. A page with a folded corner and an arrow down out of it: the page and its fold
+  share **one** path, `M2.5 1.5 H8.5 L11.5 4.5 V12.5 H2.5 Z M8.5 1.5 V4.5 H11.5`, and
+  the arrow is the second, `M6.5 5.5 V10.5 M4.5 8.5 L6.5 10.5 L8.5 8.5`. **It was prototyped at the window
   before review round 0**, which is this repo's order for UI work, on the throwaway
   branch `proto/phase-27`, in the desktop window and the web tab. The author read it on
   2026-10-23 and these numbers stood unchanged.
@@ -8212,7 +8216,11 @@ i.e. 'current 15ms', this information is not really needed"*.
   it writes. The comment above it and `menu`'s doc comment
   (*"the seven accelerators the app has. `Save a Copy…` is the one item with none"*)
   are rewritten to eight, and the second one keeps Phase 17's history in a sentence:
-  the chord was given up there, and Phase 27 took a different one back.
+  the chord was given up there, and Phase 27 took a different one back. **The other
+  comments that name the old item are reworded in the same pass**, since a rename that
+  leaves its old name in the docs is half done: in `app/src/main.rs`, the `EXPORT` and
+  `SAVE_AS` doc comments and `export_path`'s; `app/src/preview.rs:OnDisk::export_file`'s
+  and `project/src/preview.rs:export_path`'s. Comments only, and no gate reads them.
 
   **`web/host/host.mjs` — a comment and nothing else.** The binding stays, because a
   tab still has no menu. The comment *"⇧⌘E is this host's own, and the one chord here
@@ -8223,30 +8231,44 @@ i.e. 'current 15ms', this information is not really needed"*.
   - **Clause 4 is replaced, not withdrawn**, so no clause is renumbered. It asserted
     that the status line places Rust's words, and the line is gone. The new clause 4:
     *the header's third mark saves the page, says so, and dims when it cannot.* It
-    asserts that the header's children are exactly `open`, `save`, `export`, in that
-    order, and that `#status` does not exist. It asserts both of `#export`'s names are `Export PDF…`, and
+    asserts that the header's **`button`** children are exactly `open`, `save`,
+    `export`, in that order, that `#export` is the header's last element child, and
+    that `#status` does not exist. **Buttons and the last child, not every child**,
+    because `header-wraps` inserts a `<span id="wide">` into the header, and an
+    exact-children assertion would fail under it and stop that mutation isolating
+    clause 3 (round 1). It asserts both of `#export`'s names are `Export PDF…`, and
     no text. For each of the four `STATES` the clause already sets, it asserts that
     `aria-disabled` is `"true"` exactly when the state is not `current`. Last, it clicks
-    the mark in the `current` state and requires `invokes()` to contain `export_path`.
+    the mark, **through the DOM's `.click()` inside `page.evaluate`**, `pressLines`'
+    idiom, and not Playwright's `page.click`, whose hit test fails under `header-wraps`
+    once the mark wraps beneath `main` (round 2), in the `current` state and requires `invokes()` to contain `export_path`.
     **The error half**: in the `stale` state, with the harness's sentence in `#error`,
     it clicks the mark and fires `export`. It requires no `export_path` in `invokes()`
     after either, and `#error`'s text still the harness's sentence.
   - **Mutation `export-deaf`**, owned by clause 4: the mark's `click` listener is
     dropped. `OWNS` gains `'export-deaf': 4`.
   - **Mutation `export-overwrites`**, owned by clause 4: `exportDocument`'s early return
-    is dropped, so the refusal replaces the compile error. `OWNS` gains
-    `'export-overwrites': 4`.
+    is dropped. `OWNS` gains `'export-overwrites': 4`. **It is caught by the
+    `invokes()` half, not the `#error` half**: the stub answers `export_path` without
+    refusing, so in the rig the dropped guard reaches Rust but no refusal replaces the
+    sentence. The `#error` half is a check no mutation falsifies, recorded as one; the
+    window reading in gate clause 8 is what sees the replacement itself.
   - **Mutation `header-wraps` is re-keyed** from the `#status` span to the `#export`
     button, so it still inserts its wide child before the header's last element. It
     still belongs to clause 3.
+  - `checks.mjs`'s header comment, *"`--falsify` runs all twenty-six"*, becomes
+    twenty-eight.
 
   **`app/driver/drive.mjs`** — `INK_ROWS` drops its `status` field, and the failure
-  message that printed it reads `invoke('status')`'s `state` instead. No driver clause
-  changes its claim.
+  message that printed it drops that clause. `INK_ROWS` runs through `held.sync`, and
+  reading `invoke('status')` would need an async script in `ASK_WEB`'s shape for one
+  diagnostic, which buys nothing. No driver clause changes its claim.
 
-  **No change to `app/src/preview.rs`.** `Status::time` stays. Nothing draws it after
+  **No change to `project/src/preview.rs:Status` or to `app/src/preview.rs`'s tests.**
+  `Status::time`, defined in the first, stays. Nothing draws it after
   this phase, but `the_page_typedefs_name_exactly_the_fields_status_serializes` holds
-  the typedef and the serialization to each other, and the four state tests read it.
+  the typedef and the serialization to each other from `app/src/preview.rs`, and the
+  four state tests read it.
   Removing a field nothing draws is a code-only change for later (§6.1 step 0), not this
   phase's decision.
 
@@ -8302,7 +8324,8 @@ i.e. 'current 15ms', this information is not really needed"*.
   **`rules/desktop-panes.md`** — the header's children and the paragraph on
   `#status`'s auto margin; the mark's dim and why it is not `disabled`; clause and
   mutation counts. **`rules/desktop.md`** — the menu paragraph: eight accelerators,
-  and the export item is `Export PDF…` with ⇧⌘E. **`rules/web-app.md`** — the *"⇧⌘E is the host's
+  and the export item is `Export PDF…` with ⇧⌘E; and *"the two halves of Save a
+  Copy"* becomes *"of Export PDF"*. **`rules/web-app.md`** — the *"⇧⌘E is the host's
   own"* paragraph: the desktop menu now carries the same chord. At drafting they stand
   at 802/820, 593/600 and 195/220. **`rules/desktop.md` has seven lines of margin**, so
   its edit is a substitution, or it is trimmed or has its cap raised in the commit, by

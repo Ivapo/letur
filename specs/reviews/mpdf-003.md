@@ -2,6 +2,53 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 45 — Phase 27 only — 2026-10-23 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. The blocker was verified resolved against the working-tree file and
+`app/harness/serve.mjs:'header-wraps'`. Under that mutation, the header's `button`
+children are still `open`, `save`, `export`, `#export` is still the last element child,
+and `#status` is still absent, so clause 4 holds and the mutation fails clause 3 alone.
+`export-deaf` and `export-overwrites` each fail clause 4 alone, and no existing mutation
+reaches it. Re-measured: 29 clauses, 28 mutations, 8 accelerators, and rule bodies at
+802/820, 593/600 and 195/220.
+
+One non-blocking finding, folded in:
+- **Clause 4's click must go through the DOM.** Under `header-wraps` the mark wraps
+  beneath `main`, so a Playwright `page.click` fails its hit test and breaks the
+  isolation. The clause now names `.click()` inside `page.evaluate`, `pressLines`'
+  idiom.
+
+### Round 44 — Phase 27 only — 2026-10-23 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0**, answered by the author: Phase 27 produces no new observable, and says so.
+What it buys is reaching the page, which the app exists to produce and which sat one
+menu deep with no chord. That is the right thing to build, and the author read it at a
+prototype (`proto/phase-27`) before this round.
+
+One blocker:
+- **Clause 4's exact-children assertion also failed under `header-wraps`**, whose
+  inserted `<span id="wide">` is a header child, so that mutation would stop isolating
+  clause 3 and gate 5 could not pass. Resolved: clause 4 asserts the `button` children,
+  that `#export` is last, and that `#status` is absent.
+
+Seven non-blocking findings, all accepted and folded in:
+- `export-overwrites` is caught by the `invokes()` half, since the stub never refuses
+  `export_path`. The `#error` half is recorded as falsified by no mutation.
+- `clear()` and the initial markup set `aria-disabled="true"`, as the prototype did.
+- The mark is two `<path>` elements: page and fold share one, the arrow is the other.
+- The driver drops `INK_ROWS`'s `status` field instead of an async read.
+- `Status::time` is placed in `project/src/preview.rs`, the typedef test in
+  `app/src/preview.rs`.
+- The other comments naming `Save a Copy` (`main.rs`, both `preview.rs` files,
+  `checks.mjs`'s header count, `rules/desktop.md`) are in scope.
+- The padding sentence says the svg box, not the ink, sits at 12px.
+
+Verified as cited: the header markup, CSS and padding; `report`, `clear`,
+`exportDocument`, `fail` and `refusing`, whose three writers make the early return's
+condition exact; `main.rs:menu`, `EXPORT` and the seven accelerators;
+`project/src/preview.rs:exportable`'s two sentences; the web host's comment; and the
+three `CORRECTED` anchors.
+
 ### Round 43 — Phase 26 only — 2026-10-21 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking. Both blockers were verified resolved against the working-tree file and
