@@ -186,8 +186,10 @@ const MUTATIONS = {
      container with an explicit `height` does not grow when its line wraps, its
      content overflows instead. That is exactly what the height half of clause 3
      cannot see and the second half is there for — measured in the shipping
-     WKWebView, `#status` 34px below the bar's own bottom edge and the wide child
-     14px, where the unmutated header has no child outside it at all.
+     WKWebView, the header's last child 34px below the bar's own bottom edge and
+     the wide child 14px, where the unmutated header has no child outside it at
+     all. The wide child goes in before `#export`, the last child since
+     `mpdf-003` Phase 27, as it went in before `#status` until then.
 
      Two edits, because either alone is inert: the wrap without a wide child has
      nothing to wrap, and the wide child without the wrap makes one long line. */
@@ -197,11 +199,31 @@ const MUTATIONS = {
     const wrapped = rule[0].replace(/^( *)display: flex;\n/m, '$1display: flex;\n$1flex-wrap: wrap;\n')
     if (wrapped === rule[0]) die('the mutation header-wraps found no display: flex to wrap')
 
-    const status = '      <span id="status"></span>\n'
-    if (page.split(status).length !== 2) die('the mutation header-wraps found no single #status')
+    const last = '      <button id="export" '
+    if (page.split(last).length !== 2) die('the mutation header-wraps found no single #export')
     return page
       .replace(rule[0], wrapped)
-      .replace(status, '      <span id="wide" style="flex: none; width: 900px; height: 14px"></span>\n' + status)
+      .replace(last, '      <span id="wide" style="flex: none; width: 900px; height: 14px"></span>\n' + last)
+  },
+
+  /* The header's third mark, heard by nothing. It is still drawn, still named
+     and still dims; `⇧⌘E` and the menu item still export. Only the click is
+     gone, which is what clause 4 drives. `mpdf-003` Phase 27. */
+  'export-deaf': (page) => {
+    const line = "      exportButton.addEventListener('click', exportDocument)\n"
+    if (page.split(line).length !== 2) die('the mutation export-deaf found no single export click listener')
+    return page.replace(line, '')
+  },
+
+  /* An export over a compile error asks Rust anyway. **The guard line and
+     nothing else**: the comment that argues for it stays, for `divider-selects`'
+     reason. In this rig `export_path` answers rather than refusing, so what
+     falsifies is the command reaching the boundary, not the sentence being
+     replaced — that half is the window's to see. `mpdf-003` Phase 27. */
+  'export-overwrites': (page) => {
+    const line = '        if (!error.hidden && !refusing) return\n'
+    if (page.split(line).length !== 2) die('the mutation export-overwrites found no single export guard')
+    return page.replace(line, '')
   },
 
   /* The header's second mark says one thing to a sighted reader and another to

@@ -265,10 +265,10 @@ async function save({ defaultPath } = {}) {
   browser's address bar, so `view-lines` is not bound; its button is in the
   footer.
 
-  **⇧⌘E is this host's own**, and the one chord here the desktop menu does not
-  carry. Export is a menu item on the desktop with no accelerator and no button
-  in the window, and a tab has no menu — so without a chord a reader could not
-  export at all. `ltr-001` §2's table, corrected.
+  **⇧⌘E is the export**, as it is in the desktop menu since `mpdf-003` Phase 27,
+  which took this host's chord rather than choosing its own. The binding stays
+  because a tab has no menu; the header's mark is the same page's in both
+  windows. `ltr-001` §2's table, corrected.
 */
 const MAC = /Mac|iPhone|iPad/.test(navigator.platform)
 

@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all twenty-six. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all twenty-eight. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -60,6 +60,8 @@ const OWNS = {
   'footer-last': 1,
   'flex-min': 3,
   'header-wraps': 3,
+  'export-deaf': 4,
+  'export-overwrites': 4,
   'cell-main': 5,
   'theme-dark-attr': 7,
   'theme-click-direct': 8,
@@ -324,66 +326,107 @@ const sweep = async (browser, url) => {
   return errors
 }
 
-/* 4. **What "places and never composes" is assertable as.** The sentence is
-      worded in `app/src/preview.rs` out of `state` and `time`; the page places
-      it. So: take those two values out of what the line holds, and what is left
-      must carry no word of its own — a separator and nothing else. And the line
-      must not move when the values the page *could* fold into it do. */
-const statusPlaces = async (browser, url) => {
+/* 4. **The header's third mark saves the page, says so, and dims when it
+      cannot.** It replaced the status line in `mpdf-003` Phase 27, and the clause
+      replaced the one that asserted the line placed Rust's words, so no clause
+      was renumbered.
+
+      **The header's buttons and its last child, not every child**: `header-wraps`
+      puts a `<span id="wide">` into the header, and an exact-children assertion
+      would fail under it and stop that mutation isolating clause 3. **The click
+      goes through the DOM's `.click()`**, `pressLines`' idiom, because
+      Playwright's hit test fails under the same mutation once the mark wraps
+      beneath `main`.
+
+      **The error half has a check no mutation falsifies**, and it is recorded as
+      one: the stub answers `export_path` rather than refusing, so a dropped guard
+      reaches the boundary — which `export-overwrites` is caught by — but no
+      refusal replaces the sentence. The window reading in the phase's gate is
+      what sees the replacement itself. */
+const exportMark = async (browser, url) => {
   const page = await opened(browser, url)
 
+  const SENTENCE = 'the harness put a sentence here'
   const STATES = [
     { state: 'empty', time: null, error: null, page: false },
     { state: 'current', time: '31 ms', error: null, page: true },
-    { state: 'stale', time: '12 ms', error: 'the harness put a sentence here', page: true },
-    { state: 'failed', time: null, error: 'the harness put a sentence here', page: false }
+    { state: 'stale', time: '12 ms', error: SENTENCE, page: true },
+    { state: 'failed', time: null, error: SENTENCE, page: false }
   ]
 
-  const read = []
+  const shape = await page.evaluate(() => {
+    const header = document.querySelector('header')
+    const mark = document.getElementById('export')
+    return {
+      buttons: [...header.children].filter((e) => e.tagName === 'BUTTON').map((e) => e.id),
+      last: header.lastElementChild === mark,
+      status: document.getElementById('status') !== null,
+      title: mark?.getAttribute('title') ?? null,
+      label: mark?.getAttribute('aria-label') ?? null,
+      text: (mark?.textContent ?? '').trim()
+    }
+  })
+
+  const dims = []
   for (const patch of STATES) {
-    read.push(
+    dims.push(
       await page.evaluate(async (patch) => {
         window.__harness.set(patch)
         window.__harness.fire('rendered')
         await new Promise((r) => setTimeout(r, 150))
-        const status = document.getElementById('status')
-        return { asked: patch, text: status.textContent, className: status.className }
+        return { state: patch.state, dim: document.getElementById('export').getAttribute('aria-disabled') }
       }, patch)
     )
   }
+  const misdimmed = dims.filter((d) => (d.dim === 'true') !== (d.state !== 'current'))
+  for (const d of dims) note(`${d.state}: aria-disabled ${JSON.stringify(d.dim)}`)
 
-  /* The invariance half: the same two values, everything else moved. A page that
-     folded a file name or a row count into the line would move here. */
-  const before = read[1].text
-  const after = await page.evaluate(async () => {
-    window.__harness.set({
-      state: 'current',
-      time: '31 ms',
-      edited: 'somewhere/else-entirely.md',
-      main: 'another.md',
-      entries: [{ path: 'another.md', kind: 'markdown', missing: false }]
-    })
+  /* Pressed where the page can be saved: the press must reach the boundary. */
+  const pressed = await page.evaluate(async (patch) => {
+    window.__harness.set(patch)
     window.__harness.fire('rendered')
     await new Promise((r) => setTimeout(r, 150))
-    return document.getElementById('status').textContent
-  })
+    window.__harness.forget()
+    document.getElementById('export').click()
+    await new Promise((r) => setTimeout(r, 150))
+    return window.__harness.invokes().map((i) => i.name)
+  }, STATES[1])
+
+  /* Pressed, and then the menu's event, over a compile error: neither reaches
+     the boundary, and the sentence that says what to fix stands. */
+  const over = await page.evaluate(async (patch) => {
+    window.__harness.set(patch)
+    window.__harness.fire('rendered')
+    await new Promise((r) => setTimeout(r, 150))
+    window.__harness.forget()
+    document.getElementById('export').click()
+    await new Promise((r) => setTimeout(r, 150))
+    window.__harness.fire('export')
+    await new Promise((r) => setTimeout(r, 150))
+    return {
+      sent: window.__harness.invokes().map((i) => i.name),
+      error: document.getElementById('error').textContent
+    }
+  }, STATES[2])
 
   const errors = await drainErrors(page)
   await page.close()
 
-  const composed = read.filter((r) => {
-    const left = r.text.replace(r.asked.state, '').replace(r.asked.time ?? ' ', '')
-    return /[\p{L}\p{N}]/u.test(left) || !r.text.startsWith(r.asked.state) || r.className !== r.asked.state
-  })
-  for (const r of read) note(`${r.asked.state}: ${JSON.stringify(r.text)} class ${JSON.stringify(r.className)}`)
+  const shaped =
+    shape.buttons.join(', ') === 'open, save, export' && shape.last && !shape.status &&
+    shape.title === 'Export PDF…' && shape.label === 'Export PDF…' && shape.text === ''
+  const reached = pressed.includes('export_path')
+  const held = !over.sent.includes('export_path') && over.error === SENTENCE
 
   ok(
     4,
-    'the status line carries no value the page chose, in any of the four states',
-    composed.length === 0 && after === before,
-    composed.length
-      ? `composed: ${composed.map((r) => JSON.stringify(r.text)).join(', ')}`
-      : `and did not move when edited, main and entries did: ${JSON.stringify(before)}`
+    "the header's third mark saves the page, says so, and dims when it cannot",
+    shaped && misdimmed.length === 0 && reached && held,
+    `buttons ${shape.buttons.join(', ')}, export last: ${shape.last}, #status gone: ${!shape.status}, ` +
+      `named ${JSON.stringify(shape.title)} / ${JSON.stringify(shape.label)} with text ${JSON.stringify(shape.text)}; ` +
+      `misdimmed in: [${misdimmed.map((d) => d.state).join(', ')}]; ` +
+      `a press when current sent export_path: ${reached}; ` +
+      `over a compile error sent [${over.sent.join(', ')}] and left ${JSON.stringify(over.error)}`
   )
   return errors
 }
@@ -2477,7 +2520,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
     for (const check of [
       elementOrder,
       sweep,
-      statusPlaces,
+      exportMark,
       cellFollowsThePane,
       panelDrawsTheEntries,
       paletteTurnsBothWays,

@@ -34,7 +34,7 @@ pub trait OnDisk {
     fn root(&self) -> Option<&Path>;
     /// The file the pane is showing, if one is open.
     fn document(&self) -> Option<PathBuf>;
-    /// Where a Save-a-copy dialog opens, or why it does not open at all: the
+    /// Where an Export PDF dialog opens, or why it does not open at all: the
     /// crate's `export_path`, joined onto the root.
     fn export_file(&self) -> Result<PathBuf, String>;
     /// Write the page's own bytes where the user asked.

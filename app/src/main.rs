@@ -44,9 +44,12 @@ const NEW_FILE: &str = "new-file";
 /// [`create_project`] and opens what it answers. `mpdf-003` Phase 26.
 const NEW_PROJECT: &str = "new-project";
 
-/// The id of the Save-a-copy menu item, and the event it sends the page.
+/// The id of the Export PDF menu item, and the event it sends the page.
 ///
 /// It follows [`OPEN`] exactly: the item emits, and the page owns the dialog.
+/// The header's third mark and `Shift+CmdOrCtrl+E` send the page the same
+/// way in. **The id stayed `export` through the rename**, so the event the page
+/// listens for did not move. `mpdf-003` Phase 27.
 const EXPORT: &str = "export";
 
 /// The id of the Save menu item, and the event it sends the page.
@@ -62,8 +65,8 @@ const SAVE: &str = "save";
 ///
 /// It follows [`OPEN`] and [`EXPORT`]: the item emits, the page owns the
 /// dialog. **This one has the button beside it**, and it takes
-/// `Shift+CmdOrCtrl+S` — which [`EXPORT`] gave up rather than moving to a
-/// second, more obscure chord. `mpdf-003` Phase 17.
+/// `Shift+CmdOrCtrl+S`, which [`EXPORT`] gave up in `mpdf-003` Phase 17. The
+/// export took `Shift+CmdOrCtrl+E` in Phase 27 instead of taking this back.
 const SAVE_AS: &str = "save-as";
 
 /// The id of the `View` menu's `Files` item, and the event it sends the page.
@@ -736,7 +739,7 @@ fn theme(appearance: Appearance) -> Option<tauri::Theme> {
     }
 }
 
-/// Where the Save-a-copy dialog should open, or why it should not open.
+/// Where the Export PDF dialog should open, or why it should not open.
 ///
 /// The page asks this before it asks the user, so an export the pane cannot
 /// serve is refused without a dialog the answer would throw away.
@@ -766,9 +769,9 @@ fn export(session: tauri::State<'_, Mutex<Session>>, path: String) -> Result<(),
 /// The window's menu.
 ///
 /// macOS draws no menu of its own, so every item the keyboard needs is named
-/// here — `Cmd-N`, `Shift-Cmd-N`, `Cmd-O`, `Cmd-S`, `Shift-Cmd-S`, `Cmd-B` and
-/// `Cmd-L`, which are the seven accelerators the app has. `Save a Copy…` is the
-/// one item with none.
+/// here — `Cmd-N`, `Shift-Cmd-N`, `Cmd-O`, `Cmd-S`, `Shift-Cmd-S`,
+/// `Shift-Cmd-E`, `Cmd-B` and `Cmd-L`, which are the eight accelerators the app
+/// has.
 ///
 /// **The two news head `File`, above `Open…`**, with a separator between `Open…`
 /// and `Save`: make, open, then act on what is open, the order every macOS
@@ -781,7 +784,10 @@ fn export(session: tauri::State<'_, Mutex<Session>>, path: String) -> Result<(),
 /// points. **Phase 3 gave `Shift-Cmd-S` to the export and Phase 17 took it
 /// back**, on the argument that an accelerator nobody guesses is not better
 /// than the menu item it duplicates — so the export kept the item and gave the
-/// chord up rather than moving to a second, more obscure one.
+/// chord up. **Phase 27 gave it `Shift-Cmd-E`**, a different chord and not the
+/// old one back: the web host has bound it since `ltr-001`, the two windows are
+/// the same page, and a chord the other window teaches is no longer one nobody
+/// guesses.
 ///
 /// `Cmd-B` and `Cmd-L` work the two views, and the first is spent knowingly:
 /// it is the sidebar in VS Code, Zed and Cursor and the panel it folds here is
@@ -806,11 +812,14 @@ fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> 
     let save_as = MenuItemBuilder::with_id(SAVE_AS, "Save as…")
         .accelerator("Shift+CmdOrCtrl+S")
         .build(app)?;
-    // **The export gives the chord up rather than moving to a second one.**
-    // Phase 16 withdrew its button on the argument that a reader who wants it
-    // knows to look in `File`, and an accelerator nobody guesses is not better
-    // than the item it duplicates. `mpdf-003` Phase 17.
-    let export = MenuItemBuilder::with_id(EXPORT, "Save a Copy…").build(app)?;
+    // **`Export PDF…` and not `Save a Copy…`**, which read too close to
+    // `Save as…` two marks away, and names what it writes. **`Shift+CmdOrCtrl+E`
+    // is the web host's chord**: Phase 17 gave the export's first chord up, and
+    // the desktop carrying none was a difference between two windows that are
+    // the same page. `mpdf-003` Phase 27, OQ-22.
+    let export = MenuItemBuilder::with_id(EXPORT, "Export PDF…")
+        .accelerator("Shift+CmdOrCtrl+E")
+        .build(app)?;
     // **Plain items and no checkmark**, and the two words are the ones the marks
     // in the bar are named by. A `CheckMenuItem` would have to be *placed*, and
     // the state it would place is the page's — see [`VIEW_FILES`]. The bar stays

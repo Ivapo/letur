@@ -696,7 +696,7 @@ impl<F: Files> Preview<F> {
         }
     }
 
-    /// Where a Save-a-copy dialog opens, or why it does not open at all.
+    /// Where an Export PDF dialog opens, or why it does not open at all.
     ///
     /// It refuses before the dialog rather than after it, so a pane that cannot
     /// be exported never asks the user for a path it will not use.

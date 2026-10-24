@@ -609,8 +609,7 @@ const INK_ROWS = String.raw`
   return {
     rows: document.getElementById('mirror').children.length,
     lines: text.value.split('\n').length,
-    foot: (document.getElementById('edited').textContent || '').trim(),
-    status: (document.getElementById('status').textContent || '').trim()
+    foot: (document.getElementById('edited').textContent || '').trim()
   }
 `
 
@@ -972,8 +971,7 @@ const theInkWrapsWhereTheTextareaDoes = async (held) => {
   if (!caught(built)) {
     throw new Error(
       `the pane was given ${LONG_LINES} lines and holds ${built.lines}, ` +
-        `the ink ${built.rows} rows; the foot names ${JSON.stringify(built.foot)} ` +
-        `and the status says ${JSON.stringify(built.status)}`
+        `the ink ${built.rows} rows; the foot names ${JSON.stringify(built.foot)}`
     )
   }
   note(`the pane holds ${LONG.replace(`${REPO}/`, '')}'s ${built.lines} lines, and the ink ${built.rows} rows`)

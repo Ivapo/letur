@@ -134,10 +134,10 @@
         align-items: center;
         gap: 4px;
         height: 27px;
-        /* Left 8 so a 4px-padded button puts its ink at 12px, where the
-           footer's own marks start; right 12 so the status ends where the
-           brand does. */
-        padding: 0 12px 0 8px;
+        /* 8 both sides, so a 4px-padded button puts its svg box at 12px from
+           either edge: the left where the footer's own marks start, the right
+           where its brand ends. */
+        padding: 0 8px 0 8px;
         font-size: 11px;
         background: var(--chrome);
         border-bottom: 1px solid var(--edge);
@@ -229,18 +229,23 @@
       }
 
       /*
-        The status line. Every word in it is chosen in Rust and this only
-        places it, so the four states are checked by tests rather than by eye.
-        The class is the state's own name, so the colour follows the word.
+        The export's mark, at the header's far end where the status line was
+        until `mpdf-003` Phase 27. **Apart from the two actions and not beside
+        them**: it writes a derived artifact rather than the document being
+        edited, and that artifact is the product.
+
+        **It dims when an export would be refused, and stays pressable.**
+        `aria-disabled` and not `disabled`, because a disabled button takes no
+        click, and with nothing in the error bar the click is what brings
+        Rust's refusal into it. So the dim says *not now* and the click says
+        why. An opacity and not `--quiet`, since every header mark is already
+        drawn in `--quiet`.
       */
-      #status {
+      #export {
         margin-left: auto;
-        color: var(--quiet);
-        font-variant-numeric: tabular-nums;
       }
-      #status.stale,
-      #status.failed {
-        color: var(--alarm);
+      #export[aria-disabled='true'] {
+        opacity: 0.4;
       }
 
       main {
@@ -1635,21 +1640,28 @@
     </svg>
 
     <!--
-      The header's element children, in order: `#open`, `#save`, `#status`.
-      **Two actions and a status line, and nothing that decides what the window
-      shows** — the fold, the gutter and the fit are the bar's, one copy each.
-      Open and Save act on the document the author is editing, the file `⌘S`
-      writes and the title bar names. *Save a Copy…* is neither, and it is the
-      `File` menu's alone: it writes a **derived artifact** to a path the author
-      picks once, so `app/src/main.rs:export`, the item and its
-      `Shift+CmdOrCtrl+S` all stand and only the button here went.
+      The header's element children, in order: `#open`, `#save`, `#export`.
+      **Two actions on the edited document and, apart, the one that saves the
+      page, and nothing that decides what the window shows** — the fold, the
+      gutter and the fit are the bar's, one copy each. Open and Save act on the
+      document the author is editing, the file `⌘S` writes and the title bar
+      names. *Export PDF…* is neither: it writes a **derived artifact** to a
+      path the author picks, which is why it sits at the far end rather than as
+      a third button beside them. It is also the `File` menu's item and
+      `Shift+CmdOrCtrl+E`, both of which emit the same `export`. `mpdf-003`
+      Phase 27.
+
+      **The export's mark follows the floppy's rule**: two paths, the page and
+      its folded corner as one and the arrow down out of it as the other, so it
+      does not read as the floppy beside it.
 
       **Each mark carries `title` and `aria-label` both**, `wearAppearance`'s
       rule and the footer's: a bare mark names nothing to a screen reader.
       **`Save as…` and one button, which is decided rather than open**: a button
       earns its place by being the thing a reader cannot guess, and `⌘S` — still
       Save, still the menu's — is the one chord every author already has in
-      their fingers. `app/harness/checks.mjs` reads these two names.
+      their fingers. `app/harness/checks.mjs` reads `#save`'s two names and
+      `#export`'s, the latter in clause 4.
     -->
     <header>
       <button id="open" type="button" title="Open…" aria-label="Open…">
@@ -1663,7 +1675,12 @@
           <rect x="3.5" y="8.5" width="7" height="4" />
         </svg>
       </button>
-      <span id="status"></span>
+      <button id="export" type="button" title="Export PDF…" aria-label="Export PDF…" aria-disabled="true">
+        <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false">
+          <path d="M2.5 1.5 H8.5 L11.5 4.5 V12.5 H2.5 Z M8.5 1.5 V4.5 H11.5" />
+          <path d="M6.5 5.5 V10.5 M4.5 8.5 L6.5 10.5 L8.5 8.5" />
+        </svg>
+      </button>
     </header>
     <main>
       <div id="mirror" aria-hidden="true"></div>
@@ -2048,7 +2065,7 @@
       const webText = document.getElementById('web-text')
       const fetchButton = document.getElementById('fetch')
       const error = document.getElementById('error')
-      const status = document.getElementById('status')
+      const exportButton = document.getElementById('export')
       /*
         Every control that carries the fit — **one today, and a list because
         the setting is what this names rather than the control**. The header
@@ -2406,8 +2423,18 @@
         pane is not current — so a pane with nothing to write never opens a
         dialog whose answer it would throw away. Nothing recompiles: the file
         is the bytes on screen.
+
+        **An export over a compile error does nothing**, and the error stays.
+        The bar already says why there is nothing to export, and says what to
+        fix, where Rust's refusal would replace it with *the page is out of
+        date*. `refusing` is what tells a compile error from a refusal already
+        standing, so a refusal with an empty bar still reaches it. The guard is
+        here and not on the mark's click, so the mark, `⇧⌘E` and the menu item
+        all behave the same. `mpdf-003` Phase 27.
       */
       async function exportDocument() {
+        if (!error.hidden && !refusing) return
+
         let defaultPath
         try {
           defaultPath = await invoke('export_path')
@@ -2524,17 +2551,19 @@
       }
 
       /*
-        Put the status where the window shows it: the line in the header, the
-        error bar, and the mark a stale page wears. Every word here was chosen
-        in Rust — the state's own name and the compile time — so this places
-        text and never composes it.
+        Put the status where the window shows it: the error bar, the mark a
+        stale page wears, and the export's dim. Every word here was chosen in
+        Rust, so this places text and never composes it.
+
+        **The dim is the one job the status line did that nothing else does**:
+        it said whether the page could be saved, and the mark now says that
+        where the saving is. Every other state the line named the window
+        already shows another way. `mpdf-003` Phase 27.
       */
       /** @param {Status} state */
       function report(state) {
-        status.className = state.state
-        status.textContent = state.time
-          ? `${state.state} · ${state.time}`
-          : state.state
+        if (state.state !== 'current') exportButton.setAttribute('aria-disabled', 'true')
+        else exportButton.removeAttribute('aria-disabled')
 
         refusing = false
         error.textContent = state.error ?? ''
@@ -4528,8 +4557,7 @@
         divergence.hidden = true
         web.hidden = true
         error.hidden = true
-        status.textContent = ''
-        status.className = ''
+        exportButton.setAttribute('aria-disabled', 'true')
         text.value = ''
         text.disabled = true
         relines()
@@ -6156,6 +6184,7 @@
       fetchButton.addEventListener('click', fetchImages)
       document.getElementById('open').addEventListener('click', openDocument)
       document.getElementById('save').addEventListener('click', saveDocumentAs)
+      exportButton.addEventListener('click', exportDocument)
       listen('open', openDocument)
       listen('save', saveDocument)
       listen('save-as', saveDocumentAs)
