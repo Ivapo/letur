@@ -379,6 +379,18 @@ const MUTATIONS = {
     return page.replace(block, '')
   },
 
+  /* The cell names the file and says nothing on hover. **The title write and
+     nothing else**: the text is still the bare name, still follows a figure,
+     still empties when nothing is open, so every clause about what the cell
+     reads passes and only the one about where the file is fails. */
+  'cell-untitled': (page) => {
+    const block =
+      "        if (path === null) editedCell.removeAttribute('title')\n" +
+      "        else editedCell.setAttribute('title', projectFolder === null ? path : `${projectFolder}/${path}`)\n"
+    if (page.split(block).length !== 2) die('the mutation cell-untitled found no single title write')
+    return page.replace(block, '')
+  },
+
   /* The row's delete draws its mark and names nothing explicitly. **The
      `aria-label` write and nothing else**: the mark still resolves, still wears
      its two inks, still deletes, and the button is left with `title` alone —

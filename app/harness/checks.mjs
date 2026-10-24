@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all twenty-eight. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all twenty-nine. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -84,7 +84,8 @@ const OWNS = {
   'ink-math-per-line': 25,
   'web-button-always': 26,
   'create-stays-put': 27,
-  'news-deaf': 28
+  'news-deaf': 28,
+  'cell-untitled': 29
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -2497,6 +2498,93 @@ const theNewItemsReachThePage = async (browser, url) => {
   return errors
 }
 
+/* 29. **The footer's name says where the file is**, on hover: the folder Rust
+       worded joined to the path the cell names, or that path alone where there
+       is no folder — the web host. `mpdf-003` Phase 28.
+
+       **Two choices keep the other clauses' mutations isolating.** `main`
+       equals `edited`, so `cell-main` — which rewires the cell to `state.main` —
+       leaves this clause as it found it; clause 18 notes `#edited` for the same
+       reason, and the sweep's `set({ edited: name, main: name })` is the
+       precedent. And **with the figure up, the title is checked against
+       whatever the cell names**, not against the figure: `figure-unnamed`
+       leaves the cell on `deep.md`, and a title of `…/parts/ch1/deep.md` is
+       then correct, so only clause 11 fails. Which name the cell shows is
+       clause 11's job; that the title follows the cell is this one's, and a
+       title left on the edited file under a figure still fails it.
+
+       **No title at all once nothing is open**, rather than an empty one: a
+       `title=""` shows nothing either, but it is a writer that forgot the case. */
+const theNameSaysWhereItIs = async (browser, url) => {
+  const page = await opened(browser, url)
+  const DEEP = 'parts/ch1/deep.md'
+  const MARK = 'sections/mark.svg'
+  const FOLDER = '~/Papers/Gate'
+
+  const read = () =>
+    page.evaluate(() => {
+      const cell = document.getElementById('edited')
+      return { text: cell.textContent, title: cell.getAttribute('title') }
+    })
+  const rendered = async (patch) => {
+    await page.evaluate((patch) => {
+      window.__harness.set(patch)
+      window.__harness.fire('rendered')
+    }, patch)
+    await settle(page)
+  }
+
+  await rendered({ folder: FOLDER, edited: DEEP, main: DEEP })
+  const held = await read()
+
+  await page.evaluate(() => {
+    const row = [...document.querySelectorAll('#parts li')].find((li) => li.textContent.includes('mark.svg'))
+    row?.querySelector('button.name')?.click()
+  })
+  await settle(page)
+  const figure = await read()
+
+  await page.keyboard.press('Escape')
+  await settle(page)
+  const back = await read()
+
+  await rendered({ folder: null })
+  const bare = await read()
+
+  await page.evaluate(() => window.__harness.reset())
+  await rendered({})
+  const closed = await page.evaluate(() => document.getElementById('edited').hasAttribute('title'))
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  const named = { 'mark.svg': MARK, 'deep.md': DEEP }[figure.text] ?? null
+  note(
+    `the cell: ${JSON.stringify(held)} → the figure ${JSON.stringify(figure)} → Escape ${JSON.stringify(back)} → ` +
+      `no folder ${JSON.stringify(bare)} → nothing open, a title ${closed}`
+  )
+
+  const checks = [
+    held.text === 'deep.md' && held.title === `${FOLDER}/${DEEP}`
+      ? null
+      : `open on ${DEEP} gave ${JSON.stringify(held)}`,
+    named !== null && figure.title === `${FOLDER}/${named}`
+      ? null
+      : `with the figure up the cell read ${JSON.stringify(figure.text)} titled ${JSON.stringify(figure.title)}`,
+    back.title === `${FOLDER}/${DEEP}` ? null : `Escape left the title ${JSON.stringify(back.title)}`,
+    bare.title === DEEP ? null : `with no folder the title is ${JSON.stringify(bare.title)}`,
+    closed ? 'with nothing open the cell still has a title' : null
+  ].filter(Boolean)
+
+  ok(
+    29,
+    "the footer's name says where the file is, and follows what the cell names",
+    checks.length === 0,
+    checks.join('; ') || 'the folder and path on the edited file, the figure, back, with no folder, and none with nothing open'
+  )
+  return errors
+}
+
 const run = async ({ engine, headed, rev, doc, mutate }) => {
   passed = 0
   failed = 0
@@ -2544,7 +2632,8 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       displayMathIsOneInk,
       theWebLineAndWhatWrapsInThePane,
       aCreateTakesThePane,
-      theNewItemsReachThePage
+      theNewItemsReachThePage,
+      theNameSaysWhereItIs
     ]) {
       gather(await check(browser, held.url))
     }
@@ -2559,7 +2648,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    29,
+    30,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +

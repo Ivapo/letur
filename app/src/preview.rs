@@ -73,6 +73,22 @@ fn timed(run: &mut dyn FnMut()) -> Duration {
     started.elapsed()
 }
 
+/// A folder worded for the window: `~` for `home` itself, `~/<rest>` for a
+/// path under it, and any other path as it is.
+///
+/// **`strip_prefix` compares components**, so `/Users/ab` is not under a home
+/// of `/Users/a` — the case a string prefix gets wrong. A `None` home costs
+/// only the abbreviation. **Composed here and not on the page**, by Phase 3's
+/// rule that the page places words and does not choose them. `mpdf-003`
+/// Phase 28.
+fn homely(path: &Path, home: Option<&Path>) -> String {
+    match home.and_then(|home| path.strip_prefix(home).ok()) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+        Some(rest) => format!("~/{}", rest.display()),
+        None => path.display().to_string(),
+    }
+}
+
 /// One compile, planned under the lock, with the disk it reads.
 ///
 /// **The crate's `Compile` carries no files**, since the browser's runs over a
@@ -237,17 +253,27 @@ impl Session {
     /// Everything the window says, from the two places that know it.
     ///
     /// **The composition is here rather than in [`Preview::status`], and the
-    /// split is the point**: twelve of the thirteen fields are the last compile's
-    /// and one is the author's, held for a document's lifetime rather than for
-    /// a compile's. [`Preview::status`] keeps its signature because some
-    /// thirty-five call sites read it, nearly all of them tests.
+    /// split is the point**: twelve of the fourteen fields are the last
+    /// compile's, and both of the other two are the host's — the appearance the
+    /// author chose, held for the app's lifetime rather than for a compile's,
+    /// and the folder, which only a disk can name. [`Preview::status`] keeps
+    /// its signature because some thirty-five call sites read it, nearly all of
+    /// them tests.
     ///
     /// `crate::main::status` calls **this** and not `preview().status()`, which
     /// is the one line no test in this crate reaches.
     pub fn status(&self) -> Status {
+        // **One guard, bound once.** The lock is not reentrant, so reading the
+        // root and the status through two `self.preview()` calls in one
+        // expression would wait on itself for ever.
+        let preview = self.preview();
+        let home = std::env::var_os("HOME");
         Status {
             appearance: self.appearance,
-            ..self.preview().status()
+            folder: preview
+                .root()
+                .map(|root| homely(root, home.as_deref().map(Path::new))),
+            ..preview.status()
         }
     }
 
@@ -3529,7 +3555,7 @@ mod tests {
     ///
     /// **This is the narrow edge `specs/desktop_app_spec.md` OQ-10 names.**
     /// `invoke` answers with an untyped value and `app/dist/index.html` reads
-    /// thirteen fields off it by name, so a field renamed here and not there breaks
+    /// fourteen fields off it by name, so a field renamed here and not there breaks
     /// the window silently, at runtime, with no console anyone reads. The type
     /// check over that file (`app/typecheck.mjs`) makes the typedef bind on the
     /// page's side; this makes it bind on Rust's. **Two declarations compared
@@ -3545,7 +3571,9 @@ mod tests {
     /// **from twelve to thirteen in `mpdf-003` Phase 25**, which added `web` —
     /// the line about images named by URL — and joined `WebLine` to the
     /// declarations checked here, `Some` in the literal so there is a line to
-    /// compare. Phase 1 left it at ten by coincidence — it removed `sections` and
+    /// compare, and **from thirteen to fourteen in `mpdf-003` Phase 28**, which
+    /// added `folder`, `Some` in the literal so the key is there to compare.
+    /// Phase 1 left it at ten by coincidence — it removed `sections` and
     /// `master` and added `entries` and `main` — and said so here, in a note
     /// each later phase's own scope is the authority for rewriting. A literal
     /// that has now moved twice is still not a thing to "fix" to silence a
@@ -3571,6 +3599,7 @@ mod tests {
             main: Some("report.md".to_string()),
             edited: Some("sections/method.md".to_string()),
             appearance: Appearance::Dark,
+            folder: Some("~/Papers/Gate".to_string()),
             web: Some(WebLine {
                 sentence: "1 image on images.example is not fetched.".to_string(),
                 action: Some("Fetch images from the web".to_string()),
@@ -3591,7 +3620,7 @@ mod tests {
         // marker that stopped matching should fail loudly rather than pass.
         assert_eq!(
             declared.len(),
-            13,
+            14,
             "the page's `Status` typedef declares {} properties: {:?}",
             declared.len(),
             declared
@@ -3735,6 +3764,60 @@ mod tests {
         assert_eq!(told.state, empty.state);
         assert_eq!(told.revision, empty.revision);
         assert_eq!(told.entries, empty.entries);
+    }
+
+    /// `homely` writes the home folder as `~` and nothing else.
+    ///
+    /// **The last case is the reason it uses `strip_prefix`**: a path that only
+    /// starts with the same characters as home is not under it, and a string
+    /// prefix would turn `/Users/ab` into `~b`. `mpdf-003` Phase 28.
+    #[test]
+    fn homely_writes_the_home_folder_as_a_tilde() {
+        let home = Some(Path::new("/Users/a"));
+        assert_eq!(homely(Path::new("/Users/a"), home), "~");
+        assert_eq!(
+            homely(Path::new("/Users/a/Papers/My Paper"), home),
+            "~/Papers/My Paper"
+        );
+        assert_eq!(homely(Path::new("/Volumes/Work/Gate"), home), "/Volumes/Work/Gate");
+        assert_eq!(homely(Path::new("/Users/a/Papers"), None), "/Users/a/Papers");
+        assert_eq!(homely(Path::new("/Users/ab"), home), "/Users/ab");
+    }
+
+    /// A `Session` names the folder it opened; a bare `Preview` names none.
+    ///
+    /// **This covers the plumbing only.** The scratch project sits under the
+    /// temporary directory, outside `HOME`, so the value passes through
+    /// `homely` unchanged; [`homely_writes_the_home_folder_as_a_tilde`] alone
+    /// holds the `~`. Both halves are load-bearing, for the reason
+    /// [`the_session_carries_the_appearance_and_a_bare_preview_does_not`]
+    /// gives: the web host reads `Preview::status`, and must see `None`.
+    #[test]
+    fn the_session_names_the_folder_and_a_bare_preview_does_not() {
+        let dir = scratch_dir("the-session-names-the-folder");
+        std::fs::write(dir.join("paper.md"), "# Paper\n\nA paragraph.\n").unwrap();
+
+        let (mut session, compiles) = counted();
+        assert_eq!(
+            session.status().folder,
+            None,
+            "a session with nothing open named a folder"
+        );
+        session.open(dir.join("paper.md")).unwrap();
+        wait_for(&compiles, 1);
+
+        let home = std::env::var_os("HOME");
+        assert_eq!(
+            session.status().folder,
+            Some(homely(&dir, home.as_deref().map(Path::new))),
+            "the session did not name the folder it opened"
+        );
+        assert_eq!(
+            session.preview().status().folder,
+            None,
+            "the preview named a folder it cannot know"
+        );
+        assert_eq!(Preview::default().status().folder, None);
     }
 
     /// The footer's brand cell says exactly what the bundle is called.

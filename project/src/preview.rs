@@ -249,6 +249,18 @@ pub struct Status {
     /// with the value the author chose; [`Preview::status`] fills
     /// [`Appearance::System`] and says so where it does it.
     pub appearance: Appearance,
+    /// The project's root, worded for the window: `"~/Papers/Gate"`.
+    ///
+    /// The page joins it to a root-relative path for the footer cell's hover,
+    /// and words nothing itself — the `~` is composed in Rust. **`None` means
+    /// there is no folder to name, not that no document is open**: the web
+    /// host has a project and no folder on disk, and the page then shows the
+    /// root-relative path alone.
+    ///
+    /// **[`Preview`] does not know it**, for [`Status::appearance`]'s reason:
+    /// only [`Session::status`] fills it, and [`Preview::status`] fills `None`
+    /// and says so where it does it. `mpdf-003` Phase 28.
+    pub folder: Option<String>,
     /// What the page says about the images the document names by URL, and
     /// the button beside it. `None` when there is nothing to say, which
     /// includes a URL only waiting out [`remote::SETTLE`].
@@ -663,6 +675,10 @@ impl<F: Files> Preview<F> {
             // kept here would go back to `System` on every `⌘O`. The desktop's
             // `Session::status` is what fills this with the author's choice.
             appearance: Appearance::System,
+            // **Nor does it name a folder**: a `Preview` is shared with the web
+            // host, which has none to name. The desktop's `Session::status`
+            // fills this from the root it opened.
+            folder: None,
             web: self.web.line(&self.urls),
         }
     }

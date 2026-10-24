@@ -1914,7 +1914,7 @@
         `app/tsconfig.json` for why its settings are what they are.
 
         **`Status`, `Anchor` and `Entry` are the point, and they are the three
-        that can lie.** `invoke` returns an untyped value and this page reads twelve
+        that can lie.** `invoke` returns an untyped value and this page reads fourteen
         fields off it by name, so a field renamed in Rust would break the window
         silently at runtime. `app/src/preview.rs`'s own test compares the
         `@property` lists below against a serialized `Status` — two declarations
@@ -1940,6 +1940,7 @@
        * @property {string | null} main
        * @property {string | null} edited
        * @property {Appearance} appearance
+       * @property {string | null} folder
        * @property {WebLine | null} web
        */
 
@@ -2596,6 +2597,7 @@
         // empty state is `namePaneFile`'s `?? ''` — the cell collapses to
         // nothing and the brand beside it stays.
         editedPath = state.edited ?? null
+        projectFolder = state.folder ?? null
         projectEntries = state.entries
         mainPath = state.main ?? null
         namePaneFile()
@@ -2981,6 +2983,12 @@
           @type {string | null} */
       let editedPath = null
 
+      /** The project's folder as Rust worded it, `~` and all, or `null` where
+          there is none to name — the web host. Held beside `editedPath` for its
+          reason: the cell's hover is rewritten when a figure opens or closes.
+          @type {string | null} */
+      let projectFolder = null
+
       /* What an include marker is resolved and compared against, and they are
          `report`'s in the same statement `edited` is. **No new field on
          `Status`**: both are already sent, already typed and already read by
@@ -2993,14 +3001,23 @@
       let mainPath = null
 
       /*
-        Name what the pane is holding, as a bare name. **One writer, called from
-        three places** — the status, a figure opening, a figure closing — because
-        the two sources take turns and a cell written from two places shows
-        whichever wrote last rather than what is on screen.
+        Name what the pane is holding, as a bare name, and say where it is on
+        hover. **One writer, called from three places** — the status, a figure
+        opening, a figure closing — because the two sources take turns and a
+        cell written from two places shows whichever wrote last rather than
+        what is on screen.
+
+        **A figure gets its own path in the title**, not the edited file's: the
+        cell names the figure, and the title describes the cell. `title` only,
+        and no `aria-label` — the cell is text, so a screen reader already reads
+        the bare name, and the path is a hover detail rather than its name.
+        `mpdf-003` Phase 28.
       */
       function namePaneFile() {
         const path = figureInPane ?? editedPath
         editedCell.textContent = path?.split('/').pop() ?? ''
+        if (path === null) editedCell.removeAttribute('title')
+        else editedCell.setAttribute('title', projectFolder === null ? path : `${projectFolder}/${path}`)
       }
 
       /*
