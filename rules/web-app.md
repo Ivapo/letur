@@ -116,9 +116,9 @@ promise — which the host relies on: an `edit` posted before a `compile` is tak
   `set_appearance` — once it succeeds; a rejection reaches `fail` and announces nothing,
   as on desktop. `opened` follows a `hashchange` that seeds a project.
 - **The keyboard.** A capturing `keydown` takes `metaKey` on macOS and `ctrlKey`
-  elsewhere: ⌘O, ⌘S, ⇧⌘S and ⌘B are the desktop menu's own. **⇧⌘E is the host's own**:
-  export is a desktop menu item with no accelerator and no button in the window, and a
-  tab has no menu, so without a chord a reader could not export at all. ⌘L is the
+  elsewhere: ⌘O, ⌘S, ⇧⌘S, ⇧⌘E and ⌘B are the desktop menu's own. **⇧⌘E was the host's
+  first**, and the desktop took the same chord in `mpdf-003` Phase 27; a tab has no menu,
+  so the binding stays, and the header's export mark is the same page's. ⌘L is the
   browser's address bar, and `view-lines` keeps its footer button.
 - **The dialogs.** `dialog.open` is a hidden `<input type="file" accept=".md">`: its
   one file is `unstage`d-then-staged alone and answered as `/project/<name>`; a cancel

@@ -140,7 +140,7 @@ phases:
     by: null
   - name: "Phase 27 — the page is saved from the header, and the timing goes"
     reviewed: 2026-10-23
-    shipped: null
+    shipped: 2026-10-23
     cut: null
     by: null
   - name: "Phase 28 — the footer's name says where the file is"
@@ -1635,6 +1635,14 @@ which is the artifact the CLI writes.*
   the plugin ships and which OQ-2's idiom says to name here rather than
   rediscover at a build. Nothing here re-compiles: export writes the bytes the
   pane is already showing, so the file and the page cannot disagree.
+
+  > **CORRECTED 2026-10-23, by Phase 27.** The sentence below is kept as it was
+  > written. **The state and the compile time are still computed** and still
+  > serialized in `Status`, but the header no longer draws them as a line. The
+  > window shows the state by other means: *stale* dims the page and fills the
+  > error bar, *failed* fills the bar alone, *empty* shows the empty message, and
+  > the export's mark dims whenever the state is not *current*. The time is drawn
+  > nowhere.
 
   The window then shows what the loop knows: the state, the compile time and
   the error. **The open document is not a fourth thing to draw** — it is already
@@ -4517,6 +4525,13 @@ not a prediction.
   already carries the file name and the appearance is where a setting belongs. Open and
   Save are actions, and an action wants the bar the eye starts at.
 
+  > **CORRECTED 2026-10-23, by Phase 27.** The paragraph below is kept as it was
+  > written. **The mark is back**, as `Export PDF…` at the header's far end, apart
+  > from `#open` and `#save` rather than beside them. **The argument for the split
+  > still holds**: the export writes a derived artifact, not the edited document.
+  > What this paragraph did not weigh is that this derived artifact is the
+  > product, and an output hidden one menu deep had to be asked for at the window.
+
   **`#export` is neither, and the rule does not stretch to cover it — so it is argued
   on its own.** *Save a Copy…* writes to disk like the other two, so "the header acts"
   would keep it; what separates it is **what** it writes. Open and Save act on the
@@ -4968,6 +4983,13 @@ work, so round 0 has more to do than usual and the scope says where to point it.
   `Save` has no button at all, which retires the reason `app/src/main.rs:SAVE` emits an
   event rather than acting — *"a menu item and the button beside it run one code path and
   not two"*. The emit stays, the comment does not.
+
+  > **CORRECTED 2026-10-23, by Phase 27.** The paragraph below is kept as it was
+  > written. **The export took `Shift+CmdOrCtrl+E`**, not `⌥⌘S` and not its old
+  > chord back. The argument against an accelerator nobody guesses no longer
+  > applies to it, because the web host has bound ⇧⌘E to `export` since
+  > `ltr-001` and the two windows are the same page. `Shift+CmdOrCtrl+S` stays
+  > `Save as…`'s.
 
   **`Shift+CmdOrCtrl+S` moves to `Save as…`**, which is where every other application puts
   it. **`Save a Copy…` then takes no accelerator**, extending Phase 16's own argument for

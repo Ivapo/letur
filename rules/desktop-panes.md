@@ -19,8 +19,7 @@ covers: >
   canvas and two layers inside it, the vendored renderer and its worker, the retained document a geometry-only redraw draws from, the
   redraw that moves the reader and the three causes that decide where to, the
   anchor path that opens on the author's own page and the one file it is
-  filtered to, the status the page places and never composes, the bar along the
-  top and the two actions it keeps, the marks it draws for them and the ground
+  filtered to, the status the page places and never composes, the bar along the top, the two actions it keeps and the export apart from them, the dim that says the page cannot be saved, the marks it draws for them and the ground
   that says they can be pressed, the rule that decided which of the two bars a
   control belongs to and the third thing that is neither, the bar along the
   foot, the five cells and one rule it carries and the one control each of its
@@ -57,7 +56,7 @@ covers: >
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
   because the DOM cannot show one, the twenty-nine clauses it
-  asserts as properties and the twenty-six broken pages that falsify them, the rule
+  asserts as properties and the twenty-eight broken pages that falsify them, the rule
   that decides what a clause may read as well as what it may assert, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
@@ -276,18 +275,19 @@ wrote.
 ## The header
 
 A bar along the top: 27px and its own 1px rule, so 28px out of `main`. **Its element
-children, in order — `#open`, `#save`, `#status` — are two actions and a status line,
-and nothing that decides what the window shows**, which is the rule the two bars are
+children, in order — `#open`, `#save`, `#export` — are two actions on the edited document
+and, apart, the one that saves the page, and nothing that decides what the window shows**,
+which is the rule the two bars are
 split on: **the footer sets and the header acts**. A setting is left where a reader
 likes it and stops being noticed, so the fold, the gutter and the fit are the footer's
 one copy each; an action wants the bar the eye starts at. **The floppy is `Save as…`,
 one button and not two**: a button earns its place by being what a reader cannot guess,
-and `⌘S` — still Save, still the menu's — is the chord every author already has. *Save a
-Copy…* is neither and
-is argued on its own — Open and Save act on the document being edited, the file `⌘S` writes
-and the title bar names, where the export writes a **derived artifact** to a path picked
-once — so it is the `File` menu's alone, `app/src/main.rs:export`, the item and its
-`Shift+CmdOrCtrl+S` all standing with no button beside them.
+and `⌘S` — still Save, still the menu's — is the chord every author already has. *Export
+PDF…* is neither, and is argued on its own: Open and Save act on the document being edited,
+the file `⌘S` writes and the title bar names, where the export writes a **derived artifact**
+to a path the author picks. So its mark sits **apart, at the far end**, and not as a third
+button beside them. It runs `exportDocument`, as `File → Export PDF…` and
+`Shift+CmdOrCtrl+E` do.
 
 **`Save as…` writes wherever it is pointed and the pane follows it only inside the
 project.** `document::save_file` confines nothing; `Preview::save_as` asks
@@ -297,22 +297,33 @@ pane keeps what it was holding, and nothing recompiles and nothing re-arms. **Bo
 answer a receipt** the footer shows and drops, which is what says which of the two just
 happened; `#receipt` below is where it lands.
 
-**Two marks, drawn rather than borrowed**, the footer's rule rather than a taste
-restated: no glyph means *open a folder* or *write this out*. A folder, and a floppy of
-**two internal shapes and not three**, the shutter dropped as busy at 14px. **14px
-against the footer's 12**, these being the window's two primary actions and not two
-toggles beside a file name, in a 22px button leaving 2.5px of air; every coordinate on a
-half pixel; `currentColor`, a 1px stroke, `title` and `aria-label` saying `Open…` and
-`Save` — the footer's vocabulary unchanged. **The hover
+**Three marks, drawn rather than borrowed**, the footer's rule rather than a taste
+restated: no glyph means *open a folder* or *write this out*. A folder, a floppy of
+**two internal shapes and not three**, the shutter dropped as busy at 14px, and for the
+export a page with a folded corner and an arrow down out of it: two paths, so it does
+not read as the floppy beside it. **14px against the footer's 12**, these being the
+window's primary actions and not toggles beside a file name, in a 22px button leaving
+2.5px of air; every coordinate on a half pixel; `currentColor`, a 1px stroke, `title`
+and `aria-label` saying `Open…`, `Save as…` and `Export PDF…` — the footer's vocabulary
+unchanged. **The hover
 ground is the affordance, and the footer needs none**: its marks are toggles carrying
-their state in their ink, these two are actions with none to carry, so `var(--edge)`
+their state in their ink, these are actions with none to carry, so `var(--edge)`
 comes up behind them at a 3px radius and the ink goes `--quiet` to `--ink`. **`--edge`
 and not a new token** — `--chrome`'s contrast neighbour in both palettes.
 
-`#status` sits at the end on an auto margin, four states composed in Rust and placed by
-`report`, wearing the bar's own 11px rather than the body's 13px. **Nothing reads the
-header's element order, its 12px shared left column or its 22px button** — clause 1 asserts
-`body`'s children, clause 3 the bar's box, and a person the marks.
+`#export` sits at the end on an auto margin, and the header's 8px padding on both sides
+puts its svg box, like `#open`'s, 12px from the edge. **There is no status line**: *stale*
+dims the page and fills `#error`, *failed* fills `#error` alone, *empty* shows the empty
+message. **The mark dims whenever the state is not `current`**: `report` sets
+`aria-disabled="true"` and removes it otherwise, `clear` and the markup start it there, and
+a rule draws it at `opacity: 0.4`. **`aria-disabled` and not `disabled`**, because a
+disabled button takes no click, and the click is what brings `export_path`'s refusal into
+an empty bar. **An export over a compile error does nothing**: `exportDocument` returns
+when `#error` is shown and `refusing` is false, so the error that says what to fix is not
+replaced by *"the page is out of date"*. The guard is in the function and not in the click,
+so the mark, the chord and the item all behave the same. **Nothing reads the header's 12px
+shared left column or its 22px button** — clause 1 asserts `body`'s children, clause 3 the
+bar's box, clause 4 the buttons' order and the mark, and a person the marks.
 
 ## The footer
 
@@ -790,7 +801,7 @@ sentence — found by a mutation that falsified nothing, not by reading.
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
 asserts twenty-nine clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against twenty-six broken copies
+clause a property and none a metric literal**, and is falsified first against twenty-eight broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
 without either being redundant**, and clause 3 is where that now stands: `flex-min` reaches
 the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`

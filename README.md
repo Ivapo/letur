@@ -167,10 +167,11 @@ equation, footnote or reference it names. A link out to the web does not open: t
 never navigates anywhere, so those links are inert on the page — the one request Letur
 makes is for an image you allowed, and it is made by the app and not by the page.
 
-The header says where the page stands — `current` with the time the compile took, or
-`stale` when the last one failed and the page you are looking at is the older one.
+The header's right end saves the page. Its mark dims when the page cannot be saved,
+which is while the last compile failed and the page you are looking at is the older one,
+or before anything is open; the error bar beside it says why.
 
-**`File → Save a Copy…` writes the PDF where you ask**, offering the path of
+**`File → Export PDF…` (⇧⌘E, or the header's mark) writes the PDF where you ask**, offering the path of
 the file that compiles with a `.pdf` extension — the page is that document's, whichever
 file you happen to be editing. It writes the page on screen and compiles nothing, so
 the file and the page cannot disagree, and it is byte for byte the file `md2pdf` writes

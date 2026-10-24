@@ -235,7 +235,7 @@ callback and see the run events a `.run(generate_context!())` never surfaces.
 The menu is built by hand, because macOS draws none of its own: an app submenu,
 a `File` submenu carrying `New File…` at `CmdOrCtrl+N`, `New Project…` at
 `Shift+CmdOrCtrl+N` and `Open…` at `CmdOrCtrl+O`, then a separator, `Save` at `CmdOrCtrl+S`,
-`Save as…` at `Shift+CmdOrCtrl+S` and `Save a Copy…` at no accelerator at all,
+`Save as…` at `Shift+CmdOrCtrl+S` and `Export PDF…` at `Shift+CmdOrCtrl+E`,
 an `Edit` submenu, a `View` submenu carrying `Files` at `CmdOrCtrl+B` and `Lines`
 at `CmdOrCtrl+L`, and a `Window`
 submenu. **`View` sits between `Edit` and `Window`**, which is where macOS puts
@@ -245,10 +245,10 @@ window, and the page invokes, so a menu item and the button beside it run one
 code path and not two — which is why `Save` emits too, though it opens no dialog
 and so costs no capability. **`Open…` and `Save` have that button, in the header;
 `Save as…` has that button — the header's one floppy, `mpdf-003` Phase 17 — while
-`Save` has neither a button nor a rival for `⌘S`, and **`Save a Copy…` is the menu's
-alone and now its only accelerator-less item**, its header button withdrawn on the argument
-that the other two act on the document being edited where the export writes a
-derived artifact. **`Files` and `Lines` have theirs in the footer**, the bar's two
+`Save` has neither a button nor a rival for `⌘S`, and **`Export PDF…` has its mark at
+the header's far end**, apart from the two that act on the document being edited, since
+the export writes a derived artifact. ⇧⌘E is the web host's chord, and eight is now the
+app's accelerator count. **`Files` and `Lines` have theirs in the footer**, the bar's two
 drawn marks. `core:default` already carries
 `core:event:allow-listen`, so neither those events nor the `rendered` signal
 below needs an entry either.
@@ -296,7 +296,7 @@ command at all. **The loose reading fails silently**: writing the file and never
 announcing leaves the bar's own mark stale until the next compile.
 `app/src/main.rs:document_text` answers it too, and only when the status says the
 buffer was replaced from disk. `app/src/main.rs:export_path` and
-`app/src/main.rs:export` are the two halves of Save a Copy.
+`app/src/main.rs:export` are the two halves of Export PDF.
 
 `app/src/main.rs:edit` takes what the author typed, `app/src/main.rs:save`
 writes it to the edited file's own path, and `app/src/main.rs:discard` throws it
