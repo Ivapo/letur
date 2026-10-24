@@ -55,8 +55,8 @@ covers: >
   the pane does not draw, and the pane that loses both when it empties, the check that reads this file and the
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
-  because the DOM cannot show one, the twenty-nine clauses it
-  asserts as properties and the twenty-eight broken pages that falsify them, the rule
+  because the DOM cannot show one, the thirty clauses it
+  asserts as properties and the twenty-nine broken pages that falsify them, the rule
   that decides what a clause may read as well as what it may assert, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
@@ -358,7 +358,9 @@ state and **`namePaneFile` is the single writer of the cell**, called from three
 from two places showing whichever wrote last rather than what is on screen. The value
 is `(figureInPane ?? editedPath)` reduced to its bare name, `report` keeping
 `editedPath` current beside `parts(state)`; the rule above holds, so this is a cell of
-its own, and the empty state collapses it to nothing while the brand stays. **Both
+its own, and the empty state collapses it to nothing while the brand stays. **The same
+writer sets its `title`**, `Status::folder` joined to that path, the path alone where the
+folder is `None`, and no `title` with nothing held: a figure's own path under a figure. **Both
 surfaces count as held, the canvas and the sentence alike** — a `.pdf` row draws its
 first page where an `<img>` cannot, and a file that will not parse gets
 `saySoInstead`'s sentence, and the pane holds that file just as much either way.
@@ -766,7 +768,7 @@ the top of its script, the DOM subtypes `getElementById` cannot know, `doc` and
 fields `pdf.js` tolerates the absence of at runtime.
 
 **The page and `Status` are held to each other from both sides.** The typedef
-block declares `Status`'s thirteen fields, `Anchor`'s two, `Entry`'s three and
+block declares `Status`'s fourteen fields, `Anchor`'s two, `Entry`'s three and
 `WebLine`'s two; the type check binds
 the page's reads to those, and `app/src/preview.rs`'s
 `the_page_typedefs_name_exactly_the_fields_status_serializes` compares the same
@@ -800,8 +802,8 @@ sentence — found by a mutation that falsified nothing, not by reading.
 `core:default`'s own words — the half a stub that merely omits it never tests. It also keeps
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
-asserts twenty-nine clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against twenty-eight broken copies
+asserts thirty clauses in Playwright's Chromium and WebKit, **both of which must pass, every
+clause a property and none a metric literal**, and is falsified first against twenty-nine broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
 without either being redundant**, and clause 3 is where that now stands: `flex-min` reaches
 the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`

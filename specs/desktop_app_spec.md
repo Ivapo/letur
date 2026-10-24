@@ -145,7 +145,7 @@ phases:
     by: null
   - name: "Phase 28 — the footer's name says where the file is"
     reviewed: 2026-10-23
-    shipped: null
+    shipped: 2026-10-24
     cut: null
     by: null
   - name: "Phase 29 — the footer's name turns into its path under the pointer"

@@ -178,9 +178,9 @@ the page uses it as a word and as a class.
 
 `project/src/preview.rs:Status` is that state, the compile time worded as `"28 ms"`,
 the error, whether a page is drawn, the divergence, two counters and the anchors —
-one value the page places rather than composes. **Thirteen fields**, the
-appearance and the web line beside the eleven the last compile fills, and
-`preview.rs`'s own test holds the page's typedef to exactly them.
+one value the page places rather than composes. **Fourteen fields**: the
+eleven the last compile fills, the web line, and the appearance and the folder, which
+are the host's; `preview.rs`'s own test holds the page's typedef to exactly them.
 **`revision` counts compiles that produced bytes** and `reloaded` counts the times the buffer was replaced from
 disk; both exist so the page can tell a signal apart from work it has already
 taken. **The anchors ride the status because the status is already fetched on the

@@ -86,7 +86,7 @@ back to what the old one says on disk, because that is the file the document sti
 names. **The bar along the foot of the window names whatever the pane is holding** — the
 file you are typing in, which once you have clicked another file in the list is not
 the file the page beside it comes from, or the picture, if you have clicked an image
-row to look at one. **That bar also carries the view and fit controls**: the panel and
+row to look at one. Hover over the name to see where that file is. **That bar also carries the view and fit controls**: the panel and
 the line numbers as two small marks on the left, and the fit beside the appearance
 button. **The header is Open and Save as…** — two marks and the status line, and nothing
 that decides what the window shows.

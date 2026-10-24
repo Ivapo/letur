@@ -287,7 +287,7 @@ its bytes and gets the message instead.
 
 `app/src/main.rs:status` answers the same signal, **a second command rather than
 a wider return**, because the bytes cross raw and a status does not. It asks
-`Session::status`, not `preview()`, the first knowing a field the second cannot, and
+`Session::status`, not `preview()`, the first knowing two fields the second cannot, and
 **that one line is outside every test here** by the division this section's last
 paragraph records. `app/src/main.rs:set_appearance` is the sixteenth and is two
 halves: `Session::set_appearance` writes, moves and announces, then `set_theme`

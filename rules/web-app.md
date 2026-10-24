@@ -81,7 +81,8 @@ window still says "Move … to the Trash", which `ltr-001` OQ-7 holds.
 
 `status` fills `appearance` from the session's own field and **`web` with `null`,
 always**: images by URL are not fetched in a browser, so the line that offers a fetch
-never appears and a URL image is refused in `md2pdf-core`'s own sentence.
+never appears and a URL image is refused in `md2pdf-core`'s own sentence. `folder`
+is `Preview::status`'s `None`, so hovering the footer's name shows the project-relative path.
 `current_pdf` restates `app/src/main.rs:current_pdf`'s fallback, "the page is out of
 date", word for word, and `save_as_path`'s "no document is open" likewise.
 
