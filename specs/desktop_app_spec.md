@@ -5,7 +5,7 @@ note: >
   A macOS desktop app that shows the PDF while you write: a Tauri window wraps
   the same core crate, watches the document and its images, and re-renders.
 status: accepted
-last_updated: 2026-10-23
+last_updated: 2026-10-24
 
 phases:
   - name: "Phase 1 — the window, and one compile on screen"
@@ -145,6 +145,11 @@ phases:
     by: null
   - name: "Phase 28 — the footer's name says where the file is"
     reviewed: 2026-10-23
+    shipped: null
+    cut: null
+    by: null
+  - name: "Phase 29 — the footer's name turns into its path under the pointer"
+    reviewed: null
     shipped: null
     cut: null
     by: null
@@ -8533,6 +8538,152 @@ and the project-relative path in the web app.
   1. `Status::folder`, `homely`, `Session::status`, the typedef, `namePaneFile`, the
      stub's field, and harness clause 29 with its mutation, plus gate clauses 2–4;
   2. the rules, the README, the indexes and the `shipped` date.
+
+### Phase 29 — the footer's name turns into its path under the pointer
+
+*Produces the observable: **no**, and the argument is made here.* Nothing compiles
+differently. **What it buys is the path where the eye already is.** Phase 28's `title`
+is a native tooltip, which shows about a second after the pointer stops and sits
+wherever the system puts it. Under this phase the cell's own text becomes the path the
+title holds while the pointer is over it, and goes back to the bare name when it leaves.
+The tooltip stays.
+
+Appended 2026-10-24, per §6.1. **Step 0 says decision**: what the cell's text is while
+the pointer is over it, and which end of a path too long for the cell is cut. **Step 1
+does not fire**: the bare name and Phase 28's title both stay, and nothing shipped is
+removed. **Step 2 puts it here**, because this spec owns the footer (Phases 11 and 15),
+and Phase 28 is its neighbour. **Not folded into Phase 28**: that phase has passed
+review and is built, and amending it would void its review for an addition it does
+not need.
+
+**Strictly after Phase 28.** It reads the `projectFolder` Phase 28 holds and the title
+`namePaneFile` writes, and the clause and mutation counts below assume Phase 28 has
+shipped.
+
+**Asked for at the window**, 2026-10-24. After Phase 28 was built the author asked
+*"so you say that when the mouse is over the name in the footer, it changes?"*, was
+told the text stays and a tooltip appears, and asked *"and is it possible to make it
+change?"*. Three costs were put to the author: a long path cut at the wrong end, the bar
+shifting under the pointer, and the decision moving. So was a recommendation: keep the
+tooltip, add the swap, cut from the start. The author answered *"ok, lets do as you
+recommend"*.
+
+- **Scope:**
+
+  **No Rust, no `Status` field, no typedef.** The text the cell takes is the string
+  Phase 28 already composes for the title, from fields already sent.
+
+  **`app/dist/index.html`:**
+  - **`#edited` holds one child `<span>`**, and `namePaneFile` writes the text into it
+    rather than into the cell. The span is what the bidi isolation below needs. The
+    cell's `textContent` is unchanged by it, so every clause reading that still reads
+    the same string.
+  - **A page-state flag, `pointerOnCell`**, beside `figureInPane`, set by
+    `pointerenter` on `#edited` and cleared by `pointerleave`. Each handler sets the
+    flag and calls `namePaneFile`. **The handlers write nothing themselves.** The cell
+    has one writer (Phase 15), and a status or a figure arriving while the pointer is
+    over the cell must still land on the right text.
+  - **`namePaneFile` composes the title once**, into a local, and writes it to `title`
+    as now. **The text is that string while `pointerOnCell` is set**, and the bare
+    name otherwise. The cell carries the class `whole` exactly while it shows the path.
+    With no path, the flag changes nothing: the cell is empty and has no title.
+  - **CSS: `#edited.whole { direction: rtl }` and `#edited.whole > span {
+    unicode-bidi: isolate; direction: ltr }`.** With `rtl` on the cell, its existing
+    `text-overflow: ellipsis` cuts at the left. The isolated `ltr` span keeps the path's
+    own order, `~` first. Without the isolation the leading `~` moves to the right
+    end. This was measured on a scratch page before it was written: at a 160px bar,
+    both Chromium and WebKit draw `…s/ch1/deep.md` with the path's last character
+    inside the cell. Outside `whole` the cell is as it is, so a bare name too long for
+    the bar is still cut at its end. The sweep (clauses 2 and 3) holds that, and this
+    phase does not touch it.
+  - **The bar may shift under the pointer, and that is accepted.** The cell sizes to
+    its text and only grows on entry, since a path is never shorter than its last
+    segment. So the pointer cannot fall out of the cell it just entered, and the swap
+    cannot oscillate. `#receipt` beside it moves right while the path shows. `#controls`
+    keeps its auto margin, so the group on the right stays put until the cell has taken
+    all the free space.
+  - **No keyboard path and no ARIA change.** The cell is not focusable, and a screen
+    reader still reads the bare name, which is Phase 28's reason for `title` without an
+    `aria-label`.
+
+  **`app/harness/`:**
+  - **Clause 30, new: *the name turns into its path under the pointer.*** It sets
+    `folder: '~/Papers/Gate'`, and `edited` and `main` both to `parts/ch1/deep.md`,
+    Phase 28's clause 29 fixture and for its reason. Then it fires `rendered` and
+    requires the text `deep.md` with no class `whole`. It hovers `#edited` with
+    `page.hover` and requires the text `~/Papers/Gate/parts/ch1/deep.md`, the class
+    `whole`, and a title equal to the text. **While still hovering**, it sets `edited`
+    and `main` both to `sections/text.md` and fires `rendered`. It then requires
+    `~/Papers/Gate/sections/text.md`, so a status that lands mid-hover keeps the path.
+    It moves the mouse to `(0, 0)` and requires `text.md` back and no `whole`.
+
+    **The cut half:** at `WIDTHS`' last width, with `folder` set to `` `~/${LONG_NAME}`
+    `` so the path cannot fit, it hovers again. It first requires the cell to overflow,
+    `scrollWidth > clientWidth`, so the half cannot pass vacuously. Then it requires the
+    rect of the path's last character, taken through a `Range` over the span's text
+    node, to lie within the cell's rect. That is a property and not a metric literal:
+    it holds at any width at which the cell overflows.
+
+    The error clause becomes 31.
+
+    **No figure is opened in this clause**, and that keeps `figure-unnamed` isolating.
+    The text under the pointer comes from the same `path` local the bare name does, so
+    the figure is clause 11's to hold, and opening one here would make that mutation
+    fail two clauses. **`main` equals `edited` throughout**, for `cell-main`, as in
+    clause 29.
+  - **Mutation `cell-stays-bare`**, owned by clause 30: the two `addEventListener`
+    calls are dropped, so the cell never takes the path. **Mutation `whole-cut-at-end`**,
+    owned by clause 30: the `#edited.whole` rule is dropped, so the path is cut at its
+    end and the file name is what goes. Two mutations own one clause, the precedent
+    being clause 3, because they break its two halves. Each body goes in `serve.mjs`'s
+    `MUTATIONS`, guarded to match exactly once, and `checks.mjs`'s `OWNS` gains both.
+    `checks.mjs`'s header *"`--falsify` runs all twenty-nine"* becomes thirty-one.
+  - **Whether another clause leaves the pointer over `#edited` is measured, not
+    assumed.** `--falsify` is the check. A clause that does would see the path where it
+    expects the bare name, and the clean run would fail. If that happens, the fix goes
+    in that clause, as a `page.mouse.move(0, 0)` like clauses 10 and 16 already make, and is said in its
+    comment.
+
+- **Deliberately not in this phase:** a click on the name; a path on the panel's rows;
+  any change in the web app beyond what the shared page gives it (the path there is
+  root-relative, by Phase 28); cutting a bare name at its start.
+
+- **Exit gate:**
+
+  1. `bun app/typecheck.mjs` exits 0.
+  2. `cargo test --workspace` passes, unchanged.
+  3. `bun app/harness/checks.mjs` and `--webkit` each print **thirty-one clauses,
+     thirty-one passed**.
+  4. `--falsify` reports **thirty-one mutations, each isolating the clause it owns**, in
+     both engines.
+  5. `bun app/driver/drive.mjs` and `--falsify` pass, unchanged.
+  6. `bun web/check.mjs` passes.
+  7. **A person's reading at the window**, since a rig moves no real pointer over a
+     real WKWebView:
+     - With a project under your home folder, move the pointer onto the footer's name.
+       It becomes `~/…/<file>` at once, and the bare name returns when the pointer
+       leaves. The tooltip still appears if the pointer stays.
+     - Narrow the window until the path does not fit, then hover. The start is cut
+       (`…/ch1/deep.md`), not the file name.
+     - Type while hovering, so a status lands: the path stays.
+  8. `git status` is clean after clauses 1–6.
+
+- **Close-out:**
+
+  **`rules/desktop-panes.md`**: the footer cell's paragraph gains the swap, its flag,
+  that the writer is still one, and the start-cut. Clause and mutation counts move to
+  31 and 31. **It has four lines of room under its `max_lines: 820`** once Phase 28's
+  close-out has landed, so a neighbour is tightened in the same pass if the sentence
+  does not fit. **`README.md`**: Phase 28's footer sentence becomes *"Point at the name
+  to see where that file is."* **No other rule moves**: no field, no command and no
+  host is touched. **`specs/INDEX.md` and `rules/INDEX.md` are regenerated.** **No
+  `CLAUDE.md` change.**
+
+- **Commit plan.** The drafted phase lands first, on its own, ahead of review. Then one
+  push, two commits:
+  1. the span, the flag, `namePaneFile`, the CSS, harness clause 30 and its two
+     mutations;
+  2. the rule, the README, the indexes and the `shipped` date.
 
 <!--
 The review record is a sibling file, not a section: it lives at
