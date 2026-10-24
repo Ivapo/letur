@@ -395,7 +395,10 @@ const CLAUSES = {
     await page.click('#new-toggle')
     await page.fill('#new-name', 'notes.md')
     await page.press('#new-name', 'Enter')
-    const row = '#parts li[title="Edit notes.md"]'
+    // The pane takes what a create made (`mpdf-010` Phase 10), so the row is the
+    // held one and titled with its bare path, not `Edit notes.md`. That title is
+    // only the row's for the one rebuild before the pane moves.
+    const row = '#parts li.holding[title="notes.md"]'
     await page.waitForSelector(row, { timeout: 10_000 })
     // The row's controls are drawn only under the pointer, as a reader meets them.
     await page.hover(row)
