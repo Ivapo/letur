@@ -143,6 +143,11 @@ phases:
     shipped: null
     cut: null
     by: null
+  - name: "Phase 28 — the footer's name says where the file is"
+    reviewed: null
+    shipped: null
+    cut: null
+    by: null
 
 extends: null
 supersedes: null
@@ -8316,6 +8321,136 @@ i.e. 'current 15ms', this information is not really needed"*.
      harness clause 4 with its mutations and the driver's field;
   2. the three `CORRECTED` notes, the rules, the README, the indexes and the `shipped`
      date.
+
+### Phase 28 — the footer's name says where the file is
+
+*Produces the observable: **no**, and the argument is made here.* Nothing compiles
+differently. **What it buys is telling two files apart.** The footer names the file the
+pane holds by its bare name (Phase 15), so a project with `intro.md` at its root and
+`chapters/intro.md` shows `intro.md` for both, and the panel's row is the only way to
+tell which one the pane holds. A project opened from Finder by double-clicking a
+section (Phase 5) also gives no hint in the window of which folder it came from.
+Hovering the name now says both.
+
+Appended 2026-10-23, per §6.1. **Step 0 says decision, on two counts:** what the
+hover shows on the desktop, and what it shows in a browser tab, where the project has
+no folder on disk. **Step 1 does not fire**: the bare name stays as it is, and nothing
+shipped is removed. **Step 2 puts it here**, because this spec owns the footer (Phases
+11 and 15) and `Status` (Phase 3). `mpdf-010` owns the panel's rows, and this phase does
+not touch them.
+
+**Strictly after Phase 27.** It changes nothing Phase 27 does, but the clause and
+mutation counts below assume Phase 27 has shipped.
+
+**Asked for at the window**, 2026-10-23: *"when i hover over the file name in the
+footer, it shows the full path of the file"*. In the same conversation the author
+settled the two counts: the full path on the desktop with the home folder written `~`,
+and the project-relative path in the web app.
+
+- **Scope:**
+
+  **`project/src/preview.rs` — one field on `Status`.** `folder: Option<String>`: the
+  project's root, worded for the window. **[`Preview::status`] fills `None`, and says
+  so where it does it**, for `Status::appearance`'s reason: a `Preview` is shared with
+  the web host, which has no folder to name. The doc comment says that the page joins
+  it to a root-relative path, and that `None` means *no folder to name*, not *no
+  document*.
+
+  **`app/src/preview.rs` — `Session::status` fills it**, beside `appearance`, from
+  `OnDisk::root`, through a new plain function `homely(path: &Path, home: Option<&Path>)
+  -> String`. It writes `~` for `home` itself and `~/<rest>` for a path under it. A path
+  outside `home`, or a `None` home, is written as it is. **`home` is
+  `std::env::var_os("HOME")`**, read at the call. macOS sets it for an app launched from
+  Finder, and a missing `HOME` costs only the abbreviation. **No new dependency**: one
+  `strip_prefix` does not justify one. **The `~` is composed in Rust**, by Phase 3's
+  rule that the page places words and does not choose them. The `Session::status` doc
+  comment's *"twelve of the thirteen fields"* becomes *"twelve of the fourteen"*. Both
+  of the fields that are not the last compile's are the host's.
+
+  **`web/src/lib.rs` — nothing.** Its `status` spreads `..self.preview.status()`, so it
+  inherits `folder: None` from `Preview::status`. That is the web answer: the page
+  shows the project-relative path.
+
+  **`app/dist/index.html`:**
+  - The `Status` typedef gains `@property {string | null} folder`.
+  - `report` holds it beside `editedPath`, as `projectFolder`.
+  - **`namePaneFile` writes the title**, since it is already the one writer of the
+    cell, called from the status, a figure opening and a figure closing. With `path`
+    the figure or the edited file, as now: no path removes the `title` attribute;
+    otherwise the title is `` `${projectFolder}/${path}` `` when there is a folder, and
+    `path` alone when there is not. **A figure in the pane gets its own path**, not the
+    edited file's, because the cell names the figure and the title describes the cell.
+  - `title` only, and no `aria-label`. The cell is text, so a screen reader already
+    reads the bare name, and the full path is a hover detail, not the cell's name.
+    `title` renders in the shipping WKWebView (Phase 16).
+
+  **`app/harness/`:**
+  - `stub.mjs`'s status gains `folder: null`, so a run that sets nothing reads as the
+    web host.
+  - **Clause 29, new: *the footer's name says where the file is.*** It sets `folder:
+    '~/Papers/Gate'`, `edited: 'chapters/intro.md'` and fires `rendered`. It requires
+    `#edited`'s text to be `intro.md` and its `title` to be
+    `~/Papers/Gate/chapters/intro.md`. It opens a figure row and requires the title to
+    be `~/Papers/Gate/` plus the figure's path, then closes the figure and requires the
+    edited path back. It sets `folder: null` and requires the title to be
+    `chapters/intro.md`. After `__harness.reset()` and a `rendered`, it requires no
+    `title` attribute at all. The error clause becomes 30.
+  - **Mutation `cell-untitled`**, owned by clause 29: `namePaneFile`'s title write is
+    dropped. `OWNS` gains `'cell-untitled': 29`.
+
+- **Deliberately not in this phase:** a click on the name (to reveal it in Finder, or
+  to copy the path); the window title, which names the file and keeps doing so; any
+  path on the panel's rows.
+
+- **Exit gate:**
+
+  1. `bun app/typecheck.mjs` exits 0.
+  2. **`homely` holds its four cases**, in `app/src/preview.rs`'s tests: `home` itself
+     gives `~`; a path under it gives `~/Papers/My Paper`; a path outside it is
+     unchanged; a `None` home leaves the path unchanged. **A path that only starts with
+     the same characters as home**, `/Users/ab` against home `/Users/a`, is also
+     unchanged. `strip_prefix` compares components, and this case is the reason to
+     use it rather than a string prefix.
+  3. **`Session::status` names the folder, and `Preview::status` does not.** Over a
+     scratch project, `Session::status().folder` is `Some` of `homely` applied to the
+     project root, and `Preview::status().folder` is `None`.
+  4. `the_page_typedefs_name_exactly_the_fields_status_serializes` passes with the
+     typedef and its serialized `Status` both carrying `folder`. Its doc comment's count
+     moves from thirteen to fourteen.
+  5. `cargo test --workspace` passes, with the additions above and nothing else moved.
+  6. `bun app/harness/checks.mjs` and `--webkit` each print **thirty clauses, thirty
+     passed**.
+  7. `--falsify` reports **twenty-nine mutations, each isolating the clause it owns**,
+     in both engines.
+  8. `bun app/driver/drive.mjs` and `--falsify` pass, unchanged.
+  9. `bun web/check.mjs` passes.
+  10. **A person's reading at the window**, since neither rig can see a native tooltip:
+      - Open a project under your home folder. Hovering the footer's name shows
+        `~/…/<file>`. Click a row in a subfolder: the name and the hover both follow.
+      - Open a figure row: the hover names the figure's path. Close it: the edited
+        file's path comes back.
+      - In the web app, hovering shows the project-relative path, with no `~`.
+  11. `git status` is clean after clauses 1–9.
+
+- **Close-out:**
+
+  **`rules/desktop-panes.md`** — the footer cell's paragraph gains the title and its
+  one writer; *"`Status`'s thirteen fields"* becomes fourteen; clause and mutation
+  counts. **`rules/desktop-compile.md`** — `Status`'s fields, if it lists them; the
+  implementer re-greps for `thirteen` across `rules/`, `app/src` and `project/src`
+  before the commit. **`rules/web-app.md`** — one sentence: the web window's hover
+  shows the project-relative path, because `folder` is `None` there.
+
+  **`README.md`** — the footer paragraph gains one sentence: hover the file name to see
+  where it is.
+
+  **`specs/INDEX.md` and `rules/INDEX.md` are regenerated.** **No `CLAUDE.md` change.**
+
+- **Commit plan.** The drafted phase lands first, on its own, ahead of review. Then one
+  push, two commits:
+  1. `Status::folder`, `homely`, `Session::status`, the typedef, `namePaneFile`, the
+     stub's field, and harness clause 29 with its mutation, plus gate clauses 2–4;
+  2. the rules, the README, the indexes and the `shipped` date.
 
 <!--
 The review record is a sibling file, not a section: it lives at
