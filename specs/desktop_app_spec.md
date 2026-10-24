@@ -149,7 +149,7 @@ phases:
     cut: null
     by: null
   - name: "Phase 29 — the footer's name turns into its path under the pointer"
-    reviewed: null
+    reviewed: 2026-10-24
     shipped: null
     cut: null
     by: null
@@ -8583,10 +8583,14 @@ recommend"*.
     flag and calls `namePaneFile`. **The handlers write nothing themselves.** The cell
     has one writer (Phase 15), and a status or a figure arriving while the pointer is
     over the cell must still land on the right text.
-  - **`namePaneFile` composes the title once**, into a local, and writes it to `title`
-    as now. **The text is that string while `pointerOnCell` is set**, and the bare
-    name otherwise. The cell carries the class `whole` exactly while it shows the path.
-    With no path, the flag changes nothing: the cell is empty and has no title.
+  - **`namePaneFile` composes the title once**, into a local `whole`: `null` with no
+    path, otherwise Phase 28's `` `${projectFolder}/${path}` `` or `path`. It writes
+    that to `title` with the same two-line `if (whole === null) … removeAttribute('title')`
+    / `else … setAttribute('title', whole)` shape Phase 28 used, so a mutation can still
+    remove exactly that write. **The text is `whole` while `pointerOnCell` is set**, and
+    the bare name otherwise. The cell carries the class `whole` exactly while it shows
+    the path. With no path, the flag changes nothing: the cell is empty and has no
+    title.
   - **CSS: `#edited.whole { direction: rtl }` and `#edited.whole > span {
     unicode-bidi: isolate; direction: ltr }`.** With `rtl` on the cell, its existing
     `text-overflow: ellipsis` cuts at the left. The isolated `ltr` span keeps the path's
@@ -8599,7 +8603,9 @@ recommend"*.
   - **The bar may shift under the pointer, and that is accepted.** The cell sizes to
     its text and only grows on entry, since a path is never shorter than its last
     segment. So the pointer cannot fall out of the cell it just entered, and the swap
-    cannot oscillate. `#receipt` beside it moves right while the path shows. `#controls`
+    cannot oscillate. A status landing mid-hover can name a shorter path and shrink
+    the cell. If the pointer is then outside it, `pointerleave` fires and the bare name
+    returns, which is one step and not a loop, since the bare name is shorter still. `#receipt` beside it moves right while the path shows. `#controls`
     keeps its auto margin, so the group on the right stays put until the cell has taken
     all the free space.
   - **No keyboard path and no ARIA change.** The cell is not focusable, and a screen
@@ -8611,18 +8617,38 @@ recommend"*.
     `folder: '~/Papers/Gate'`, and `edited` and `main` both to `parts/ch1/deep.md`,
     Phase 28's clause 29 fixture and for its reason. Then it fires `rendered` and
     requires the text `deep.md` with no class `whole`. It hovers `#edited` with
-    `page.hover` and requires the text `~/Papers/Gate/parts/ch1/deep.md`, the class
-    `whole`, and a title equal to the text. **While still hovering**, it sets `edited`
+    `page.hover` and requires the text `~/Papers/Gate/parts/ch1/deep.md` and the class
+    `whole`. **It does not read the `title`.** That is clause 29's, and reading it here
+    would make `cell-untitled` fail both clauses. **While still hovering**, it sets `edited`
     and `main` both to `sections/text.md` and fires `rendered`. It then requires
     `~/Papers/Gate/sections/text.md`, so a status that lands mid-hover keeps the path.
     It moves the mouse to `(0, 0)` and requires `text.md` back and no `whole`.
 
-    **The cut half:** at `WIDTHS`' last width, with `folder` set to `` `~/${LONG_NAME}`
-    `` so the path cannot fit, it hovers again. It first requires the cell to overflow,
-    `scrollWidth > clientWidth`, so the half cannot pass vacuously. Then it requires the
-    rect of the path's last character, taken through a `Range` over the span's text
-    node, to lie within the cell's rect. That is a property and not a metric literal:
-    it holds at any width at which the cell overflows.
+    **The cut half**, in order: it sets the viewport to `WIDTHS`' last width at
+    `HEIGHT`, sets `folder` to `` `~/${LONG_NAME}` `` with `edited` and `main` still
+    `sections/text.md`, fires `rendered`, and hovers `#edited` again. It requires the
+    rect of the path's last character to have **a positive width** and to lie within
+    the cell's rect. The rect is taken through a `Range` over the span's text node.
+    That is a property and not a metric literal. It *notes* whether the cell overflows
+    (`scrollWidth > clientWidth`) and does not require it.
+
+    **Why those two conditions, measured in round 48 and re-measured by the author.**
+    WebKit gives every character cut by the ellipsis a zero-width rect at the
+    ellipsis point, inside the cell. So "within the cell" alone holds with the
+    `#edited.whole` rule dropped there, and only the positive width tells the two apart.
+    Chromium puts a cut character's rect outside the cell instead. On a scratch page at
+    a 240px bar holding that path, the clean CSS gives a last character 5.6px wide
+    inside the cell in both engines. With the rule dropped, Chromium gives x 364 against
+    a cell ending at 177.5, and WebKit gives width 0.
+
+    **Why overflow is noted and not required:** `flex-min`. That mutation removes
+    `min-width: 0` and `overflow: hidden` from `#edited`, so the cell grows to its text
+    and does not overflow. A required overflow would then fail this clause beside
+    clause 3, and `flex-min` would stop isolating. In that layout the last character
+    is inside the cell and drawn, so the clause passes as it should. **The half is held
+    non-vacuous by `whole-cut-at-end`'s falsification instead.** If the clean run ever
+    stopped overflowing at this width, that mutation would fail nothing and `--falsify`
+    would report it not isolating.
 
     The error clause becomes 31.
 
@@ -8637,12 +8663,17 @@ recommend"*.
     end and the file name is what goes. Two mutations own one clause, the precedent
     being clause 3, because they break its two halves. Each body goes in `serve.mjs`'s
     `MUTATIONS`, guarded to match exactly once, and `checks.mjs`'s `OWNS` gains both.
-    `checks.mjs`'s header *"`--falsify` runs all twenty-nine"* becomes thirty-one.
+    `checks.mjs`'s header *"`--falsify` runs all twenty-nine"* becomes thirty-one, and
+    `OWNS`'s comment *"clause 3 is where that stands"* names clause 30 beside it.
+  - **`cell-untitled` keeps its job and gets its new match text.** Its body matches the
+    two title lines `namePaneFile` now writes, over `whole` rather than the inline
+    template, and removes them. The text under the pointer still becomes the path,
+    and clause 30 reads no title, so the mutation fails clause 29 alone, as before.
   - **Whether another clause leaves the pointer over `#edited` is measured, not
     assumed.** `--falsify` is the check. A clause that does would see the path where it
     expects the bare name, and the clean run would fail. If that happens, the fix goes
-    in that clause, as a `page.mouse.move(0, 0)` like clauses 10 and 16 already make, and is said in its
-    comment.
+    in that clause, as a `page.mouse.move(0, 0)` like clauses 10 and 16 already make,
+    and is said in its comment.
 
 - **Deliberately not in this phase:** a click on the name; a path on the panel's rows;
   any change in the web app beyond what the shared page gives it (the path there is
@@ -8672,10 +8703,11 @@ recommend"*.
 
   **`rules/desktop-panes.md`**: the footer cell's paragraph gains the swap, its flag,
   that the writer is still one, and the start-cut. Clause and mutation counts move to
-  31 and 31. **It has four lines of room under its `max_lines: 820`** once Phase 28's
+  31 and 31, and the harness paragraph's *"clause 3 is where that now stands"* names
+  clause 30 too. **It has four lines of room under its `max_lines: 820`** once Phase 28's
   close-out has landed, so a neighbour is tightened in the same pass if the sentence
-  does not fit. **`README.md`**: Phase 28's footer sentence becomes *"Point at the name
-  to see where that file is."* **No other rule moves**: no field, no command and no
+  does not fit. **`README.md`**: Phase 28's footer sentence, *"Hover over the name to
+  see where that file is."*, becomes *"Point at the name to see where that file is."* **No other rule moves**: no field, no command and no
   host is touched. **`specs/INDEX.md` and `rules/INDEX.md` are regenerated.** **No
   `CLAUDE.md` change.**
 

@@ -2,6 +2,60 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 49 — Phase 29 only — 2026-10-24 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. The reviewer checked all three blockers as resolved against the file
+and against its own probe at a 240px viewport in both engines.
+- Under `flex-min` the last character is inside the cell and drawn, so `flex-min`
+  fails clause 3 alone.
+- With `#edited.whole` dropped, WebKit's cut characters read width 0 and Chromium's
+  last character falls outside the cell. So `whole-cut-at-end` fails clause 30 in
+  both engines.
+
+The reviewer read all 29 existing mutations against clause 30 and found none that
+reaches it:
+- **`cell-main`**: `main` equals `edited` throughout.
+- **`figure-unnamed`**: the clause opens no figure.
+- **`cell-untitled`**: the clause reads no title.
+- **`footer-last`**: the module script runs after parsing either way.
+- **`controls-auto-margin`**: the cell's room is unchanged.
+- **The rest** reach nothing the clause reads.
+
+Re-derived: 30 + 1 clauses, 29 + 2 mutations, and 816/820 lines in
+`rules/desktop-panes.md` with Phase 28's close-out in the tree.
+
+### Round 48 — Phase 29 only — 2026-10-24 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0**, answered by the author: Phase 29 produces no new observable, and says so.
+What it buys is the path where the eye already is, instead of in a tooltip a second
+later. The author asked for it at the window after Phase 28 was built. It is one flag,
+one span and one CSS rule, and that is the right size for what it buys.
+
+Three blockers, each a mutation that would have stopped isolating, so gate 4 could not
+have passed:
+- **`cell-untitled`.** Clause 30 asked for a title equal to the text, so dropping the
+  title write failed both clauses. The rewritten title write also left that mutation's
+  match text stale. **Resolved:** clause 30 reads no title. `namePaneFile` keeps Phase
+  28's two-line title-write shape over a local `whole`, and the mutation gets the new
+  match text.
+- **`flex-min`.** Clause 30 required the cell to overflow. That mutation lets the cell
+  grow to its text, so the clause failed beside clause 3. **Resolved:** overflow is
+  noted and not required. The half is held non-vacuous by `whole-cut-at-end`'s
+  falsification.
+- **`whole-cut-at-end` in WebKit.** WebKit gives every character cut by the ellipsis a
+  zero-width rect inside the cell, so "the last character lies within the cell" held
+  with the rule dropped. **Resolved:** the rect must also have a positive width.
+  Re-measured by the author on a scratch page at a 240px bar:
+  - clean: 5.58px wide and inside in Chromium, 5.86px and inside in WebKit;
+  - rule dropped: x 364 against a cell ending at 177.5 in Chromium, width 0 in WebKit.
+
+Four non-blocking findings, all accepted:
+- the cut half's setup order is now stated;
+- the two "clause 3 is where that stands" comments now name clause 30 too;
+- a status landing mid-hover can shrink the cell, which costs one `pointerleave` and
+  no loop;
+- the README sentence is quoted as Phase 28's close-out leaves it.
+
 ### Round 47 — Phase 28 only — 2026-10-23 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking. Both blockers were verified resolved against the working-tree file, the
