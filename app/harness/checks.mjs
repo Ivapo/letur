@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all twenty-nine. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all thirty-one. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -53,7 +53,9 @@ const flag = (name, fallback = null) => {
    **Two mutations may own one clause without either being redundant**, and
    clause 3 is where that stands: `flex-min` reaches the footer's half — the
    brand pushed out of a bar that holds one line — and `header-wraps` reaches
-   the header's, a pinned box whose children have left it. `views-one-way` was
+   the header's, a pinned box whose children have left it. Clause 30 is the
+   second: `cell-stays-bare` reaches its swap, the name that never turns into
+   its path, and `whole-cut-at-end` its cut, a path that loses its file name. `views-one-way` was
    the other such pair and was withdrawn when the header gave its copies up:
    it reached the sync between a toggle's two copies, and there is one copy. */
 const OWNS = {
@@ -85,7 +87,9 @@ const OWNS = {
   'web-button-always': 26,
   'create-stays-put': 27,
   'news-deaf': 28,
-  'cell-untitled': 29
+  'cell-untitled': 29,
+  'cell-stays-bare': 30,
+  'whole-cut-at-end': 30
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -2585,6 +2589,120 @@ const theNameSaysWhereItIs = async (browser, url) => {
   return errors
 }
 
+/* 30. **The footer's name turns into its path under the pointer**, and a path
+       too long for the cell is cut at its start. `mpdf-003` Phase 29.
+
+       **It never reads the `title`**: that is clause 29's, and reading it here
+       would make `cell-untitled` fail both. **No figure is opened**: the text
+       under the pointer comes from the same `path` the bare name does, so the
+       figure is clause 11's, and opening one here would make `figure-unnamed`
+       fail two clauses. **`main` equals `edited` throughout**, for `cell-main`,
+       as in clause 29.
+
+       **The cut is read as the path's last character, drawn and inside the
+       cell** — a property, through a `Range` over the span's text node, and no
+       metric literal. Both conditions, because the engines differ in how they
+       place a character the ellipsis cut, measured in round 48: Chromium puts
+       its rect outside the cell, WebKit gives it zero width at the ellipsis,
+       inside. "Within the cell" alone would pass `whole-cut-at-end` in WebKit.
+
+       **Overflow is noted and not required**, because of `flex-min`: with
+       `min-width: 0` and `overflow: hidden` gone the cell grows to its text and
+       does not overflow, its last character is inside and drawn, and the clause
+       passes as it should. The half is held non-vacuous by `whole-cut-at-end`
+       instead: if the clean run stopped overflowing here, that mutation would
+       fail nothing and `--falsify` would say so. */
+const theNameTurnsIntoItsPath = async (browser, url) => {
+  const page = await opened(browser, url)
+  const DEEP = 'parts/ch1/deep.md'
+  const TEXT = 'sections/text.md'
+  const FOLDER = '~/Papers/Gate'
+
+  const read = () =>
+    page.evaluate(() => {
+      const cell = document.getElementById('edited')
+      return { text: cell.textContent, whole: cell.classList.contains('whole') }
+    })
+  const rendered = async (patch) => {
+    await page.evaluate((patch) => {
+      window.__harness.set(patch)
+      window.__harness.fire('rendered')
+    }, patch)
+    await settle(page)
+  }
+
+  await rendered({ folder: FOLDER, edited: DEEP, main: DEEP })
+  const bare = await read()
+
+  await page.hover('#edited')
+  await settle(page)
+  const under = await read()
+
+  await rendered({ edited: TEXT, main: TEXT })
+  const landed = await read()
+
+  await page.mouse.move(0, 0)
+  await settle(page)
+  const left = await read()
+
+  await page.setViewportSize({ width: WIDTHS.at(-1), height: HEIGHT })
+  await rendered({ folder: `~/${LONG_NAME}` })
+  await page.hover('#edited')
+  await settle(page)
+  const cut = await page.evaluate(() => {
+    const cell = document.getElementById('edited')
+    const text = cell.firstElementChild?.firstChild
+    if (!(text instanceof Text) || text.length === 0) return { text: cell.textContent, last: null }
+    const range = document.createRange()
+    range.setStart(text, text.length - 1)
+    range.setEnd(text, text.length)
+    const last = range.getBoundingClientRect()
+    const box = cell.getBoundingClientRect()
+    return {
+      text: cell.textContent,
+      last: { left: last.left, right: last.right, width: last.width },
+      box: { left: box.left, right: box.right },
+      overflows: cell.scrollWidth > cell.clientWidth
+    }
+  })
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  note(
+    `the cell: ${JSON.stringify(bare)} → under the pointer ${JSON.stringify(under)} → a status mid-hover ` +
+      `${JSON.stringify(landed)} → left ${JSON.stringify(left)}`
+  )
+  note(`at ${WIDTHS.at(-1)}px: ${JSON.stringify(cut)}`)
+
+  const drawnInside =
+    cut.last !== null &&
+    cut.last.width > 0 &&
+    cut.last.left >= cut.box.left &&
+    cut.last.right <= cut.box.right
+  const checks = [
+    bare.text === 'deep.md' && !bare.whole ? null : `open on ${DEEP} gave ${JSON.stringify(bare)}`,
+    under.text === `${FOLDER}/${DEEP}` && under.whole
+      ? null
+      : `under the pointer the cell gave ${JSON.stringify(under)}`,
+    landed.text === `${FOLDER}/${TEXT}` && landed.whole
+      ? null
+      : `a status landing mid-hover gave ${JSON.stringify(landed)}`,
+    left.text === 'text.md' && !left.whole ? null : `the pointer leaving gave ${JSON.stringify(left)}`,
+    cut.text === `~/${LONG_NAME}/${TEXT}` && drawnInside
+      ? null
+      : `a path too long for the cell lost its end: ${JSON.stringify(cut)}`
+  ].filter(Boolean)
+
+  ok(
+    30,
+    'the name turns into its path under the pointer, and a long path is cut at its start',
+    checks.length === 0,
+    checks.join('; ') || 'bare, the path under the pointer, kept through a status, bare again, and the end kept at the floor'
+  )
+  return errors
+}
+
 const run = async ({ engine, headed, rev, doc, mutate }) => {
   passed = 0
   failed = 0
@@ -2633,7 +2751,8 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       theWebLineAndWhatWrapsInThePane,
       aCreateTakesThePane,
       theNewItemsReachThePage,
-      theNameSaysWhereItIs
+      theNameSaysWhereItIs,
+      theNameTurnsIntoItsPath
     ]) {
       gather(await check(browser, held.url))
     }
@@ -2648,7 +2767,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    30,
+    31,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +

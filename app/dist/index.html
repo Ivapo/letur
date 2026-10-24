@@ -1455,6 +1455,23 @@
         text-overflow: ellipsis;
       }
       /*
+        **Under the pointer the cell holds the whole path, and a path too long
+        for it is cut at its start**, so what goes is the folder and not the
+        file name. `mpdf-003` Phase 29. `rtl` on the cell is what moves the
+        ellipsis above to the left; the span inside is isolated and `ltr` so the
+        path keeps its own order, and without the isolation the leading `~`
+        moves to the right end. Measured on a scratch page in both engines
+        before it was written. Outside `whole` the cell is as it was, so a bare
+        name too long for the bar is still cut at its end.
+      */
+      #edited.whole {
+        direction: rtl;
+      }
+      #edited.whole > span {
+        unicode-bidi: isolate;
+        direction: ltr;
+      }
+      /*
         The receipt a save leaves, `mpdf-003` Phase 19. **Transient, and every
         word of it chosen in Rust** — `app/src/main.rs:save` and `save_as` answer
         it and `sayReceipt` places it, the bar's own rule that nothing here is
@@ -1859,7 +1876,7 @@
           </svg>
         </button>
       </span>
-      <span id="edited"></span>
+      <span id="edited"><span></span></span>
       <!--
         What the last save did, for four seconds. Empty the rest of the time, and
         `#receipt:empty` is what keeps an empty one out of the bar's gaps.
@@ -2090,6 +2107,9 @@
       // The footer's left cell. Named for the cell rather than for the field,
       // because `panelRows` and `fileRow` already take an `edited` of their own.
       const editedCell = document.getElementById('edited')
+      // The text goes in the cell's one child, which the start-cut's bidi
+      // isolation needs; the cell's `textContent` is the same string either way.
+      const editedName = /** @type {HTMLSpanElement} */ (editedCell.firstElementChild)
 
       /*
         What the last save did, said for four seconds.
@@ -2989,6 +3009,15 @@
           @type {string | null} */
       let projectFolder = null
 
+      /** Whether the pointer is over the cell, which turns its text into the
+          path. **The two handlers set it and write nothing themselves**: the
+          cell has one writer, and a status or a figure landing mid-hover must
+          still land on the right text. `mpdf-003` Phase 29.
+          @type {boolean} */
+      let pointerOnCell = false
+      editedCell.addEventListener('pointerenter', () => ((pointerOnCell = true), namePaneFile()))
+      editedCell.addEventListener('pointerleave', () => ((pointerOnCell = false), namePaneFile()))
+
       /* What an include marker is resolved and compared against, and they are
          `report`'s in the same statement `edited` is. **No new field on
          `Status`**: both are already sent, already typed and already read by
@@ -3012,12 +3041,24 @@
         and no `aria-label` — the cell is text, so a screen reader already reads
         the bare name, and the path is a hover detail rather than its name.
         `mpdf-003` Phase 28.
+
+        **Under the pointer the text is the title's own string**, and the cell
+        wears `whole` exactly while it shows it — the class the start-cut hangs
+        on. The bar may shift under the pointer and that is accepted: a path is
+        never shorter than its last segment, so the cell only grows on entry and
+        the pointer cannot fall out of the cell it just entered. A status that
+        names a shorter path mid-hover can shrink it from under the pointer;
+        `pointerleave` then brings the bare name back, which is shorter still,
+        so that is one step and not a loop. `mpdf-003` Phase 29.
       */
       function namePaneFile() {
         const path = figureInPane ?? editedPath
-        editedCell.textContent = path?.split('/').pop() ?? ''
-        if (path === null) editedCell.removeAttribute('title')
-        else editedCell.setAttribute('title', projectFolder === null ? path : `${projectFolder}/${path}`)
+        const whole = path === null ? null : projectFolder === null ? path : `${projectFolder}/${path}`
+        if (whole === null) editedCell.removeAttribute('title')
+        else editedCell.setAttribute('title', whole)
+        const showing = pointerOnCell && whole !== null
+        editedName.textContent = showing ? whole : (path?.split('/').pop() ?? '')
+        editedCell.classList.toggle('whole', showing)
       }
 
       /*

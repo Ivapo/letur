@@ -385,10 +385,32 @@ const MUTATIONS = {
      reads passes and only the one about where the file is fails. */
   'cell-untitled': (page) => {
     const block =
-      "        if (path === null) editedCell.removeAttribute('title')\n" +
-      "        else editedCell.setAttribute('title', projectFolder === null ? path : `${projectFolder}/${path}`)\n"
+      "        if (whole === null) editedCell.removeAttribute('title')\n" +
+      "        else editedCell.setAttribute('title', whole)\n"
     if (page.split(block).length !== 2) die('the mutation cell-untitled found no single title write')
     return page.replace(block, '')
+  },
+
+  /* The cell never takes the path. **The two listeners and nothing else**: the
+     title is still written, the bare name still follows a figure, and the
+     start-cut's rule is still there to wear — so only the clause about what the
+     pointer turns the name into fails. `mpdf-003` Phase 29. */
+  'cell-stays-bare': (page) => {
+    const block =
+      "      editedCell.addEventListener('pointerenter', () => ((pointerOnCell = true), namePaneFile()))\n" +
+      "      editedCell.addEventListener('pointerleave', () => ((pointerOnCell = false), namePaneFile()))\n"
+    if (page.split(block).length !== 2) die('the mutation cell-stays-bare found no single pair of listeners')
+    return page.replace(block, '')
+  },
+
+  /* The path is cut at its end, so the file name is what goes. **The `rtl` rule
+     and nothing else**: the cell still takes the path and still wears `whole`,
+     and the isolated span inside it now changes nothing, so the clause's swap
+     half passes and its cut half fails. `mpdf-003` Phase 29. */
+  'whole-cut-at-end': (page) => {
+    const rule = page.match(/\n( *)#edited\.whole \{\n[\s\S]*?\n\1\}\n/g)
+    if (rule?.length !== 1) die('the mutation whole-cut-at-end found no single #edited.whole rule')
+    return page.replace(rule[0], '\n')
   },
 
   /* The row's delete draws its mark and names nothing explicitly. **The
