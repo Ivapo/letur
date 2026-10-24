@@ -150,7 +150,7 @@ phases:
     by: null
   - name: "Phase 29 — the footer's name turns into its path under the pointer"
     reviewed: 2026-10-24
-    shipped: null
+    shipped: 2026-10-24
     cut: null
     by: null
 
