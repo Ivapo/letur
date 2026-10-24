@@ -144,7 +144,7 @@ phases:
     cut: null
     by: null
   - name: "Phase 28 — the footer's name says where the file is"
-    reviewed: null
+    reviewed: 2026-10-23
     shipped: null
     cut: null
     by: null
@@ -8410,7 +8410,17 @@ and the project-relative path in the web app.
   `strip_prefix` does not justify one. **The `~` is composed in Rust**, by Phase 3's
   rule that the page places words and does not choose them. The `Session::status` doc
   comment's *"twelve of the thirteen fields"* becomes *"twelve of the fourteen"*. Both
-  of the fields that are not the last compile's are the host's.
+  of the fields that are not the last compile's are the host's. **One guard, bound
+  once**: `Session::status` takes `self.preview()` into a local and reads both the root
+  and `status()` from it. Writing `folder: self.preview()…, ..self.preview().status()`
+  locks the same non-reentrant `Mutex` twice in one expression and hangs.
+
+  **The typedef test moves with it.**
+  `the_page_typedefs_name_exactly_the_fields_status_serializes` asserts
+  `declared.len()` against a literal `13`, and builds a `Status { … }` literal. The
+  literal becomes `14`, the struct literal gains `folder: Some(..)` with any path, so
+  the serialized key is present, and the doc comment's history gains *"from thirteen
+  to fourteen in `mpdf-003` Phase 28, which added `folder`"*.
 
   **`web/src/lib.rs` — nothing.** Its `status` spreads `..self.preview.status()`, so it
   inherits `folder: None` from `Preview::status`. That is the web answer: the page
@@ -8430,18 +8440,38 @@ and the project-relative path in the web app.
     `title` renders in the shipping WKWebView (Phase 16).
 
   **`app/harness/`:**
-  - `stub.mjs`'s status gains `folder: null`, so a run that sets nothing reads as the
-    web host.
+  - `stub.mjs`'s **two** status literals, `EMPTY` and `OPEN`, each gain `folder:
+    null`, so a run that sets nothing reads as the web host.
   - **Clause 29, new: *the footer's name says where the file is.*** It sets `folder:
-    '~/Papers/Gate'`, `edited: 'chapters/intro.md'` and fires `rendered`. It requires
-    `#edited`'s text to be `intro.md` and its `title` to be
-    `~/Papers/Gate/chapters/intro.md`. It opens a figure row and requires the title to
-    be `~/Papers/Gate/` plus the figure's path, then closes the figure and requires the
-    edited path back. It sets `folder: null` and requires the title to be
-    `chapters/intro.md`. After `__harness.reset()` and a `rendered`, it requires no
-    `title` attribute at all. The error clause becomes 30.
+    '~/Papers/Gate'`, and `edited` and `main` **both** to `parts/ch1/deep.md`, a
+    fixture file in a subfolder, then fires `rendered`. It requires `#edited`'s text
+    to be `deep.md` and its `title` to be `~/Papers/Gate/parts/ch1/deep.md`. It clicks
+    the `mark.svg` row, the figure clause 11 opens, which is `sections/mark.svg` in
+    `tests/fixtures/panel`. With the figure up it reads the cell's text and requires
+    the title to be `` `~/Papers/Gate/${p}` ``. Here `p` is `sections/mark.svg` when
+    the cell reads `mark.svg`, and `parts/ch1/deep.md` when the cell reads `deep.md`.
+    Any other text fails the clause. It presses Escape and requires
+    `~/Papers/Gate/parts/ch1/deep.md` back. It sets `folder: null` and requires the
+    title to be `parts/ch1/deep.md`. After `__harness.reset()` and a `rendered`, it
+    requires no `title` attribute at all. The error clause becomes 30.
+
+    **Two choices here keep the existing mutations isolating**, which gate 7 needs,
+    and `rules/desktop-panes.md`'s record of clause 18 is why it is said here:
+    - **`main` equals `edited`**, so `cell-main` leaves clause 29 unchanged. That
+      mutation rewires the cell to `state.main`, and clause 18 already only notes
+      `#edited` for the same reason. This is the precedent at `checks.mjs`'s
+      `set({ edited: name, main: name })`.
+    - **With the figure up, the clause checks that the title describes whatever the
+      cell names**, not that the cell names the figure. `figure-unnamed` leaves the
+      cell on `deep.md`, and a title of `…/parts/ch1/deep.md` is then correct, so
+      only clause 11 fails, as before. Which name the cell shows is clause 11's job.
+      Clause 29's job is that the title follows the cell, and it still fails a title
+      left on the edited file under a figure.
   - **Mutation `cell-untitled`**, owned by clause 29: `namePaneFile`'s title write is
-    dropped. `OWNS` gains `'cell-untitled': 29`.
+    dropped. Its body goes in `serve.mjs`'s `MUTATIONS`, guarded to match exactly once
+    like its neighbours, and `checks.mjs`'s `OWNS` gains `'cell-untitled': 29`.
+    `checks.mjs`'s header *"`--falsify` runs all twenty-eight"* becomes
+    twenty-nine.
 
 - **Deliberately not in this phase:** a click on the name (to reveal it in Finder, or
   to copy the path); the window title, which names the file and keeps doing so; any
@@ -8458,7 +8488,9 @@ and the project-relative path in the web app.
      use it rather than a string prefix.
   3. **`Session::status` names the folder, and `Preview::status` does not.** Over a
      scratch project, `Session::status().folder` is `Some` of `homely` applied to the
-     project root, and `Preview::status().folder` is `None`.
+     project root, and `Preview::status().folder` is `None`. **This gate covers only
+     the plumbing.** A scratch project sits under `$TMPDIR`, outside `HOME`, so the
+     value passes through unchanged. Gate 2 alone holds the `~`.
   4. `the_page_typedefs_name_exactly_the_fields_status_serializes` passes with the
      typedef and its serialized `Status` both carrying `folder`. Its doc comment's count
      moves from thirteen to fourteen.
@@ -8481,8 +8513,13 @@ and the project-relative path in the web app.
 
   **`rules/desktop-panes.md`** — the footer cell's paragraph gains the title and its
   one writer; *"`Status`'s thirteen fields"* becomes fourteen; clause and mutation
-  counts. **`rules/desktop-compile.md`** — `Status`'s fields, if it lists them; the
-  implementer re-greps for `thirteen` across `rules/`, `app/src` and `project/src`
+  counts. **It has six lines of room under its `max_lines: 820`**, so the sentence is
+  written to fit, and it tightens a neighbour if it does not. **`rules/desktop-compile.md`**
+  — *"**Thirteen fields**, the appearance and the web line beside the eleven the last
+  compile fills"* is reworded for fourteen, with the folder beside the appearance as
+  the host's. **`rules/desktop.md`** — the `main.rs:status` paragraph's *"the first
+  knowing a field the second cannot"* becomes two fields. The implementer re-greps
+  **case-insensitively** for `thirteen` across `rules/`, `app/src` and `project/src`
   before the commit. **`rules/web-app.md`** — one sentence: the web window's hover
   shows the project-relative path, because `folder` is `None` there.
 

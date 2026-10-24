@@ -2,6 +2,56 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 47 — Phase 28 only — 2026-10-23 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. Both blockers were verified resolved against the working-tree file, the
+fixture and `app/harness/serve.mjs:MUTATIONS`. The reviewer read all 28 existing
+mutations, and none reaches clause 29 as now written. `cell-main` leaves it unchanged
+because `main` equals `edited`. `figure-unnamed` fails clause 11 alone, because the
+figure half asks only that the title describe what the cell names. `cell-untitled`
+isolates, because no other clause reads `#edited`'s `title`. Neither neighbour's
+match-once string is disturbed by `projectFolder` or the title write. Re-derived: 29 + 1
+clauses, 28 + 1 mutations, and the typedef count 13 → 14.
+
+### Round 46 — Phase 28 only — 2026-10-23 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0**, answered by the author: Phase 28 produces no new observable, and says so.
+What it buys is telling two same-named files apart, and seeing which folder a project
+opened from Finder came from. The author asked for it at the window. It is one field
+and one attribute, and that is the right size for what it buys.
+
+Two blockers. Both are the trap `rules/desktop-panes.md` records for clause 18: a new
+clause reading `#edited` also fails under an existing mutation, so that mutation stops
+isolating and gate 7 cannot pass.
+- **`cell-main`** rewires the cell to `state.main`, which is `book.md` after `opened()`,
+  so clause 29's `chapters/intro.md` assertions failed under it too. Resolved: the
+  clause sets `edited` and `main` both to `parts/ch1/deep.md`, a real fixture file in a
+  subfolder, following `checks.mjs:sweep`'s precedent.
+- **`figure-unnamed`** drops `raiseFigure`'s naming, so a figure-title assertion of
+  "the figure's path" failed under it too. The stub serves both figures, so no row
+  reaches `saySoInstead`. Resolved: with the figure up, the clause requires the title
+  to describe whatever the cell names (`sections/mark.svg` for `mark.svg`, the edited
+  path for `deep.md`, anything else fails). Which name the cell shows stays clause
+  11's job.
+
+Six non-blocking findings, all accepted and folded in:
+- The typedef test's `declared.len()` literal `13` and its `Status` literal are named.
+- The close-out names `rules/desktop-compile.md`'s capitalised *"Thirteen fields"* and
+  `rules/desktop.md`'s *"the first knowing a field the second cannot"*. The re-grep is
+  case-insensitive.
+- `rules/desktop-panes.md` has six lines of room under its cap (814/820).
+- `Session::status` binds one guard. Two `self.preview()` calls in one expression
+  would deadlock.
+- `checks.mjs`'s *"twenty-eight"*, `serve.mjs`'s `MUTATIONS`, and both stub literals
+  `EMPTY` and `OPEN` are named.
+- Gate 3 is said to cover plumbing only, since a scratch project sits outside `HOME`.
+
+Verified as cited: `Status`'s thirteen fields; `Preview::status`'s `appearance`
+precedent; `Session::status` and its doc comment; `web/src/lib.rs:status`'s spread;
+`namePaneFile` as the cell's one writer, with its four call sites; the typedef's
+thirteen properties; 29 clauses with the error clause last, 28 `OWNS` entries;
+`__harness.reset()` and `set()`; `homely`'s cases under `Path::strip_prefix`.
+
 ### Round 45 — Phase 27 only — 2026-10-23 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking. The blocker was verified resolved against the working-tree file and
