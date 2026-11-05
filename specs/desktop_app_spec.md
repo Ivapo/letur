@@ -164,7 +164,7 @@ phases:
     cut: null
     by: null
   - name: "Phase 32 — Escape in the text pane stays in the pane"
-    reviewed: null
+    reviewed: 2026-11-05
     shipped: null
     cut: null
     by: null
@@ -9142,14 +9142,21 @@ fullscreen**, so the claim is checked in two parts, below, and the second is a p
   - **Clause 31 gains an assertion and no clause is added**: with focus in `#text`, an
     `Escape` keydown reaches `document` with `defaultPrevented` true (a `keydown` listener the
     clause installs on `document` for the purpose, reading the flag after the page's own has
-    run). The clause already presses `Escape`, so this reads the one it makes. The error
+    run: a bubble-phase listener installed before the first `Escape` press, which either of
+    the clause's two presses can be read from; probed in both engines in round 55). The clause already presses `Escape`, so this reads the one it makes. The error
     clause does not move.
   - **Mutation `escape-passes`**, owned by clause 31: the `preventDefault` is dropped from the
     `Escape` branch. Guarded in `serve.mjs`'s `MUTATIONS` to match exactly once, and
-    `checks.mjs`'s `OWNS` gains it. **The mutation count rises by one and the clause count by
+    `checks.mjs`'s `OWNS` gains it; its match-once string is the `Escape` branch's own
+    `preventDefault` line, whose indent and context are not `tab-default`'s. **The mutation count rises by one and the clause count by
     none, from whichever phase last left them**: Phase 31 is reviewed and unshipped, so this
     phase does not name an absolute number.
   - **Both engines** run it. The assertion is on the event's flag, which both set alike.
+
+- **The `isComposing` carve-out has no harness reading**, said here rather than found:
+  Playwright cannot synthesise a composing `Escape`, and the guard protects an input method's
+  own cancel rather than the observable. It is the one statement `escape-passes` does not
+  reach, and gate item 5 covers it only if a person composes at the window.
 
 - **Deliberately not in this phase:** anything about leaving fullscreen from the keyboard
   another way; `Escape` outside the text pane; the rename field's own `Escape`; any change to
@@ -9173,7 +9180,8 @@ fullscreen**, so the claim is checked in two parts, below, and the second is a p
   6. `git status` is clean after the gate.
 
 - **Close-out:** **`rules/desktop-panes.md`** changes the sentence that `Escape` calls no
-  `preventDefault` and its mutation counts. **No other rule moves.** `README.md` needs
+  `preventDefault` and its mutation counts, which are read off the tree at build time (the
+  `covers` frontmatter and the body's *"broken copies"* and *"broken pages"*). **No other rule moves.** `README.md` needs
   nothing, since no keystroke the reader uses changes meaning. **`specs/INDEX.md` and
   `rules/INDEX.md` are regenerated.** **No `CLAUDE.md` change.**
 

@@ -2,6 +2,32 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 55 — Phase 32 only — 2026-11-05 — fresh reviewer with repo access — **READY (converged)**
+
+**Round 0**, answered by the author: the phase produces no observable and says so. It
+changes whether `Escape` takes the window out of fullscreen while the author types, which
+the page never draws. Argued explicitly, so it stands.
+
+Zero blocking, in one round. The reviewer opened every citation and they held: the `keydown`
+listener on `#text` and its `Escape` branch (no `preventDefault`), the `escaped` flag and
+its `blur` reset, the window-level figure-closing listener (which reads no `defaultPrevented`),
+`#new-name`'s own listener on the field, `app/src/main.rs`'s `.fullscreen()` item, and clause
+31's two `Escape` presses. `OWNS` and `MUTATIONS` each hold 33, matching Phase 31's starting
+point, and Phase 31 does not touch clause 31, so the relative counts hold in either order.
+
+The reviewer probed a bare page in Chromium and WebKit: with the textarea-level
+`preventDefault` present, a `document` and a `window` bubble listener both read
+`defaultPrevented === true`; with it dropped, both read `false`. So the clause's assertion
+sees the flag and `escape-passes` flips it. `preventDefault` stops no other listener, so
+the figure-closing `Escape` and clause 27's field `Escape` are unaffected.
+
+Six non-blocking. Accepted and folded in: the `isComposing` carve-out has no harness
+reading, now said; the assertion's listener is a bubble-phase one installed before the first
+press, either press serving; `escape-passes`'s match-once string is the `Escape` branch's own
+line; the rule's counts are read off the tree at build time. Already covered, no change: the
+relative gate counts are deliberate, and the fullscreen half is a stated hypothesis with a
+cut arm. Rejections: none.
+
 ### Round 54 — Phase 31 only — 2026-11-05 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking, on the third round, which is the cap. The round-53 blocker is resolved:
