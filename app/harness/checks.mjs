@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all thirty-one. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all thirty-three. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -89,7 +89,9 @@ const OWNS = {
   'news-deaf': 28,
   'cell-untitled': 29,
   'cell-stays-bare': 30,
-  'whole-cut-at-end': 30
+  'whole-cut-at-end': 30,
+  'tab-default': 31,
+  'tab-assigns': 31
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -2703,6 +2705,111 @@ const theNameTurnsIntoItsPath = async (browser, url) => {
   return errors
 }
 
+/* 31. **Tab indents and Shift+Tab outdents, and undo holds.** `mpdf-003`
+       Phase 30.
+
+       **The two engines are made alike by waiting.** WebKit merges typing and
+       an indent into one undo group unless 600 ms pass between them, and an
+       assignment to `value` resets Chromium's undo stack, so the clause settles
+       after each. **Selections are asserted by the text they cover and not by
+       offsets**, since the engines place the caret differently after a
+       multi-line `insertText`. The undo chord is `ControlOrMeta+z`.
+
+       **Exactly one `edit` per key** is read off the invokes, since
+       `insertText` fires an `input` event per character and per break. */
+const tabIndentsAndUndoHolds = async (browser, url) => {
+  const page = await opened(browser, url)
+  const wait = () => page.waitForTimeout(600)
+  const value = () => page.evaluate(() => document.getElementById('text').value)
+  const edits = () =>
+    page.evaluate(() => window.__harness.invokes().filter((i) => i.name === 'edit').length)
+  const covered = () =>
+    page.evaluate(() => {
+      const t = document.getElementById('text')
+      return t.value.slice(t.selectionStart, t.selectionEnd)
+    })
+  const select = (a, b) =>
+    page.evaluate(([a, b]) => document.getElementById('text').setSelectionRange(a, b), [a, b])
+  const focusId = () => page.evaluate(() => document.activeElement?.id ?? document.activeElement?.tagName)
+
+  await page.evaluate(() => {
+    const t = document.getElementById('text')
+    t.value = ''
+    t.focus()
+  })
+  await wait()
+  await page.keyboard.type('- a')
+  await wait()
+  await page.evaluate(() => window.__harness.forget())
+  await page.keyboard.press('Tab')
+  const indented = await value()
+  const focused = await focusId()
+  const indentEdits = await edits()
+  await page.keyboard.press('Shift+Tab')
+  const outdented = await value()
+
+  await page.evaluate(() => {
+    document.getElementById('text').value = 'x\ny\nz'
+    document.getElementById('text').focus()
+  })
+  await wait()
+  await page.evaluate(() => window.__harness.forget())
+  await select(0, 3)
+  await page.keyboard.press('Tab')
+  const multi = await value()
+  const multiEdits = await edits()
+  const multiCovered = await covered()
+  await page.keyboard.press('ControlOrMeta+z')
+  const undone = await value()
+
+  await wait()
+  await select(0, 2)
+  await page.keyboard.press('Tab')
+  const columnZero = await value()
+
+  await page.evaluate(() => {
+    document.getElementById('text').focus()
+  })
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Tab')
+  const left = await focusId()
+  await page.evaluate(() => document.getElementById('text').focus())
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('a')
+  await page.keyboard.press('Tab')
+  const kept = await focusId()
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  note(
+    `indent ${JSON.stringify(indented)} (${indentEdits} edit, focus ${focused}) → ${JSON.stringify(outdented)}; ` +
+      `multi ${JSON.stringify(multi)} (${multiEdits} edit, covered ${JSON.stringify(multiCovered)}) → undo ${JSON.stringify(undone)}; ` +
+      `column 0 ${JSON.stringify(columnZero)}; Escape,Tab → ${left}; Escape,a,Tab → ${kept}`
+  )
+
+  const checks = [
+    indented === '    - a' && focused === 'text' ? null : `Tab gave ${JSON.stringify(indented)} with focus on ${focused}`,
+    indentEdits === 1 ? null : `Tab made ${indentEdits} edit calls`,
+    outdented === '- a' ? null : `Shift+Tab gave ${JSON.stringify(outdented)}`,
+    multi === '    x\n    y\nz' ? null : `a multi-line Tab gave ${JSON.stringify(multi)}`,
+    multiEdits === 1 ? null : `a multi-line Tab made ${multiEdits} edit calls`,
+    multiCovered === '    x\n    y' ? null : `the selection after it covered ${JSON.stringify(multiCovered)}`,
+    undone === 'x\ny\nz' ? null : `one undo gave ${JSON.stringify(undone)}`,
+    columnZero === '    x\ny\nz' ? null : `a selection ending at column 0 gave ${JSON.stringify(columnZero)}`,
+    left !== 'text' ? null : 'Escape then Tab left focus on the text',
+    kept === 'text' ? null : `Escape, a, Tab moved focus to ${kept}`
+  ].filter(Boolean)
+
+  ok(
+    31,
+    'Tab indents and Shift+Tab outdents, one edit and one undo step a key, and Escape then Tab leaves',
+    checks.length === 0,
+    checks.join('; ') || 'indent, outdent, three lines in one undo step, the column-0 rule, and the escape'
+  )
+  return errors
+}
+
 const run = async ({ engine, headed, rev, doc, mutate }) => {
   passed = 0
   failed = 0
@@ -2752,7 +2859,8 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       aCreateTakesThePane,
       theNewItemsReachThePage,
       theNameSaysWhereItIs,
-      theNameTurnsIntoItsPath
+      theNameTurnsIntoItsPath,
+      tabIndentsAndUndoHolds
     ]) {
       gather(await check(browser, held.url))
     }
@@ -2767,7 +2875,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    31,
+    32,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +

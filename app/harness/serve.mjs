@@ -413,6 +413,28 @@ const MUTATIONS = {
     return page.replace(rule[0], '\n')
   },
 
+  /* `Tab` is left to the webview, so the key moves focus. **The `preventDefault`
+     and nothing else.** `mpdf-003` Phase 30. */
+  'tab-default': (page) => {
+    const call = '        e.preventDefault()\n\n        const value = text.value\n'
+    if (page.split(call).length !== 2) die('the mutation tab-default found no single Tab preventDefault')
+    return page.replace(call, '        const value = text.value\n')
+  },
+
+  /* The change is an assignment to `value`, with `noteEdit` still called after
+     it: the text and the one `edit` are right and the undo is not. `mpdf-003`
+     Phase 30. */
+  'tab-assigns': (page) => {
+    const call =
+      "            if (s === '') document.execCommand('delete')\n" +
+      "            else document.execCommand('insertText', false, s)\n"
+    if (page.split(call).length !== 2) die('the mutation tab-assigns found no single insertText call')
+    return page.replace(
+      call,
+      '            text.value = text.value.slice(0, text.selectionStart) + s + text.value.slice(text.selectionEnd)\n'
+    )
+  },
+
   /* The row's delete draws its mark and names nothing explicitly. **The
      `aria-label` write and nothing else**: the mark still resolves, still wears
      its two inks, still deletes, and the button is left with `title` alone —

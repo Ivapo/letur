@@ -4585,6 +4585,13 @@
       // a refusal is cleared by a keystroke: a compile error is the truth about
       // the document until the next compile says otherwise.
       let refusing = false
+      // `mpdf-003` Phase 30. `indenting` is set around the one `insertText` a
+      // `Tab` makes, so the `input` events that call fires (one per character
+      // and per line break, in both engines) do not each reach Rust; the
+      // handler calls `noteEdit` once after. `escaped` is set by `Escape` in the
+      // text pane and lets the next `Tab` through, so the pane is no keyboard trap.
+      let indenting = false
+      let escaped = false
 
       function fail(problem) {
         error.textContent = String(problem)
@@ -6210,7 +6217,9 @@
       // Every change goes to Rust, which holds the buffer and owns the
       // debounce. A debounce in this page would be logic reachable only by
       // typing at the window, and no test could hold it.
-      text.addEventListener('input', () => {
+      // **It is the only place `edit` is called from**; `Tab` below reaches it
+      // through here once per key.
+      function noteEdit() {
         // The author has moved on, so a refusal stops being the news. Guarded
         // on `refusing` so a compile error is not blanked for the 300 ms until
         // the typing debounce puts it back.
@@ -6222,6 +6231,92 @@
         }
         invoke('edit', { text: text.value })
         relines()
+      }
+      text.addEventListener('input', () => {
+        if (indenting) return
+        noteEdit()
+      })
+
+      /* `mpdf-003` Phase 30. `Tab` indents by four spaces, `Shift+Tab` outdents,
+         and a selection holding a newline indents every line it touches (a last
+         line it reaches only at column 0 is left out). Every change is an
+         `execCommand('insertText')`, the one route onto the textarea's undo
+         stack in both engines, and a multi-line change is a single one, so one
+         key is one undo step. `Escape` then `Tab` leaves the pane. */
+      const INDENT = '    '
+      text.addEventListener('blur', () => (escaped = false))
+      text.addEventListener('keydown', (e) => {
+        if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return
+        if (e.key === 'Escape') {
+          escaped = true
+          return
+        }
+        if (e.key !== 'Tab' || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) {
+          escaped = false
+          return
+        }
+        if (escaped) {
+          escaped = false
+          return
+        }
+        e.preventDefault()
+
+        const value = text.value
+        const start = text.selectionStart
+        const end = text.selectionEnd
+        const insert = (s) => {
+          indenting = true
+          try {
+            // An empty `insertText` is a no-op in some engines; a selection
+            // being removed is `delete`, which is on the same undo stack.
+            if (s === '') document.execCommand('delete')
+            else document.execCommand('insertText', false, s)
+          } finally {
+            indenting = false
+          }
+          noteEdit()
+        }
+        const lineStart = (at) => value.lastIndexOf('\n', at - 1) + 1
+        const lineEnd = (at) => {
+          const n = value.indexOf('\n', at)
+          return n < 0 ? value.length : n
+        }
+        const multi = value.slice(start, end).includes('\n')
+
+        if (!multi) {
+          const from = lineStart(start)
+          if (!e.shiftKey) {
+            // The indent goes at the line's start, wherever the caret is, so
+            // `- a` then `Tab` nests the item.
+            text.setSelectionRange(from, from)
+            insert(INDENT)
+            text.setSelectionRange(start + INDENT.length, end + INDENT.length)
+            return
+          }
+          const line = value.slice(from, lineEnd(start))
+          const cut = line.startsWith('\t') ? 1 : line.match(/^ {0,4}/)[0].length
+          if (cut === 0) return
+          const [a, b] = [start, end].map((p) => Math.max(from, p - cut))
+          text.setSelectionRange(from, from + cut)
+          insert('')
+          text.setSelectionRange(a, b)
+          return
+        }
+
+        const first = lineStart(start)
+        // A last line the selection reaches only at column 0 is left out.
+        const last = lineEnd(end > lineStart(end) ? end : end - 1)
+        const lines = value.slice(first, last).split('\n')
+        const out = lines.map((l) => {
+          if (!e.shiftKey) return INDENT + l
+          const cut = l.startsWith('\t') ? 1 : l.match(/^ {0,4}/)[0].length
+          return l.slice(cut)
+        })
+        const block = out.join('\n')
+        if (block === lines.join('\n')) return
+        text.setSelectionRange(first, last)
+        insert(block)
+        text.setSelectionRange(first, first + block.length)
       })
 
       // **The click asks and does not act.** It names the other of the two and
