@@ -159,7 +159,7 @@ phases:
     cut: null
     by: null
   - name: "Phase 31 — the buffer saves itself after a pause"
-    reviewed: null
+    reviewed: 2026-11-05
     shipped: null
     cut: null
     by: null
@@ -8866,9 +8866,12 @@ autosave**, and `mpdf-010` gave the reason: the save is deliberate, and the dive
 rule `mpdf-003` OQ-5 settled depends on it. **Step 1 does not fire**, because no
 *shipped behaviour* is removed: a deliberate `Cmd+S` still works and still means what it
 did. It is `mpdf-010`'s **statement of the decision** that is now misleading, and §6.1
-answers that with a dated `CORRECTED` note in place, which this phase's first commit adds
-beside `mpdf-010`'s non-goal. **Step 2 puts the phase here**, because this spec owns
+answers that with a dated `CORRECTED` note in place, which this phase's first commit
+added beside `mpdf-010`'s non-goal. **Step 2 puts the phase here**, because this spec owns
 `save`, `Preview::save` and the divergence rule.
+
+**Strictly after Phase 30.** Its clause and mutation counts below start from the ones
+Phase 30 leaves (32 clauses, 33 mutations).
 
 **Asked for at the window**, 2026-11-05: *"we need to add an autosave feature"*. Asked to
 choose, the author chose **a save after a typing pause** (about one to two seconds, and on
@@ -8877,110 +8880,215 @@ rather than letting it overwrite the outside edit.
 
 **Why OQ-5 survives.** The rule was *refuse when the buffer is dirty, take the disk copy
 when it is clean*. Autosave keeps the buffer clean more often, which makes the second
-half more common, and it never has to override the first: **when the disk differs from
-`saved`, autosave writes nothing and raises the same divergence.**
+half more common, and it never has to override the first: **when the disk holds something
+that is neither the buffer nor the last-saved text, autosave writes nothing and raises the
+same divergence.**
+
+**Round 52 corrected the first draft here, and the correction is the design.**
+`external_change(file, buffer, saved)` never compares `file` to `saved`: a dirty buffer
+over a disk still equal to `saved` is `Diverged`, which is the *ordinary* autosave case,
+so a draft that asked it "is the disk untouched" would never have written. And its doc
+comment already records a limit: an author who keeps typing between a save and that
+save's event gets a `Diverged` that was really the app's own write. Under a deliberate
+save that costs one extra `Cmd+S`. **Under autosave it would be the common case and it
+would stop autosave until one.** Both are one change, below.
 
 - **Scope:**
 
-  **`project/src/preview.rs`** (the crate with no clock and no window):
-  - **`Preview::autosave(&mut self) -> Autosave`**, with `Autosave` one of `Clean` (the
-    buffer equals `saved`, nothing written), `Held` (a divergence is already set, or the
-    disk file now differs from `saved`, nothing written) and `Wrote`. **It reads the file
-    before it writes**, asking `external_change` its existing three-string question. A
-    `Taken` or `Diverged` answer is `Held`, and the second sets the divergence exactly as
-    `reload` does. That read closes the window where an outside write has landed and its
-    filesystem event has not: without it autosave could overwrite an edit the app has not
-    heard about yet. A write is `save()`'s own, so `saved` moves with it and its filesystem
-    event arrives as `Unchanged`, with no second compile.
-  - **`Held` leaves the buffer alone.** The author resolves it as today: `Save` overwrites
-    the disk, reopening takes it, and either clears the divergence, after which autosave
-    resumes on the next pause.
+  **`project/src/preview.rs`** (the crate with no clock and no window, shared by the web
+  build):
+  - **`external_change` gains one arm, first after `file == buffer`: `file == saved` is
+    `Unchanged`.** The disk holds exactly what the app last wrote or read, so nothing
+    external has happened, whatever the buffer holds. It changes one case, a dirty buffer
+    over an untouched disk, from `Diverged` to `Unchanged`, and every other answer is
+    as it was. Its doc comment's first stated limit goes, and the second (an outside
+    writer who writes exactly the author's text) stays. **`a_save_as_outside_leaves_an_external_change_diverged_and_not_taken`
+    (`app/src/preview.rs`) writes nothing to the disk, so the file still equals `saved` and
+    it now answers `Unchanged`.** Its intent, that a dirty buffer is never `Taken`, still
+    holds, and the test is corrected to assert `Unchanged` or to write outside bytes
+    first. Any other test asserting the old answer is corrected in the same pass. The web app gets the same improvement
+    through the shared crate, and that is accepted.
+  - **`Preview::autosave(&mut self) -> Autosave`**, with
+    `Autosave` one of `Clean`, `Held`, `Suspended`, `Wrote` and `Failed(String)`.
+    **The order is the specification**, first match wins:
+    1. Nothing open, or no edited file: `Clean`. Nothing is written.
+    2. `buffer == saved`: `Clean`. **This is asked before the disk is read**, so a clean
+       buffer over a changed disk is the watch loop's `Taken` and not autosave's.
+    3. `suspended` (see OQ-B below): `Suspended`.
+    4. A divergence already set: `Held`. **`divergence` also carries the refusal sentences
+       of a refused switch or trash**, so one of those parks autosave too, until a `Save`
+       or an Open clears it. That follows from *a divergence stops autosave*, and is
+       accepted.
+    5. Read the file. A **missing file** goes on to the write, which recreates it as
+       `Save` would. **Any other read error** is `Failed`, with `cannot read …`.
+    6. `external_change(file, buffer, saved)`: **`Diverged` sets the divergence exactly as
+       `reload` does and answers `Held`.** The disk is left as the outside writer made it.
+       `Unchanged` with `file == buffer` moves `saved` to the buffer, writes nothing and
+       answers `Clean`. `Unchanged` otherwise, and a missing file, go to the write.
+       `Taken` cannot arise here, step 2 having returned, and is treated as `Held`.
+    7. The write is `save()`'s own, so `saved` moves with it. **A write error is
+       `Failed`** with `save()`'s own sentence and leaves the buffer dirty, so the next
+       pause tries again. It never sets the divergence.
+  - **`Preview` holds a `suspended` flag**, false by default and rebuilt false by `open()`.
+    See OQ-B.
 
   **`app/src/preview.rs`, `app/src/watch.rs`, `app/src/main.rs`:**
   - **`AUTOSAVE_DEBOUNCE`, 1500 ms**, beside `TYPING_DEBOUNCE` and for the same reason it
     is Rust's: the interval stays on the testable side of the window. It runs on a second
-    `watch::debounced` fed by the same `Session::edit`, and is dropped with the typing
-    channel on every open. **It is not folded into the 300 ms loop**, because a compile
-    per pause and a disk write per pause answer different questions and fold different
-    nudges.
-  - **`Session::autosave`** takes the lock, calls `Preview::autosave`, and on `Wrote`
-    emits an `autosaved` event carrying the receipt. **The receipt rides an event for the
-    reason `save`'s rides its return**: it is an event and not state (Phase 19). On `Held`
-    it emits nothing, and the divergence bar the existing refusal draws is the news.
-  - **A window blur flushes.** The page calls a new `autosave` command on `blur`. **A
-    switch of the edited file, an Open and a quit flush before they ask whether the
-    buffer is dirty**, so `refused_while_dirty` is asked of the buffer *after* its autosave.
-    A flush that returns `Held` still refuses, which is the case the rule exists for.
-  - **`app/capabilities/default.json`** gains nothing: `autosave` is a command the page
-    already may call, like `save`.
+    `watch::debounced` channel that `Session::edit` nudges beside the first, held in a
+    field beside `typing` and **dropped in `arm` with it**, so opening a document moves
+    both. **Its closure carries the same stale-document guard `recompile_with` applies**,
+    so a pause that settles after an open writes nothing into the new document. It is not
+    folded into the 300 ms loop, because a compile per pause and a write per pause answer
+    different questions.
+  - **`Session::autosave`** locks, calls `Preview::autosave` and tells the page through a
+    callback: `Wrote` sends the receipt, `Failed` sends its sentence, and `Clean`, `Held`
+    and `Suspended` send nothing (a `Held` already drew the divergence bar). **The callback
+    is a setter, `Session::set_on_autosave`, called from `main.rs` after `Session::new`**,
+    and not a constructor parameter, which would touch every test's `Session::new`. **It is
+    called before the first open**, so the closure that `arm` builds can clone the callback. It
+    carries two cases that `main.rs` emits as two events, **`autosaved`** (a string, the
+    receipt) and **`autosave-failed`** (a string, the sentence). The receipt rides an event
+    for the reason `save`'s rides its return (Phase 19): it is an event and not state.
+  - **The flush lives in `Session`, never in the crate.** `Session::open`,
+    `Session::set_main` and `Session::set_edited` each call a private `Session::flush`
+    **first**, which is `Session::autosave` run now. Whatever those three did with a dirty
+    buffer before, they still do after a flush that answered `Held`, `Suspended` or
+    `Failed`, and a flush that wrote leaves them a clean buffer. For `open` the flush is of
+    the *old* preview, before it is replaced. **It is kept out of `Preview::set_edited` and
+    `ask_main`** because those are the crate's, which the browser build shares, and a flush
+    there would give the browser an autosave nobody decided on.
+  - **A quit flushes.** `main.rs`'s `app.run` closure, which today matches only
+    `RunEvent::Opened`, gains `RunEvent::ExitRequested`, which calls the same
+    `Session::flush` and does not prevent the exit. **That `Cmd+Q` and a last-window close
+    both deliver `ExitRequested` is assumed and is checked by the person's reading
+    below**; if one does not, `RunEvent::Exit` is the second hook and is measured at plan.
+  - **A window `blur` flushes, and an open dialog holds the timer, in Rust.** The page
+    invokes a new `autosave` command on `blur`. **A native dialog is not a pause in the
+    author's work, and the Rust timer is not the page's**: `saveDocumentAs` invokes `edit`
+    before it opens its panel, which nudges the 1500 ms channel, and choosing a path takes
+    longer than that, so the timer settles with the panel still open and writes the buffer
+    into the very file a Save-as-copy is meant to leave alone (round 53 found this). So a
+    second command, **`autosave_hold(held: bool)`**, sets a `Session` flag. `Session::autosave`
+    — the timer's and the blur's entry — returns at once while it is set and sends nothing.
+    **`Session::flush` ignores it**, because the flushes before `open`, `set_main` and
+    `set_edited` are deliberate acts, and an Open's own dialog is still open when it
+    reaches `open_at`. Releasing it (`held: false`) **nudges the autosave channel**, so a
+    cancelled dialog over a dirty buffer resumes on the next quiet interval and a window
+    that is never typed in again is not left unwritten. **The page sets it first in each
+    of `openDocument`, `saveDocumentAs` and `exportDocument`, before the `edit` that
+    `saveDocumentAs` makes and so before anything that could start the timer, awaits it,
+    and clears it in a `finally`**, so a cancel and a thrown error both release it. The
+    hold is therefore set before the dialog opens, and the blur the dialog causes finds it.
+    **The flag is shared, an `Arc<AtomicBool>` cloned into the timer's closure**, because
+    that closure runs on its own thread holding only clones, as `recompile_with`'s does.
+    **A dialog that never answers keeps the hold set**, and with it autosave off, until the
+    page releases it; that is accepted, the dialog being the author's to answer.
+  - **`app/capabilities/default.json`** gains nothing: the build declares no app manifest,
+    so a command added to `generate_handler!` is callable like `save`.
 
   **`app/dist/index.html`:**
-  - **`listen('autosaved', sayReceipt)`**, beside the `listen('save', …)` line. The receipt
-    is the one `save` shows, and `sayReceipt`'s own rule about the cell staying silent while
-    nothing was saved is untouched.
-  - **`addEventListener('blur', …)` on the window** invokes `autosave` and ignores the
-    answer. The handler cannot place a receipt itself: the event does.
+  - **`listen('autosaved', …)` beside `listen('save', …)`**, placing the receipt through
+    `sayReceipt`, and **`listen('autosave-failed', …)`**, putting the sentence where `fail`
+    does. Both read the event's payload.
+  - **The blur handler and the hold calls swallow the answer and the rejection**:
+    `invoke('autosave').catch(() => {})`, and the same for `autosave_hold`. This matters in the browser: the browser host's
+    `invoke` ends in `throw \`${command} is not answered in a browser\``, and every other
+    command in the page reaches `fail`, which would draw an error bar on every tab blur.
+    **`web/host/host.mjs` is unchanged**, and `autosaved` and `autosave-failed` are events
+    it never sends, as it never sends `rendered`. A hold the browser host rejects is
+    swallowed too, so the open, save-as and export paths there work as they did.
+  - **`app/harness/stub.mjs` answers `autosave` and `autosave_hold`** with nothing, as it
+    answers `save`. **Its dialog answer gains a pending form** (today `dialog.open` resolves
+    `null` at once), which clause 33 needs.
 
-  **`web/`:** **unchanged.** The browser host sends no loops (`rules/web-app.md`), so
-  `autosaved` is an event it never sends and the shared page listens harmlessly, as it
-  already does for `rendered`. Autosave in a browser tab is a separate decision, because
-  the host's own debounce and flush are a different piece of code. See OQ-A.
+- **OQ-B, decided: a Save-as outside suspends autosave.** Phase 19 made a save outside the
+  project a **copy**: the pane keeps the original, `saved`, `edited` and `divergence` are
+  left alone, and the buffer stays dirty against the original. Nothing else tells that
+  case from an ordinary dirty buffer, so without a mark autosave would write the buffer
+  into the original after the next pause. **`Preview::save_as`'s outside branch sets
+  `suspended`.** It is cleared by **`Preview::save`** (the deliberate save, since
+  autosave is suspended), by `save_as`'s inside branch, by `Preview::open`, which rebuilds
+  it, and by a `set_edited` that moves the pane. Until then `autosave` answers `Suspended`.
+  A buffer that becomes clean by `Taken` needs no clear, `Clean` being asked first.
+- **OQ-A, the web app.** Whether the browser host autosaves, and into what. A tab's project
+  is held in the browser's own storage or a granted folder, so a write there has a different
+  cost and failure. *Recommendation: no, and a sentence in the README.* Blocks nothing here.
+- **OQ-C, the interval.** One to two seconds was named. 1500 ms is a guess, not a
+  measurement. It is tuned at the window, and the rule records the number that shipped.
+  **Not blocking.**
 
-- **Open questions this phase carries, and which block it:**
-  - **OQ-A, the web app.** Whether the browser host autosaves, and into what. A tab's
-    project is held in the browser's own storage or a granted folder, so a write there has a
-    different cost and failure. *Recommendation: no, and a sentence in the README.* Blocks
-    nothing here.
-  - **OQ-B, a Save-as outside.** Phase 19 made a save outside the project a **copy**: the
-    pane keeps the original file and the buffer stays dirty against it. **Autosave would
-    then write the buffer into the original after the pause**, which is the thing the
-    author who saved a copy elsewhere may have meant not to do. *Recommendation: autosave
-    is suspended after a Save-as outside, until the next deliberate `Save`, an edit of a
-    different file or an Open.* **This blocks the phase** and is the first thing the review
-    round must decide.
-  - **OQ-C, the interval.** One to two seconds was named. 1500 ms is a guess, not a
-    measurement, and the window it protects is a crash between pauses. It is tuned at the
-    window, and the rule records the number that shipped.
+- **`app/harness/`: two clauses, new.** **Clause 32, *the two autosave events*:**
+  `autosaved` places its receipt, and `autosave-failed` puts its sentence on the page.
+  **Clause 33, *the blur flushes, and a dialog holds the timer*:** a `blur` invokes
+  `autosave` once; and for each of Open, Save as and Export, with the dialog's answer
+  pending, `autosave_hold` has been invoked `true` **before** the dialog and `false`
+  **after** it, **on a cancel (`null`) and on a thrown error as well as on a path**. The
+  error clause becomes 34. **Five mutations:** `autosaved-unheard` (the receipt listener
+  dropped) and `autosave-failure-unheard` (the failure listener dropped), owned by
+  clause 32; `blur-unflushed` (the blur handler dropped), `dialog-unheld` (the hold's
+  `true` dropped) and `hold-unreleased` (the `finally` that releases it dropped), owned by
+  clause 33, **three mutations on one clause, which is the precedent Phase 29 set for two**.
+  Each body goes in `serve.mjs`'s `MUTATIONS`, guarded to match exactly once, and `OWNS`
+  gains all five.
 
-- **Deliberately not in this phase:** a setting to turn autosave off (OQ-C's reading may
-  want one); backups, history or an undo of an autosave; saving a file other than the one
-  in the pane; a merge. **The divergence rule is unchanged.**
+- **Deliberately not in this phase:** a setting to turn autosave off; backups, history or
+  an undo of an autosave; saving a file other than the one in the pane; a merge; autosave
+  in the browser (OQ-A). **The divergence rule is unchanged except for the one arm above.**
 
 - **Exit gate:**
 
-  1. `cargo test --workspace` passes, and **adds**: `autosave` on a clean buffer is
-     `Clean` and writes nothing; on a dirty buffer it is `Wrote`, `saved` moves and the
-     file's bytes equal the buffer's; **with the file changed on disk under a dirty buffer
-     it is `Held`, the file keeps the outside bytes and the divergence is set**, which is
-     the test that fails if the read before the write is removed; with a divergence already
-     set it is `Held`; its own filesystem event is `Unchanged` and compiles nothing.
-     Whatever OQ-B decides gets its own test.
+  1. `cargo test --workspace` passes, and **adds**, for `Preview::autosave`: a dirty buffer
+     over an untouched disk is `Wrote`, `saved` moves and the file's bytes equal the
+     buffer's; a clean buffer is `Clean` and writes nothing, **including over a changed
+     disk**; **with the file changed on disk under a dirty buffer it is `Held`, the file
+     keeps the outside bytes and the divergence is set**, which fails if the check before
+     the write is removed; with a divergence already set it is `Held`; `file == buffer`
+     under a dirty buffer is `Clean`, writes nothing and moves `saved`; a deleted file is
+     recreated; a write into a read-only directory is `Failed` with the buffer still dirty
+     and no divergence; nothing open is `Clean`; **after a `save_as` outside it is
+     `Suspended` and the original's bytes are unchanged, and after a `save()` it writes
+     again**. For `external_change`: the new arm, and **the case the draft would have
+     got wrong**, an autosave write followed by more typing and then that write's event,
+     which is `Unchanged` with no divergence. For `Session`: the callback fires on `Wrote`
+     and `Failed` and not on `Clean`, `Held` or `Suspended`; and `set_edited`, `set_main`
+     and `open` each flush first, **and a flush runs while the hold is set**. **And the
+     case round 53 found, with a short interval the way `Debounce` takes one:** with the hold
+     set, an `edit` and a wait past the interval leave the file unchanged; a `save_as`
+     outside and then the release leaves the original's bytes unchanged; and releasing a
+     hold over a dirty, unsuspended buffer writes after the interval.
   2. A `watch.rs` test, clockless like `Debounce`'s, shows `AUTOSAVE_DEBOUNCE` folding a
      burst into one call.
   3. `bun app/typecheck.mjs`, `bun app/harness/checks.mjs` (both engines, plus `--falsify`)
-     and `bun web/check.mjs` pass with the clause counts Phase 30 left, **plus one clause**
-     that an `autosaved` event places the receipt, with its mutation.
+     and `bun web/check.mjs` pass, **printing thirty-four clauses and thirty-eight
+     mutations**, each isolating the clause it owns. `bun web/check.mjs` must show no
+     error bar and no unhandled rejection from a blur.
   4. `bun app/driver/drive.mjs` and `--falsify` pass, and the driver gains **one case**
      through the real binary: type, wait past the interval, and require the file on disk
      equals the pane. Run serially, per the recorded gate flakes.
   5. **A person's reading at the window**: type and wait, and the file changes without a
      `Cmd+S`; change the file from another editor while the pane is dirty, and the
      divergence bar appears and nothing is overwritten; blur the window and the file is
-     written at once.
+     written at once; **type and press `Cmd+Q` within the interval, reopen, and the text is
+     there**; do the same with the red close button; **type, press Save as…,
+     and leave the panel open for longer than two seconds before choosing a path outside the
+     project: the original file does not change, and keeps not changing as you type on**;
+     and **cancel that panel instead, and the original is written after the pause**.
   6. `git status` is clean after the gate.
 
-- **Close-out:** **`rules/desktop-compile.md`** (the interval, the second debounce and the
-  line *"an author who types and does not save leaves the file behind"*, which stops being
-  true for the file); **`rules/desktop.md`** (the new command and event, and the host
-  surface); **`rules/desktop-project.md` or `desktop-compile.md`**, whichever holds
-  `external_change`, gains the read autosave asks it. **`README.md`**'s save paragraph.
-  **`specs/file_panel_spec.md`** gets the dated `CORRECTED` note in the first commit.
-  **`specs/INDEX.md` and `rules/INDEX.md` are regenerated.** **No `CLAUDE.md` change.**
+- **Close-out:** **`rules/desktop-compile.md`** (the interval, the second debounce, the
+  flush, the quit hook and the line *"an author who types and does not save leaves the
+  file behind"*, which stops being true for the file); **`rules/desktop.md`** (the new
+  command, the setter, the two events and the host surface); **whichever rule holds
+  `external_change`** gains the new arm and loses the first limit; **`rules/web-app.md`**
+  gains that the browser host answers no `autosave` and the page swallows the rejection.
+  **`README.md`**'s save paragraph. **`specs/INDEX.md` and `rules/INDEX.md` are
+  regenerated.** **No `CLAUDE.md` change.**
 
-- **Commit plan.** The drafted phase and the `CORRECTED` note land first, on their own,
-  ahead of review. Then one push, three commits: (1) `Preview::autosave` and its tests;
-  (2) the debounce, the command, the event, the page and the harness and driver cases;
-  (3) the rules, the README, the indexes and the `shipped` date.
+- **Commit plan.** One push, three commits: (1) `external_change`'s arm, `Preview::autosave`,
+  the `suspended` flag and their tests; (2) the debounce, `Session::flush`, the command,
+  the setter, the events, the quit hook, the page, the stub and the harness and driver
+  cases; (3) the rules, the README, the indexes and the `shipped` date.
 
 <!--
 The review record is a sibling file, not a section: it lives at

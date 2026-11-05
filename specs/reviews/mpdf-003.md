@@ -2,6 +2,72 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 54 — Phase 31 only — 2026-11-05 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking, on the third round, which is the cap. The round-53 blocker is resolved:
+`autosave_hold` sets a flag `Session::autosave` honours and `Session::flush` ignores,
+released in a `finally` that nudges the channel. The reviewer re-derived the counts (Phase
+30's 32 clauses and 33 mutations, plus clauses 32 and 33 and five mutations, give 34 and
+38) and read `checks.mjs`'s `OWNS` and the `--falsify` test to confirm several mutations
+may own one clause. A hold released against a flush does not race: release only nudges, and
+the write path re-evaluates the buffer under the preview lock.
+
+Non-blocking, all accepted and folded in: the hold is now set first in each dialog
+function, before `edit`, so no timing margin is relied on; the flag is an
+`Arc<AtomicBool>` cloned into the timer's closure; a dialog that never answers keeps the
+hold set, stated as accepted. Two round numbers the spec itself cites were corrected to 52
+and 53.
+
+### Round 53 — Phase 31 only — 2026-11-05 — the same reviewer, resumed — **NOT READY**
+
+All six round-52 blockers resolved against the file and the code. One new blocker.
+
+- **[BLOCKING] The Rust autosave timer fires while a native dialog is open.** The page's
+  blur guard held only the `blur` invoke. `saveDocumentAs` invokes `edit` before its panel,
+  which starts the 1500 ms debounce, and choosing a path takes longer, so the timer wrote
+  the buffer into the original before `suspended` was set, which is the overwrite OQ-B
+  exists to prevent. Gate item 5 exercised only the state after the save-as, so it would
+  not have caught it. Accepted: `autosave_hold`, a Rust-side flag, replaces the page guard.
+- Checked and sound: the `file == saved` arm against the existing tests, with one test
+  named for correction (`a_save_as_outside_leaves_an_external_change_diverged_and_not_taken`
+  writes nothing to disk and now answers `Unchanged`); the seven-step order; `Session::flush`
+  under the lock structure of `open`, `set_main` and `set_edited`; the quit hook's access
+  to the `Session` through the `AppHandle`; the 34 and 37 counts then stated.
+- Non-blocking, accepted: the setter precedes the first open; the stub gains a pending
+  dialog answer; a refusal sentence rides `divergence` and so also parks autosave until a
+  Save or an Open.
+
+### Round 52 — Phase 31 only — 2026-11-05 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0**, answered by the author: the phase produces no observable and says so. The page
+is drawn from the buffer and that does not change; what changes is that the file catches
+up with it. Argued explicitly, so it stands. The phase also reverses a recorded decision,
+`mpdf-010`'s no-autosave, which it states and corrects in place.
+
+Six blockers, each verified against the code by the author before adjudication.
+- **`external_change` cannot answer the question asked of it.** It never compares the
+  file to `saved`, so the ordinary autosave case, a dirty buffer over an untouched disk,
+  is `Diverged` and autosave would never have written. The author's draft was wrong.
+  Accepted: `external_change` gains a `file == saved` arm, which also removes the
+  documented limit that a save's own event, landing after more typing, reads as a divergence
+  and which under autosave would have been sticky. `Preview::autosave` became an ordered
+  seven-step procedure.
+- **OQ-B was self-declared blocking and left open.** Accepted and decided: a `suspended`
+  flag, with its set and clear points and a gate test.
+- **The `Autosave` outcomes were not exhaustive** (nothing open, write failure, unreadable
+  or missing file, `file == buffer`, clean buffer over a changed disk). Accepted: five
+  outcomes and a stated order, and a `Failed` that reaches the page.
+- **The quit flush had no mechanism.** Accepted: `RunEvent::ExitRequested`, with
+  `RunEvent::Exit` as the stated fallback and a Cmd+Q reading in the gate.
+- **The flush's layer was not stated**, and in the crate it would have given the browser an
+  autosave. Accepted: `Session` only.
+- **The browser host rejects an unknown `autosave` command.** Accepted: the page swallows it.
+- Non-blocking, accepted: an emitter seam as a setter, the stale-document guard on the new
+  closure, and the counts named.
+
+Rejections: none across the three rounds. Numbers re-derived by the reviewer: the clause and
+mutation counts above; no gate number was keyed to a literal that no method reproduces.
+
 ### Round 51 — Phase 30 only — 2026-11-05 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking. Both round-50 blockers resolved against the file. The reviewer's
