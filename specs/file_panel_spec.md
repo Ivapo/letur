@@ -190,6 +190,12 @@ worth reading.
 - **No tabs and no second pane.** One pane, one edited file. §2 records what that
   costs and why the alternative was refused.
 - **No auto-save.** The save stays deliberate, per §2.
+
+  > **CORRECTED 2026-11-05, by `mpdf-003` Phase 31.** The decision above held when it was
+  > made and no longer does: the author asked for autosave, and Phase 31 adds it. The
+  > reason recorded, that the divergence rule `mpdf-003` OQ-5 depends on a deliberate
+  > save, is met by keeping that rule and having autosave decline when the disk differs.
+  > The original is left as written.
 - **No merge.** `mpdf-003` OQ-5's divergence rule is unchanged and the app still
   refuses rather than merging.
 - **A section more than one directory below its master is not opened as a

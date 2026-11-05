@@ -5,7 +5,7 @@ note: >
   A macOS desktop app that shows the PDF while you write: a Tauri window wraps
   the same core crate, watches the document and its images, and re-renders.
 status: accepted
-last_updated: 2026-10-24
+last_updated: 2026-11-05
 
 phases:
   - name: "Phase 1 — the window, and one compile on screen"
@@ -151,6 +151,16 @@ phases:
   - name: "Phase 29 — the footer's name turns into its path under the pointer"
     reviewed: 2026-10-24
     shipped: 2026-10-24
+    cut: null
+    by: null
+  - name: "Phase 30 — Tab indents the text pane by four spaces"
+    reviewed: null
+    shipped: null
+    cut: null
+    by: null
+  - name: "Phase 31 — the buffer saves itself after a pause"
+    reviewed: null
+    shipped: null
     cut: null
     by: null
 
@@ -8716,6 +8726,231 @@ recommend"*.
   1. the span, the flag, `namePaneFile`, the CSS, harness clause 30 and its two
      mutations;
   2. the rule, the README, the indexes and the `shipped` date.
+
+### Phase 30 — Tab indents the text pane by four spaces
+
+*Produces the observable: **no**, and the argument is made here.* Nothing compiles
+differently. **What it buys is the keystroke a nested list needs.** `md2pdf` nests lists
+to any depth (checked by rendering a three-level bullet list, an ordered list inside a
+bullet and a task list with subtasks), but in the text pane `Tab` is the webview's
+default and moves focus to the next control, so an author cannot indent a line without
+leaving the pane. The page the author sees is untouched; the way to write the markdown
+that draws a nested page is what changes.
+
+Appended 2026-11-05, per §6.1. **Step 0 says decision**: how wide, whether `Shift+Tab`
+and a multi-line selection are handled, and whether the key still leaves the pane.
+**Step 1 does not fire**: no shipped behaviour is removed, since the focus move was never
+a documented feature. **Step 2 puts it here**, because this spec owns the text pane
+(Phases 1, 22 and 23).
+
+**Asked for at the window**, 2026-11-05: *"when we press tab we move panels or im not
+sure, but we should just move the cursor 3 or 4 spaces"*. Asked to choose, the author
+chose **four spaces**, **`Shift+Tab` outdents** and **a multi-line selection indents every
+line it touches**. Four is wide enough to nest under `1. ` (3) and under `- ` (2) in
+CommonMark, and it is the width the author named.
+
+- **Scope:**
+
+  **No Rust, no `Status` field, no typedef, no new command.** Every edit this phase makes
+  goes through the existing `input` listener, so `edit` and `relines()` still have one
+  caller.
+
+  **`app/dist/index.html`:**
+  - **One `keydown` listener on `#text`.** It acts on `Tab` with no `Cmd`, `Ctrl` or `Alt`
+    held, and not while `e.isComposing`. It calls `preventDefault` only when it acts.
+  - **`Tab`, collapsed selection:** four spaces at the caret. **`Tab`, a selection that
+    contains a newline:** four spaces at the start of every line the selection touches,
+    and the selection grows to keep covering them. **A selection inside one line** is
+    replaced by four spaces, as typing would.
+  - **`Shift+Tab`:** removes up to four leading spaces, or one leading tab character, from
+    the caret's line or from each line the selection touches. A line with none is left
+    alone. The caret keeps its place in the text it was in, clamped to the line start.
+  - **Every change is made with `document.execCommand('insertText')`**, not
+    `setRangeText` or an assignment to `value`, because only that goes onto the
+    textarea's undo stack: `Cmd+Z` after an indent must undo the indent. It fires `input`,
+    which is why the `edit` call needs no second caller. `execCommand` is deprecated and
+    is still the one route both engines keep; the harness clause below is what notices if
+    that stops being true.
+  - **`Escape` then `Tab` leaves the pane.** A text area that eats `Tab` is a keyboard
+    trap, so a flag set by `Escape` in the pane lets the *next* `Tab` through with its
+    default, and any other key clears it. **`Escape` already closes a figure** (the
+    unconditional listener above) and calls no `preventDefault`, so the two do not
+    contend. The flag is page state beside `refusing`.
+
+  **`app/harness/`:**
+  - **Clause 31, new: *Tab indents and Shift+Tab outdents, and undo holds.*** It types
+    `- a` into `#text`, presses `Tab` and requires the value `    - a` and that focus is
+    still on `#text`. It requires `Shift+Tab` to give `- a` back. It selects two lines,
+    presses `Tab`, and requires both lines indented and **exactly one** `edit` call per
+    key. Then it presses `Cmd+Z` (`Control+Z` is not the chord on this window) and
+    requires the text before the indent. Last, `Escape` then `Tab` must move focus off
+    `#text`. The error clause becomes 32.
+  - **Mutation `tab-default`**, owned by clause 31: the listener's `preventDefault` is
+    dropped, so the key moves focus. **Mutation `tab-assigns`**, owned by clause 31: the
+    `insertText` call becomes an assignment to `value`, so the text is right and undo is
+    not. Each body goes in `serve.mjs`'s `MUTATIONS`, guarded to match exactly once, and
+    `checks.mjs`'s `OWNS` gains both. The header's count becomes thirty-three.
+  - **Both engines.** WebKit's `execCommand` and Chromium's differ in where the caret lands
+    after a multi-line `insertText`, and the clause asserts the selection by what it covers
+    rather than by an offset, for that reason.
+
+- **Deliberately not in this phase:** soft tabs of another width; a setting for the
+  width; auto-continuing a list on `Enter`; indenting inside the panel's rename field; any
+  change to what the dialect accepts, which is a spec in `Ivapo/md2pdf`.
+
+- **Exit gate:**
+
+  1. `bun app/typecheck.mjs` exits 0.
+  2. `cargo test --workspace` passes, unchanged.
+  3. `bun app/harness/checks.mjs` and `--webkit` each print **thirty-two clauses, all
+     passed**, and `--falsify` reports **thirty-three mutations, each isolating the clause
+     it owns**, in both engines.
+  4. `bun app/driver/drive.mjs` and `--falsify` pass, unchanged. `bun web/check.mjs`
+     passes, since the web app wears this page.
+  5. **A person's reading at the window**, since a rig does not use a real WKWebView's
+     input method: `Tab` indents; type `- a`, `Tab`, `- b` and the page draws a nested
+     list; `Shift+Tab` returns it; `Cmd+Z` undoes one indent; `Escape` then `Tab` reaches
+     the next control.
+  6. `git status` is clean after the gate.
+
+- **Close-out:** **`rules/desktop-panes.md`** gains the listener and the `Escape` escape
+  in the text-pane section, and the clause and mutation counts move. **`README.md`** gains
+  a line on `Tab`, `Shift+Tab` and `Escape` then `Tab`. **No other rule moves.**
+  **`specs/INDEX.md` and `rules/INDEX.md` are regenerated.** **No `CLAUDE.md` change.**
+
+- **Commit plan.** The drafted phase lands first, on its own, ahead of review. Then one
+  push, two commits: (1) the listener, harness clause 31 and its two mutations; (2) the
+  rule, the README, the indexes and the `shipped` date.
+
+### Phase 31 — the buffer saves itself after a pause
+
+*Produces the observable: **no**, and the argument is made here.* The page is drawn from
+the buffer, not from the file, and that does not change. **What it buys is that the file
+catches up with the page.** Today an author who types and does not press `Cmd+S` leaves
+the file behind the page for as long as they like (`rules/desktop-compile.md`), and a
+crash or a quit loses what the page was showing.
+
+Appended 2026-11-05, per §6.1. **Step 0 says decision, and it reverses one.**
+`mpdf-010` §1.2 and Phase 17's *"Deliberately not in this phase"* both record **no
+autosave**, and `mpdf-010` gave the reason: the save is deliberate, and the divergence
+rule `mpdf-003` OQ-5 settled depends on it. **Step 1 does not fire**, because no
+*shipped behaviour* is removed: a deliberate `Cmd+S` still works and still means what it
+did. It is `mpdf-010`'s **statement of the decision** that is now misleading, and §6.1
+answers that with a dated `CORRECTED` note in place, which this phase's first commit adds
+beside `mpdf-010`'s non-goal. **Step 2 puts the phase here**, because this spec owns
+`save`, `Preview::save` and the divergence rule.
+
+**Asked for at the window**, 2026-11-05: *"we need to add an autosave feature"*. Asked to
+choose, the author chose **a save after a typing pause** (about one to two seconds, and on
+blur and before a switch), and **that a divergence stops autosave until it is resolved**
+rather than letting it overwrite the outside edit.
+
+**Why OQ-5 survives.** The rule was *refuse when the buffer is dirty, take the disk copy
+when it is clean*. Autosave keeps the buffer clean more often, which makes the second
+half more common, and it never has to override the first: **when the disk differs from
+`saved`, autosave writes nothing and raises the same divergence.**
+
+- **Scope:**
+
+  **`project/src/preview.rs`** (the crate with no clock and no window):
+  - **`Preview::autosave(&mut self) -> Autosave`**, with `Autosave` one of `Clean` (the
+    buffer equals `saved`, nothing written), `Held` (a divergence is already set, or the
+    disk file now differs from `saved`, nothing written) and `Wrote`. **It reads the file
+    before it writes**, asking `external_change` its existing three-string question. A
+    `Taken` or `Diverged` answer is `Held`, and the second sets the divergence exactly as
+    `reload` does. That read closes the window where an outside write has landed and its
+    filesystem event has not: without it autosave could overwrite an edit the app has not
+    heard about yet. A write is `save()`'s own, so `saved` moves with it and its filesystem
+    event arrives as `Unchanged`, with no second compile.
+  - **`Held` leaves the buffer alone.** The author resolves it as today: `Save` overwrites
+    the disk, reopening takes it, and either clears the divergence, after which autosave
+    resumes on the next pause.
+
+  **`app/src/preview.rs`, `app/src/watch.rs`, `app/src/main.rs`:**
+  - **`AUTOSAVE_DEBOUNCE`, 1500 ms**, beside `TYPING_DEBOUNCE` and for the same reason it
+    is Rust's: the interval stays on the testable side of the window. It runs on a second
+    `watch::debounced` fed by the same `Session::edit`, and is dropped with the typing
+    channel on every open. **It is not folded into the 300 ms loop**, because a compile
+    per pause and a disk write per pause answer different questions and fold different
+    nudges.
+  - **`Session::autosave`** takes the lock, calls `Preview::autosave`, and on `Wrote`
+    emits an `autosaved` event carrying the receipt. **The receipt rides an event for the
+    reason `save`'s rides its return**: it is an event and not state (Phase 19). On `Held`
+    it emits nothing, and the divergence bar the existing refusal draws is the news.
+  - **A window blur flushes.** The page calls a new `autosave` command on `blur`. **A
+    switch of the edited file, an Open and a quit flush before they ask whether the
+    buffer is dirty**, so `refused_while_dirty` is asked of the buffer *after* its autosave.
+    A flush that returns `Held` still refuses, which is the case the rule exists for.
+  - **`app/capabilities/default.json`** gains nothing: `autosave` is a command the page
+    already may call, like `save`.
+
+  **`app/dist/index.html`:**
+  - **`listen('autosaved', sayReceipt)`**, beside the `listen('save', …)` line. The receipt
+    is the one `save` shows, and `sayReceipt`'s own rule about the cell staying silent while
+    nothing was saved is untouched.
+  - **`addEventListener('blur', …)` on the window** invokes `autosave` and ignores the
+    answer. The handler cannot place a receipt itself: the event does.
+
+  **`web/`:** **unchanged.** The browser host sends no loops (`rules/web-app.md`), so
+  `autosaved` is an event it never sends and the shared page listens harmlessly, as it
+  already does for `rendered`. Autosave in a browser tab is a separate decision, because
+  the host's own debounce and flush are a different piece of code. See OQ-A.
+
+- **Open questions this phase carries, and which block it:**
+  - **OQ-A, the web app.** Whether the browser host autosaves, and into what. A tab's
+    project is held in the browser's own storage or a granted folder, so a write there has a
+    different cost and failure. *Recommendation: no, and a sentence in the README.* Blocks
+    nothing here.
+  - **OQ-B, a Save-as outside.** Phase 19 made a save outside the project a **copy**: the
+    pane keeps the original file and the buffer stays dirty against it. **Autosave would
+    then write the buffer into the original after the pause**, which is the thing the
+    author who saved a copy elsewhere may have meant not to do. *Recommendation: autosave
+    is suspended after a Save-as outside, until the next deliberate `Save`, an edit of a
+    different file or an Open.* **This blocks the phase** and is the first thing the review
+    round must decide.
+  - **OQ-C, the interval.** One to two seconds was named. 1500 ms is a guess, not a
+    measurement, and the window it protects is a crash between pauses. It is tuned at the
+    window, and the rule records the number that shipped.
+
+- **Deliberately not in this phase:** a setting to turn autosave off (OQ-C's reading may
+  want one); backups, history or an undo of an autosave; saving a file other than the one
+  in the pane; a merge. **The divergence rule is unchanged.**
+
+- **Exit gate:**
+
+  1. `cargo test --workspace` passes, and **adds**: `autosave` on a clean buffer is
+     `Clean` and writes nothing; on a dirty buffer it is `Wrote`, `saved` moves and the
+     file's bytes equal the buffer's; **with the file changed on disk under a dirty buffer
+     it is `Held`, the file keeps the outside bytes and the divergence is set**, which is
+     the test that fails if the read before the write is removed; with a divergence already
+     set it is `Held`; its own filesystem event is `Unchanged` and compiles nothing.
+     Whatever OQ-B decides gets its own test.
+  2. A `watch.rs` test, clockless like `Debounce`'s, shows `AUTOSAVE_DEBOUNCE` folding a
+     burst into one call.
+  3. `bun app/typecheck.mjs`, `bun app/harness/checks.mjs` (both engines, plus `--falsify`)
+     and `bun web/check.mjs` pass with the clause counts Phase 30 left, **plus one clause**
+     that an `autosaved` event places the receipt, with its mutation.
+  4. `bun app/driver/drive.mjs` and `--falsify` pass, and the driver gains **one case**
+     through the real binary: type, wait past the interval, and require the file on disk
+     equals the pane. Run serially, per the recorded gate flakes.
+  5. **A person's reading at the window**: type and wait, and the file changes without a
+     `Cmd+S`; change the file from another editor while the pane is dirty, and the
+     divergence bar appears and nothing is overwritten; blur the window and the file is
+     written at once.
+  6. `git status` is clean after the gate.
+
+- **Close-out:** **`rules/desktop-compile.md`** (the interval, the second debounce and the
+  line *"an author who types and does not save leaves the file behind"*, which stops being
+  true for the file); **`rules/desktop.md`** (the new command and event, and the host
+  surface); **`rules/desktop-project.md` or `desktop-compile.md`**, whichever holds
+  `external_change`, gains the read autosave asks it. **`README.md`**'s save paragraph.
+  **`specs/file_panel_spec.md`** gets the dated `CORRECTED` note in the first commit.
+  **`specs/INDEX.md` and `rules/INDEX.md` are regenerated.** **No `CLAUDE.md` change.**
+
+- **Commit plan.** The drafted phase and the `CORRECTED` note land first, on their own,
+  ahead of review. Then one push, three commits: (1) `Preview::autosave` and its tests;
+  (2) the debounce, the command, the event, the page and the harness and driver cases;
+  (3) the rules, the README, the indexes and the `shipped` date.
 
 <!--
 The review record is a sibling file, not a section: it lives at
