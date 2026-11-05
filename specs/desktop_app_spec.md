@@ -154,7 +154,7 @@ phases:
     cut: null
     by: null
   - name: "Phase 30 — Tab indents the text pane by four spaces"
-    reviewed: null
+    reviewed: 2026-11-05
     shipped: null
     cut: null
     by: null
@@ -8751,20 +8751,40 @@ CommonMark, and it is the width the author named.
 
 - **Scope:**
 
-  **No Rust, no `Status` field, no typedef, no new command.** Every edit this phase makes
-  goes through the existing `input` listener, so `edit` and `relines()` still have one
-  caller.
+  **No Rust, no `Status` field, no typedef, no new command.** The body of the existing
+  `input` listener (the `refusing` reset, `invoke('edit', …)` and `relines()`) becomes a
+  function, `noteEdit`, and **it stays the only place `edit` is called from**.
+
+  **One key is one `noteEdit`, and that needs saying**, because `insertText` of four spaces
+  fires four `input` events in both engines, and a multi-line insert fires one per line
+  and per break (measured in round 1 on a bare textarea in Chromium and WebKit). The
+  `input` listener returns at once while the page flag `indenting` is set, and the `Tab`
+  handler sets it around its `insertText` and calls `noteEdit` exactly once after. A typed
+  character is unaffected, since `indenting` is clear.
 
   **`app/dist/index.html`:**
   - **One `keydown` listener on `#text`.** It acts on `Tab` with no `Cmd`, `Ctrl` or `Alt`
     held, and not while `e.isComposing`. It calls `preventDefault` only when it acts.
-  - **`Tab`, collapsed selection:** four spaces at the caret. **`Tab`, a selection that
-    contains a newline:** four spaces at the start of every line the selection touches,
-    and the selection grows to keep covering them. **A selection inside one line** is
-    replaced by four spaces, as typing would.
-  - **`Shift+Tab`:** removes up to four leading spaces, or one leading tab character, from
-    the caret's line or from each line the selection touches. A line with none is left
-    alone. The caret keeps its place in the text it was in, clamped to the line start.
+  - **Which lines are touched.** With a collapsed selection or one containing no newline,
+    the one line holding the selection. With a selection that contains a newline, every
+    line from the one holding `selectionStart` to the one holding `selectionEnd`, **except
+    that a last line the selection reaches only at column 0 is left out** (the rule most
+    editors use, so a triple-click-and-down selection does not indent the line below it).
+  - **`Tab`, collapsed selection:** four spaces at the caret. **`Tab`, a non-empty
+    selection with no newline:** replaced by four spaces, as typing would. **`Tab`, a
+    selection containing a newline:** four spaces at the start of every touched line.
+  - **`Shift+Tab`**, on the touched lines by the same rule: a line starting with a tab
+    character loses that one character; otherwise it loses up to four leading spaces. The
+    two are not combined, so `  \tx` loses its two spaces and keeps its tab. A line with
+    neither is left alone, and nothing is inserted. **The key is still swallowed** when
+    nothing came off (`preventDefault` is called, `noteEdit` is not), so `Shift+Tab` on an
+    unindented line does not leave the pane.
+  - **One key is one undo step.** For a multi-line change the handler selects from the start
+    of the first touched line to the end of the last (not including its newline), makes a
+    **single** `insertText` of the rewritten block, and leaves that span selected. A
+    single-line change touches only the caret or the replaced text. After a single-line
+    indent the caret is four columns on. After a single-line outdent each end of the
+    selection moves left by the number of characters removed, clamped to the line start.
   - **Every change is made with `document.execCommand('insertText')`**, not
     `setRangeText` or an assignment to `value`, because only that goes onto the
     textarea's undo stack: `Cmd+Z` after an indent must undo the indent. It fires `input`,
@@ -8773,22 +8793,32 @@ CommonMark, and it is the width the author named.
     that stops being true.
   - **`Escape` then `Tab` leaves the pane.** A text area that eats `Tab` is a keyboard
     trap, so a flag set by `Escape` in the pane lets the *next* `Tab` through with its
-    default, and any other key clears it. **`Escape` already closes a figure** (the
+    default. **Any other `keydown` in the pane clears it, except a bare modifier (`Shift`,
+    `Control`, `Alt`, `Meta`), and so does the pane losing focus.** **`Escape` already closes a figure** (the
     unconditional listener above) and calls no `preventDefault`, so the two do not
     contend. The flag is page state beside `refusing`.
 
   **`app/harness/`:**
   - **Clause 31, new: *Tab indents and Shift+Tab outdents, and undo holds.*** It types
-    `- a` into `#text`, presses `Tab` and requires the value `    - a` and that focus is
-    still on `#text`. It requires `Shift+Tab` to give `- a` back. It selects two lines,
-    presses `Tab`, and requires both lines indented and **exactly one** `edit` call per
-    key. Then it presses `Cmd+Z` (`Control+Z` is not the chord on this window) and
-    requires the text before the indent. Last, `Escape` then `Tab` must move focus off
-    `#text`. The error clause becomes 32.
+    `- a` into `#text`, **waits 600 ms** so the typing and the indent are separate undo
+    groups (WebKit merges them otherwise, measured in round 1), presses `Tab` and requires
+    the value `    - a` and that focus is still on `#text`, **and exactly one `edit` call
+    for the key** (`window.__harness.invokes()`, after `forget()`). It requires `Shift+Tab`
+    to give `- a` back. **It then sets the value `x\ny\nz`, waits 600 ms again (an assignment resets Chromium's undo stack, and the settle keeps the two engines alike), selects from the start of `x`
+    to the middle of `y`, and presses `Tab`**: lines one and two are indented and `z` is
+    not, again with exactly one `edit`. A selection from the start of `x` to column 0 of
+    `y` indents `x` alone. It presses **one** `ControlOrMeta+z` and requires the text
+    before that indent, so a multi-line indent is one undo step. (The window's own chord is
+    `Cmd+Z`; the rig takes whichever its platform has.) Last, `Escape` then `Tab` must move
+    focus off `#text`, and `Escape`, `a`, `Tab` must not. **Selections are asserted by the
+    text they cover and not by offsets**, since the two engines place the caret differently
+    after a multi-line `insertText`. The error clause becomes 32.
   - **Mutation `tab-default`**, owned by clause 31: the listener's `preventDefault` is
     dropped, so the key moves focus. **Mutation `tab-assigns`**, owned by clause 31: the
-    `insertText` call becomes an assignment to `value`, so the text is right and undo is
-    not. Each body goes in `serve.mjs`'s `MUTATIONS`, guarded to match exactly once, and
+    `insertText` call becomes an assignment to `value`, with `noteEdit` still called after
+    it, so the text and the one `edit` are right and the undo is not. The undo
+    assertion fails, and the covered-text assertion may fail with it, since an assignment
+    collapses the selection. Isolation is per clause, so both belong to clause 31. Each body goes in `serve.mjs`'s `MUTATIONS`, guarded to match exactly once, and
     `checks.mjs`'s `OWNS` gains both. The header's count becomes thirty-three.
   - **Both engines.** WebKit's `execCommand` and Chromium's differ in where the caret lands
     after a multi-line `insertText`, and the clause asserts the selection by what it covers

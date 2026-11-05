@@ -2,6 +2,47 @@
 
 Append-only. One heading per round, newest first.
 
+### Round 51 — Phase 30 only — 2026-11-05 — the same reviewer, resumed — **READY (converged)**
+
+Zero blocking. Both round-50 blockers resolved against the file. The reviewer's
+probes showed the `input` events fire synchronously inside `execCommand` in both
+engines, so the `indenting` flag around one `insertText` and a single `noteEdit`
+after it yields one `edit` per key. The column-0 rule agrees between the scope text
+and clause 31, and `Escape`, `a`, `Tab` is sound because pressing `a` clears the flag
+and focus never leaves the pane.
+
+Three new non-blocking, all accepted and folded in: `Shift+Tab` on a line with nothing
+to remove is still swallowed and calls no `noteEdit`; the `tab-assigns` wording now says
+the covered-text assertion may fail beside the undo one, isolation being per clause; the
+clause settles 600 ms again after assigning the `x/y/z` value.
+
+### Round 50 — Phase 30 only — 2026-11-05 — fresh reviewer with repo access — **NOT READY**
+
+**Round 0**, answered by the author: the phase produces no observable and says so. It
+makes nested lists typable from the keyboard, which `md2pdf` already draws, and the
+compile is untouched. Argued explicitly, so it stands.
+
+The reviewer ran probes in Chromium and WebKit on a bare textarea. Citations held: the
+`input` listener, `refusing`, the unconditional `Escape` listener and the `newName`
+listener as the only other `keydown`. The clause counts re-derive (error clause 31
+becomes 32, `OWNS` 31 becomes 33).
+
+- **[BLOCKING] "exactly one `edit` call per key" could not hold.** `insertText` of four
+  spaces fired four `input` events in both engines, and a multi-line insert one per line
+  and break. Accepted: the listener body became `noteEdit`, skipped by `input` while
+  `indenting` is set and called once after.
+- **[BLOCKING] multi-line behaviour under-specified.** Which lines a selection touches,
+  one undo step per key, the selection afterwards, mixed whitespace on outdent. Accepted:
+  all four are now stated, and clause 31 exercises a three-line value and the column-0
+  case with a single undo.
+- Non-blocking, all accepted: WebKit merges typing and indent into one undo group without
+  a pause, so the clause waits 600 ms; the rig takes `ControlOrMeta+z`; `tab-assigns`'s
+  failure mode was reworded; the `Escape` flag's edges (bare modifiers, focus loss) are
+  defined.
+
+Rejections: none. Round 50 measured the event counts above; no number in the phase's gate
+changed.
+
 ### Round 49 — Phase 29 only — 2026-10-24 — the same reviewer, resumed — **READY (converged)**
 
 Zero blocking. The reviewer checked all three blockers as resolved against the file
