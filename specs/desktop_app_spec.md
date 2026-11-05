@@ -163,6 +163,11 @@ phases:
     shipped: null
     cut: null
     by: null
+  - name: "Phase 32 — Escape in the text pane stays in the pane"
+    reviewed: null
+    shipped: null
+    cut: null
+    by: null
 
 extends: null
 supersedes: null
@@ -9096,6 +9101,84 @@ would stop autosave until one.** Both are one change, below.
   the `suspended` flag and their tests; (2) the debounce, `Session::flush`, the command,
   the setter, the events, the quit hook, the page, the stub and the harness and driver
   cases; (3) the rules, the README, the indexes and the `shipped` date.
+
+### Phase 32 — Escape in the text pane stays in the pane
+
+*Produces the observable: **no**, and the argument is made here.* Nothing compiles
+differently and no page changes. **What it buys is that `Escape` no longer takes the
+window out of fullscreen while the author is typing.** The page the author sees is
+untouched.
+
+Appended 2026-11-05, per §6.1. **Step 0 says decision, and it reverses a line**: Phase 30's
+scope says `Escape` in the pane *"calls no `preventDefault`"*, which was written to say the
+figure-closing listener and the new `escaped` flag do not contend. It was not a decision
+about fullscreen, which that round never looked at. **Step 1 does not fire**: no documented
+behaviour is removed. That `Escape` leaves fullscreen is macOS's own default, written down
+nowhere in this repository, and the menu's `Window → Enter Full Screen` (`app/src/main.rs`,
+the `.fullscreen()` item) and `⌃⌘F` still leave it. **Step 2 puts the phase here**, because
+this spec owns the text pane and Phase 30's `Escape` flag.
+
+**Asked for at the window**, 2026-11-05, after Phase 30 was shipped: *"when I type Escape and
+I'm in fullscreen, it escapes fullscreen.. I'm not sure if that's best behavior when I'm
+typing"*. The author asked for it to be looked into and agreed to a phase.
+
+**A hypothesis, stated as one.** The app has no code that leaves fullscreen on `Escape`
+(`grep` finds only the stock Window-menu item), so this is read as AppKit's default for an
+`Escape` the web content did not handle. WKWebView passes a key on to AppKit only when the
+page did not `preventDefault` it. **Neither the harness nor `drive.mjs` can show native
+fullscreen**, so the claim is checked in two parts, below, and the second is a person's.
+
+- **Scope:**
+
+  **No Rust, no `Status` field, no new command.** In the `keydown` listener on `#text` that
+  Phase 30 added, the `Escape` branch (which sets `escaped`) also calls `e.preventDefault()`,
+  **except while `e.isComposing`**, where `Escape` cancels the input method's composition and
+  is not the page's to take. `Tab`, every other key and the `escaped` flag are unchanged, and
+  **the global `Escape` listener that closes a figure is not touched**: `preventDefault`
+  stops no listener, so it still runs. `Escape` pressed with focus anywhere else is
+  unchanged, and still leaves fullscreen.
+
+  **`app/harness/`:**
+  - **Clause 31 gains an assertion and no clause is added**: with focus in `#text`, an
+    `Escape` keydown reaches `document` with `defaultPrevented` true (a `keydown` listener the
+    clause installs on `document` for the purpose, reading the flag after the page's own has
+    run). The clause already presses `Escape`, so this reads the one it makes. The error
+    clause does not move.
+  - **Mutation `escape-passes`**, owned by clause 31: the `preventDefault` is dropped from the
+    `Escape` branch. Guarded in `serve.mjs`'s `MUTATIONS` to match exactly once, and
+    `checks.mjs`'s `OWNS` gains it. **The mutation count rises by one and the clause count by
+    none, from whichever phase last left them**: Phase 31 is reviewed and unshipped, so this
+    phase does not name an absolute number.
+  - **Both engines** run it. The assertion is on the event's flag, which both set alike.
+
+- **Deliberately not in this phase:** anything about leaving fullscreen from the keyboard
+  another way; `Escape` outside the text pane; the rename field's own `Escape`; any change to
+  what the figure surface does with `Escape`.
+
+- **Exit gate:**
+
+  1. `bun app/typecheck.mjs` exits 0.
+  2. `cargo test --workspace` passes, unchanged.
+  3. `bun app/harness/checks.mjs` and `--webkit` each print every clause passed, with the
+     same count as before this phase, and `--falsify` reports one mutation more than before,
+     each isolating the clause it owns, in both engines.
+  4. `bun app/driver/drive.mjs` and `--falsify` pass, unchanged. Run serially, per the
+     recorded gate flakes.
+  5. **A person's reading at the window**, since only the shipped binary has a native
+     fullscreen: enter fullscreen, put the caret in the text pane and press `Escape`, and the
+     window **stays** in fullscreen; then `Escape` then `Tab` still moves to the next control;
+     a figure opened over the pane still closes on `Escape`; and `⌃⌘F` or the Window menu
+     still leaves fullscreen. **If the window still leaves fullscreen, the hypothesis is
+     wrong, and the phase is cut** (`cut` set in `phases[]`) and not shipped.
+  6. `git status` is clean after the gate.
+
+- **Close-out:** **`rules/desktop-panes.md`** changes the sentence that `Escape` calls no
+  `preventDefault` and its mutation counts. **No other rule moves.** `README.md` needs
+  nothing, since no keystroke the reader uses changes meaning. **`specs/INDEX.md` and
+  `rules/INDEX.md` are regenerated.** **No `CLAUDE.md` change.**
+
+- **Commit plan.** One push, two commits: (1) the `preventDefault`, the assertion and
+  `escape-passes`; (2) the rule, the indexes and the `shipped` date.
 
 <!--
 The review record is a sibling file, not a section: it lives at
