@@ -55,12 +55,12 @@ covers: >
   the pane does not draw, and the pane that loses both when it empties, the check that reads this file and the
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
-  because the DOM cannot show one, the thirty-one clauses it
-  asserts as properties and the thirty-one broken pages that falsify them, the rule
+  because the DOM cannot show one, the thirty-two clauses it
+  asserts as properties and the thirty-three broken pages that falsify them, the rule
   that decides what a clause may read as well as what it may assert, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
-max_lines: 820
+max_lines: 840
 generated: 2026-09-22
 ---
 
@@ -84,6 +84,18 @@ selection, the disabled state and the divider's geometry are all still the
 textarea's, and every change goes straight to Rust, which holds the buffer. **No
 autocomplete and no formatting commands**, which were the other two halves of the
 sentence this replaces.
+
+**`Tab` indents and `Shift+Tab` outdents, through one `keydown` listener on `#text`.**
+`Tab` puts four spaces at the start of the line wherever the caret is; `Shift+Tab`
+takes one tab character off, or else up to four leading spaces. A selection holding
+a newline changes every line it touches, bar a last line it reaches only at column 0.
+Each key is one `execCommand('insertText')` (or `delete`), the one route onto the
+textarea's undo stack in both engines, so `Cmd+Z` undoes one key. The `input`
+listener's body is `noteEdit`, **still the only caller of `edit`**; `indenting` makes
+the listener skip the events `insertText` fires, and the handler calls `noteEdit`
+once. **`Escape` then `Tab` leaves the pane**: `escaped` lets the next `Tab` through,
+and any key but a bare modifier, or a blur, clears it. A `Shift+Tab` with nothing to
+remove is swallowed and calls no `noteEdit`.
 
 **The divider's press cancels its own default action, and the capture is not what
 does that.** `setPointerCapture` routes the gesture — the `pointermove`s and the
@@ -805,13 +817,14 @@ sentence — found by a mutation that falsified nothing, not by reading.
 `core:default`'s own words — the half a stub that merely omits it never tests. It also keeps
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
-asserts thirty-one clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against thirty-one broken copies
+asserts thirty-two clauses in Playwright's Chromium and WebKit, **both of which must pass, every
+clause a property and none a metric literal**, and is falsified first against thirty-three broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
-without either being redundant**, and clauses 3 and 30 are where that now stands: `flex-min`
+without either being redundant**, and clauses 3, 30 and 31 are where that now stands: `flex-min`
 reaches the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`
 the header's, a pinned box whose children have left it; `cell-stays-bare` reaches the cell's
-swap and `whole-cut-at-end` its start-cut. Clause 10 was a third such pair; `views-one-way`
+swap and `whole-cut-at-end` its start-cut; `tab-default` reaches the key's swallowing and
+`tab-assigns` its undo. Clause 10 was a third such pair; `views-one-way`
 went when the header gave its copies up, and `marks-unlit` owns it alone. The error clause stays last and its
 number moves as clauses are added, being the only one that accumulates across the others.
 **The rule also decides what a clause may read**, which clause 18 is the record of: it

@@ -253,6 +253,10 @@ so the list holds one, and clicking it draws the first page — the one the docu
 embeds. **A bibliography opens in the pane** like a markdown file, and the page goes on
 compiling the whole document while you edit the citations.
 
+**`Tab` indents the line by four spaces and `Shift+Tab` takes them back**, so a nested list
+is `- a`, `Tab`, `- b`. A selection over several lines moves all of them, and `⌘Z` undoes
+one press. `Escape` then `Tab` moves on to the next control.
+
 ## Developing
 
 The Rust suite needs nothing beyond a toolchain:

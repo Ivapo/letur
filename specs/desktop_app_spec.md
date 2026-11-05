@@ -155,7 +155,7 @@ phases:
     by: null
   - name: "Phase 30 — Tab indents the text pane by four spaces"
     reviewed: 2026-11-05
-    shipped: null
+    shipped: 2026-11-05
     cut: null
     by: null
   - name: "Phase 31 — the buffer saves itself after a pause"
@@ -8748,6 +8748,13 @@ sure, but we should just move the cursor 3 or 4 spaces"*. Asked to choose, the a
 chose **four spaces**, **`Shift+Tab` outdents** and **a multi-line selection indents every
 line it touches**. Four is wide enough to nest under `1. ` (3) and under `- ` (2) in
 CommonMark, and it is the width the author named.
+
+**CORRECTED 2026-11-05, at build.** The scope below says `Tab` inserts four spaces *at the
+caret* and replaces a non-empty single-line selection. Clause 31 and exit-gate item 5
+(`- a`, `Tab`, `- b` draws a nested list) need the indent at the **start of the line**, since
+after typing `- a` the caret is at its end. The author chose line start. As built, a
+single-line `Tab` prefixes the line with four spaces wherever the caret is, replaces nothing,
+and moves each end of the selection four columns on.
 
 - **Scope:**
 
