@@ -92,6 +92,22 @@ pub enum External {
     Diverged,
 }
 
+/// What one autosave came to, `mpdf-003` Phase 31.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Autosave {
+    /// Nothing to write: nothing open, or the buffer is the last-saved text.
+    Clean,
+    /// A divergence stands, already or just now, and the disk was left alone.
+    Held,
+    /// A Save-as outside the project left the buffer dirty against the file the
+    /// pane holds, and writing it there would be the wrong file's overwrite.
+    Suspended,
+    /// The buffer was written and the last-saved text moved with it.
+    Wrote,
+    /// A read or a write failed, in the sentence the window shows.
+    Failed(String),
+}
+
 /// The report a refused external change leaves for the author.
 ///
 /// It names both ways out and takes neither: saving overwrites the disk,
@@ -162,14 +178,17 @@ pub const SAVED: &str = "saved";
 /// still redraws the page with no action taken in the window, which is the
 /// loop Phase 2 shipped and the README documents.
 ///
-/// Two limits it accepts. An author who keeps typing between a save and that
-/// save's event lands in [`External::Diverged`], so the app can name a
-/// divergence that was really its own write — it loses nothing, and the next
-/// save clears it. And an external writer that happens to write exactly the
+/// **The file equal to the last-saved text is `Unchanged` whatever the buffer
+/// holds**, `mpdf-003` Phase 31: the disk says exactly what the app last wrote
+/// or read, so nothing external has happened. It is what lets an author keep
+/// typing between a save and that save's event without the app naming its own
+/// write a divergence, which under autosave would be the common case.
+///
+/// One limit it accepts: an external writer that happens to write exactly the
 /// author's unsaved text takes [`External::Unchanged`], which leaves the
-/// last-saved text unrefreshed. Both err toward keeping work.
+/// last-saved text unrefreshed. It errs toward keeping work.
 pub fn external_change(file: &str, buffer: &str, saved: &str) -> External {
-    if file == buffer {
+    if file == buffer || file == saved {
         External::Unchanged
     } else if buffer == saved {
         External::Taken
@@ -441,6 +460,10 @@ pub struct Preview<F> {
     stale: bool,
     error: Option<String>,
     divergence: Option<String>,
+    /// A Save-as outside the project left the buffer dirty against the original,
+    /// and autosave must not write it there. Cleared by a deliberate save, by a
+    /// Save-as inside, and by a switch of the pane; rebuilt false by an open.
+    suspended: bool,
     /// The images the document names by URL, off the last walk that answered.
     urls: Vec<String>,
     /// The URL the last compile was refused on, if it was one.
@@ -486,6 +509,7 @@ impl<F> Default for Preview<F> {
             stale: false,
             error: None,
             divergence: None,
+            suspended: false,
             urls: Vec::new(),
             refused: None,
             web: Web::default(),
@@ -832,7 +856,68 @@ impl<F: Files> Preview<F> {
 
         self.saved = self.buffer.clone();
         self.divergence = None;
+        self.suspended = false;
         Ok(SAVED.to_string())
+    }
+
+    /// Write the buffer if, and only if, nothing but the author has touched the
+    /// file. `mpdf-003` Phase 31.
+    ///
+    /// **The order is the specification, and the first match wins.** The clean
+    /// buffer is asked before the disk is read, so a clean buffer over a changed
+    /// disk is the watch loop's `Taken` and never autosave's. A divergence
+    /// already set parks it — and that field also carries a refused switch or
+    /// trash, so one of those parks it too until a save or an open clears it.
+    /// **A write error is `Failed` and never a divergence**, and leaves the buffer
+    /// dirty so the next pause tries again.
+    pub fn autosave(&mut self) -> Autosave {
+        let (Some(files), Some(document)) = (&self.files, &self.edited) else {
+            return Autosave::Clean;
+        };
+        if self.buffer == self.saved {
+            return Autosave::Clean;
+        }
+        if self.suspended {
+            return Autosave::Suspended;
+        }
+        if self.divergence.is_some() {
+            return Autosave::Held;
+        }
+
+        let located = files.locate(document);
+        let file = match files.read(&located) {
+            Ok(bytes) => match String::from_utf8(bytes) {
+                Ok(text) => Some(text),
+                Err(_) => {
+                    return Autosave::Failed(format!(
+                        "cannot read {}: stream did not contain valid UTF-8",
+                        located.display()
+                    ))
+                }
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Autosave::Failed(format!("cannot read {}: {e}", located.display())),
+        };
+
+        if let Some(file) = file {
+            match external_change(&file, &self.buffer, &self.saved) {
+                External::Diverged => {
+                    self.divergence = Some(DIVERGED.to_string());
+                    return Autosave::Held;
+                }
+                External::Taken => return Autosave::Held,
+                External::Unchanged if file == self.buffer => {
+                    self.saved = self.buffer.clone();
+                    return Autosave::Clean;
+                }
+                External::Unchanged => {}
+            }
+        }
+
+        match self.save() {
+            Ok(_) => Autosave::Wrote,
+            Err(sentence) => Autosave::Failed(sentence),
+        }
     }
 
     /// Write the buffer to a path the author picked, and hold that file if it is
@@ -919,7 +1004,10 @@ impl<F: Files> Preview<F> {
         if let Some(spelled) = inside {
             self.saved = self.buffer.clone();
             self.divergence = None;
+            self.suspended = false;
             self.edited = Some(spelled);
+        } else {
+            self.suspended = true;
         }
 
         // The listing is refreshed on both paths: a no-op outside, and the
@@ -1283,6 +1371,7 @@ impl<F: Files> Preview<F> {
         }
 
         self.edited = Some(path.to_string());
+        self.suspended = false;
         self.load();
         Ok(Asked::Granted)
     }
@@ -1578,5 +1667,93 @@ mod tests {
             document::remove_file(files, "../escape.md"),
             Err("../escape.md is outside this project".to_string())
         );
+    }
+    fn write(preview: &mut Preview<MemFiles>, path: &str, text: &str) {
+        preview
+            .files_mut()
+            .unwrap()
+            .write(path, text.as_bytes())
+            .unwrap();
+    }
+
+    #[test]
+    fn external_change_takes_a_file_equal_to_the_last_saved_text_as_unchanged() {
+        assert_eq!(external_change("a", "b", "a"), External::Unchanged);
+        assert_eq!(external_change("a", "a", "c"), External::Unchanged);
+        assert_eq!(external_change("x", "a", "a"), External::Taken);
+        assert_eq!(external_change("x", "b", "a"), External::Diverged);
+    }
+
+    /// The case the first draft would have got wrong: an autosave write, more
+    /// typing, and then that write's own event.
+    #[test]
+    fn typing_between_an_autosave_and_its_event_is_not_a_divergence() {
+        let mut preview = opened();
+        preview.edit("# Book, one\n".to_string());
+        assert_eq!(preview.autosave(), Autosave::Wrote);
+        preview.edit("# Book, one and more\n".to_string());
+
+        assert_eq!(preview.reload(), External::Unchanged);
+        assert_eq!(preview.status().divergence, None);
+    }
+
+    #[test]
+    fn a_dirty_buffer_over_an_untouched_disk_is_written() {
+        let mut preview = opened();
+        preview.edit("# Book, typed\n".to_string());
+
+        assert_eq!(preview.autosave(), Autosave::Wrote);
+        assert_eq!(read(&preview, "book.md"), "# Book, typed\n");
+        assert_eq!(preview.saved(), "# Book, typed\n");
+        assert_eq!(preview.status().divergence, None);
+    }
+
+    #[test]
+    fn a_clean_buffer_writes_nothing_even_over_a_changed_disk() {
+        let mut preview = opened();
+        assert_eq!(preview.autosave(), Autosave::Clean);
+
+        write(&mut preview, "book.md", "# Theirs\n");
+        assert_eq!(preview.autosave(), Autosave::Clean);
+        assert_eq!(read(&preview, "book.md"), "# Theirs\n");
+        assert_eq!(preview.status().divergence, None);
+    }
+
+    #[test]
+    fn a_file_changed_under_a_dirty_buffer_is_held_and_left_alone() {
+        let mut preview = opened();
+        preview.edit("# Mine\n".to_string());
+        write(&mut preview, "book.md", "# Theirs\n");
+
+        assert_eq!(preview.autosave(), Autosave::Held);
+        assert_eq!(read(&preview, "book.md"), "# Theirs\n");
+        assert_eq!(preview.status().divergence.as_deref(), Some(DIVERGED));
+        assert_eq!(preview.text(), "# Mine\n");
+    }
+
+    #[test]
+    fn a_divergence_already_set_holds_autosave() {
+        let mut preview = opened();
+        preview.edit("# Mine\n".to_string());
+        assert_eq!(preview.set_edited("sections/one.md"), Ok(Asked::Refused));
+
+        assert_eq!(preview.autosave(), Autosave::Held);
+        assert_eq!(read(&preview, "book.md"), "# Book\n\n[](sections/one.md)\n");
+    }
+
+    #[test]
+    fn a_file_equal_to_a_dirty_buffer_is_clean_and_moves_saved_without_a_write() {
+        let mut preview = opened();
+        preview.edit("# Same\n".to_string());
+        write(&mut preview, "book.md", "# Same\n");
+
+        assert_eq!(preview.autosave(), Autosave::Clean);
+        assert_eq!(preview.saved(), "# Same\n");
+        assert_eq!(preview.status().divergence, None);
+    }
+
+    #[test]
+    fn nothing_open_is_clean() {
+        assert_eq!(Preview::<MemFiles>::default().autosave(), Autosave::Clean);
     }
 }

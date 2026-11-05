@@ -994,7 +994,7 @@ impl Worker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use letur_project::preview::{SAVED, State};
+    use letur_project::preview::{Autosave, SAVED, State};
     use letur_project::remote::WebLine;
     use std::collections::BTreeSet;
     use std::sync::Condvar;
@@ -1709,14 +1709,17 @@ mod tests {
         );
     }
 
-    /// And an event on that file answers [`External::Diverged`], not
-    /// [`External::Taken`].
+    /// And an event on that file is never [`External::Taken`]: untouched, it is
+    /// [`External::Unchanged`], and once an outside writer has changed it, it is
+    /// [`External::Diverged`].
     ///
     /// **The other half of the same unsafe state, and the one that loses work
     /// without any gesture at all.** With `saved == buffer`, [`external_change`]
     /// falls to its middle arm and takes the disk copy over the author's text on
     /// the next event touching that file — the outcome §2's *"Why an external
-    /// change waits for a clean buffer"* names as the one that loses.
+    /// change waits for a clean buffer"* names as the one that loses. **Since
+    /// Phase 31 the first reading is `Unchanged` and not `Diverged`**: the outside
+    /// save wrote nothing to the original, so the file still equals `saved`.
     #[test]
     fn a_save_as_outside_leaves_an_external_change_diverged_and_not_taken() {
         let dir = scratch_dir("save-as-outside-diverged");
@@ -1725,7 +1728,7 @@ mod tests {
         let _ = std::fs::remove_file(&outside);
 
         let (mut session, compiles) = counted();
-        session.open(document).unwrap();
+        session.open(document.clone()).unwrap();
         wait_for(&compiles, 1);
 
         let text = format!(
@@ -1738,6 +1741,9 @@ mod tests {
             .save_as(outside.to_string_lossy().into_owned())
             .unwrap();
 
+        assert_eq!(session.preview().reload(), External::Unchanged);
+
+        std::fs::write(&document, "# Written by another program\n").unwrap();
         assert_eq!(session.preview().reload(), External::Diverged);
     }
 
@@ -4809,5 +4815,69 @@ mod tests {
         let during_the_render = type_one("# typed while its render was held\n");
         gate.release(reading);
         during_the_render.expect("the keystroke waited on the fetch's render");
+    }
+    /// `Preview::autosave` against a real disk, for the three cases a map of
+    /// strings cannot make: a file that is gone, a directory that refuses a
+    /// write, and a Save-as that lands outside the project. `mpdf-003` Phase 31.
+    #[test]
+    fn autosave_recreates_a_deleted_file() {
+        let dir = scratch_dir("autosave-deleted");
+        let document = article_in(&dir);
+        let mut preview = compiled(&document);
+
+        preview.edit("# Typed\n".to_string());
+        std::fs::remove_file(&document).unwrap();
+
+        assert_eq!(preview.autosave(), Autosave::Wrote);
+        assert_eq!(std::fs::read_to_string(&document).unwrap(), "# Typed\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn autosave_into_a_read_only_directory_fails_and_leaves_the_buffer_dirty() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = scratch_dir("autosave-read-only");
+        let document = article_in(&dir);
+        let mut preview = compiled(&document);
+        preview.edit("# Typed\n".to_string());
+
+        let writable = std::fs::metadata(&document).unwrap().permissions();
+        std::fs::set_permissions(&document, std::fs::Permissions::from_mode(0o444)).unwrap();
+        let answer = preview.autosave();
+        std::fs::set_permissions(&document, writable).unwrap();
+
+        // A privileged user writes through a read-only file; the case is about
+        // the failure's shape, so it is only asserted where the write failed.
+        if let Autosave::Failed(sentence) = answer {
+            assert!(sentence.starts_with("cannot write "), "{sentence}");
+            assert_ne!(preview.saved(), preview.text(), "the buffer was marked saved");
+            assert_eq!(preview.status().divergence, None);
+        } else {
+            assert_eq!(answer, Autosave::Wrote, "running as a user the mode does not bind");
+        }
+    }
+
+    #[test]
+    fn autosave_is_suspended_by_a_save_as_outside_until_a_deliberate_save() {
+        let dir = scratch_dir("autosave-suspended");
+        let document = article_in(&dir);
+        let outside = dir.parent().unwrap().join("outside-autosave.md");
+        let _ = std::fs::remove_file(&outside);
+        let mut preview = compiled(&document);
+        let original = std::fs::read(&document).unwrap();
+
+        preview.edit("# Typed\n".to_string());
+        preview
+            .save_as(&outside.to_string_lossy())
+            .unwrap();
+
+        assert_eq!(preview.autosave(), Autosave::Suspended);
+        assert_eq!(std::fs::read(&document).unwrap(), original);
+
+        preview.save().unwrap();
+        preview.edit("# Typed again\n".to_string());
+        assert_eq!(preview.autosave(), Autosave::Wrote);
+        assert_eq!(std::fs::read_to_string(&document).unwrap(), "# Typed again\n");
     }
 }
