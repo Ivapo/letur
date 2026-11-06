@@ -36,7 +36,7 @@ covers: >
   and the two of them that are now two files, the second file beside the store and
   the one thing in it that is not about a folder, the third beside them for the
   sites a folder allows, the nineteenth command and the two halves one of them is,
-  the twentieth that creates and does not open, the second
+  the twentieth that creates and does not open, the twenty-first and second that save unasked, the second
   setter called where capabilities do not apply, the field composed in two places
   and the seam that holds them, the buffer that compiles and the closure it rides,
   the export and its two
@@ -228,7 +228,7 @@ capability added for either. `app/gen/` is generated and is not committed.
 
 `app/src/main.rs` holds only what needs a window. `main` registers the dialog
 plugin, builds the menu, manages one `Mutex<Session>` and one
-`app/src/main.rs:Pending`, registers twenty commands, and — since the bundle —
+`app/src/main.rs:Pending`, registers twenty-two commands, and — since the bundle —
 **builds the app rather than running it**, so that it can hand `App::run` a
 callback and see the run events a `.run(generate_context!())` never surfaces.
 
@@ -306,13 +306,19 @@ therefore cross the IPC boundary and the debounce is Rust's**, which is what put
 the interval on the testable side of the window: a debounce in the page would be
 logic reachable only by typing at one.
 
-Eighteen of the twenty commands are wrappers over a plain function.
+**Autosave is two more commands and two events**, `mpdf-003` Phase 31.
+`app/src/main.rs:autosave` is what a `blur` invokes; `app/src/main.rs:autosave_hold`
+is what Open, Save as and Export bracket their dialog with, since a dialog is not
+a pause and the timer is Rust's. Neither answers: a write says so through
+`autosaved` (the receipt) and a failure through `autosave-failed`, set by
+`Session::set_on_autosave` before the first open. `rules/desktop-compile.md` has the rest.
+
+Twenty of the twenty-two commands are wrappers over a plain function.
 `app/src/main.rs:pending_open` is the odd one and is not: it reads no session
 and **takes** a slot the run event filled, which the section on the bundle below
-explains. `app/src/main.rs:create_project` is the newest of the twenty, and the
-split is load-bearing rather than tidy: this file has no test module, the crate
-is bin-only and `tauri::State` has a private field and no public constructor, so
-a rule written into a command is a rule nothing in this repository can reach.
+explains. The split is load-bearing: this file has no test module, the crate is
+bin-only and `tauri::State` has no public constructor, so a rule written into a
+command is a rule nothing in this repository can reach.
 
 ## The file I/O
 
@@ -566,10 +572,9 @@ and `cli/tests/cli_test.rs`, meeting at an in-test `md_to_pdf` call.
 
 The limit the flag accepts: **"stale" answers "did the last compile fail", not
 "does the page match the file on disk"**. It never answered the second question,
-and the window in which the two can differ is now unbounded rather than the
-debounce plus the compile: an author who types and does not save leaves the file
-behind the page for as long as they like, and the pane reads *current* throughout,
-because it is current — for the text in the pane.
+and the window in which the two can differ is the autosave interval, 1500 ms,
+and a held divergence or a Save-as outside, where it is unbounded; the pane reads
+*current* throughout, because it is current — for the text in the pane.
 
 Nothing in `preview.rs`, `document.rs`, `watch.rs` or `project/` needs a window: a GUI whose
 logic is reachable only by clicking has no exit gate but a screenshot. Two claims
@@ -621,7 +626,9 @@ editor** — the ranking working, not a broken association.
 
 **The association only launches the app; it hands the process nothing**, and
 nothing here reads `std::env::args`. The path arrives as
-`tauri::RunEvent::Opened`, which is why `main` builds and then runs. Its URLs are
+`tauri::RunEvent::Opened`, which is why `main` builds and then runs — and the same
+callback flushes the buffer on `ExitRequested`, `Session::flush`, never preventing
+the exit. Its URLs are
 `file://`, and the path comes from `Url::to_file_path` and **not** `Url::path`,
 which leaves a space percent-encoded — `my doc.md` would arrive as `my%20doc.md`
 and open as nothing; `tauri` re-exports `Url`, so this costs no dependency.

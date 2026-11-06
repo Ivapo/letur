@@ -160,7 +160,7 @@ phases:
     by: null
   - name: "Phase 31 — the buffer saves itself after a pause"
     reviewed: 2026-11-05
-    shipped: null
+    shipped: 2026-11-06
     cut: null
     by: null
   - name: "Phase 32 — Escape in the text pane stays in the pane"

@@ -44,7 +44,10 @@ level. **The page is never edited for the browser's sake**: `app/typecheck.mjs` 
 unless the file holds exactly one module script, and a second front end would drift
 from the first on the next phase of `mpdf-003` with nothing noticing. A command the
 host has not learnt rejects with `<command> is not answered in a browser`, which the
-window prints through `fail`. The window reads three members of the object —
+window prints through `fail`. **`autosave` and `autosave_hold` are two such commands**, `mpdf-003`
+Phase 31: the page swallows both rejections, so a blur or a dialog draws no error bar, and
+`autosaved` and `autosave-failed` are events the host never sends. The browser does not
+autosave, though the shared crate's `external_change` took the same new arm. The window reads three members of the object —
 `core.invoke`, `dialog.open`/`dialog.save` and `event.listen` — and nothing else.
 
 ## The session

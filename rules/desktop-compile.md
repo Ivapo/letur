@@ -79,7 +79,7 @@ arrive would leave the watcher running, every event dropped, and the page never
 redrawn. The document's *directory* is resolved rather than each file, because a
 figure named before it exists has no real path to resolve.
 
-**There are two intervals, and each is measured against a different thing.**
+**There are two intervals here, and each is measured against a different thing**; a third, for the write, is `rules/desktop-autosave.md`'s.
 `app/src/watch.rs:DEBOUNCE` is 100 ms, margin over FSEvents' own batching —
 twenty saves under each of three write strategies, tabulated in its own doc
 comment. `app/src/watch.rs:TYPING_DEBOUNCE` is 300 ms, and it is not protecting
@@ -102,8 +102,9 @@ document and the assets moved, since one window can hold both.
 
 **Dropping the `Watch` stops the loop**: it unregisters the directory and drops
 the sender its handler holds, which disconnects the channel, which ends the
-thread. Dropping the typing channel ends its thread the same way. That is the
-whole mechanism by which opening a second document moves both.
+thread. Dropping the typing channel ends its thread the same way, and the autosave
+channel with it. That is the whole mechanism by which opening a second document
+moves all of them.
 
 **The compile runs with the state lock released, and two guards decide whether its
 answer is still wanted.** `project/src/preview.rs:Preview::compile` is three steps:
@@ -151,7 +152,7 @@ both. A `main` this app cannot read leaves `read_document`'s own sentence and th
 buffer, and `Preview::edit` takes what the author typed without compiling,
 because one keystroke is not a document. `Preview::save` writes the buffer to
 `edited`'s path and moves the last-saved text with it — which is what makes that
-save's own event mean nothing a moment later. **`Session::save` and
+save's own event mean nothing a moment later. Autosave calls it. **`Session::save` and
 `Session::save_as` answer a receipt rather than `()`**, `mpdf-003` Phase 19: the bare
 word `saved` for the first, and `saved as <name> in <folder>` for the second with the
 folder absolute and spelled as landed. **Composed in `Session` and not in the
@@ -224,14 +225,19 @@ will not read at that instant counts as `Unchanged`. **A divergence is not
 staleness**: nothing failed to compile, and the page belongs to the text in the
 pane.
 
-Two limits it accepts. An author typing between a save and that save's event
-lands in `Diverged`, so the app can name a divergence that was really its own
-write — it loses nothing, and the next save clears it. And an external writer
-that writes exactly the author's unsaved text takes `Unchanged`, leaving the
-last-saved text unrefreshed. Both err toward keeping work. **Nothing suppresses a
-self-write**: the first outcome *is* the self-write case, decided by comparing
-content rather than by winning a race against an event that arrives 12 ms after
-the write.
+**The file equal to the last-saved text is `Unchanged` too**, whatever the buffer
+holds — the first arm after *file equals buffer*, `mpdf-003` Phase 31. It is what
+lets an author type between a save and that save's event without the app naming
+its own write a divergence, which under autosave would be the common case. One
+limit remains: an external writer that writes exactly the author's unsaved text
+takes `Unchanged`, leaving the last-saved text unrefreshed. **Nothing suppresses a
+self-write**: the self-write case is decided by comparing content rather than by
+winning a race against an event that arrives 12 ms after the write.
+
+## Autosave
+
+The third interval, the write after a pause, its hold and its flush are
+`rules/desktop-autosave.md`.
 
 ## The images fetched by URL
 

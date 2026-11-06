@@ -73,7 +73,12 @@ rebuild-on-change.
 **Type in the left pane and the page follows.** It redraws when you stop typing, and
 **the PDF is what the pane says, not what the file says** — so the page shows your
 unsaved work. `⌘S` writes the pane back to whichever file it is
-holding, and the foot of the window says `saved` for a moment. **The floppy in the
+holding, and the foot of the window says `saved` for a moment. **The pane also saves
+itself**: about a second and a half after you stop typing, when you click out of it, before
+you open another file and when you quit, and the foot says `saved` as it does for `⌘S`. It
+never writes over a file that changed underneath you (see below), and it leaves the
+original alone after a `Save as…` outside the project, until you press `⌘S`. The browser
+version does not save itself. **The floppy in the
 header, or `⇧⌘S`, is `Save as…`**: it saves **wherever you point it**, and it takes the
 same kinds the panel lists — `.md`, `.bib`, `.yml` and `.yaml`. **Where it lands decides
 whether the pane goes with it.** Inside the project, the pane holds the new file and the
@@ -115,8 +120,8 @@ your document compiles.
 **Save the file in another program and the page redraws too** — with one exception. The
 window watches the whole project, so editing a section, a figure or the bibliography
 elsewhere redraws it as well, and adding or removing a file shows up in the list. If the
-pane holds unsaved edits when the file changes underneath, the app keeps your text and
-says so rather than choosing for you: save to write the pane over the file, or press
+pane holds unsaved edits when the file changes underneath, the app keeps your text, stops
+saving it, and says so rather than choosing for you: save to write the pane over the file, or press
 `Discard` in the bar it says it in to take the file instead. It never merges the two.
 
 A document that will not compile leaves the last good page on screen, dimmed, with the

@@ -55,8 +55,8 @@ covers: >
   the pane does not draw, and the pane that loses both when it empties, the check that reads this file and the
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
-  because the DOM cannot show one, the thirty-two clauses it
-  asserts as properties and the thirty-three broken pages that falsify them, the rule
+  because the DOM cannot show one, the thirty-four clauses it
+  asserts as properties and the thirty-eight broken pages that falsify them, the rule
   that decides what a clause may read as well as what it may assert, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
@@ -817,14 +817,16 @@ sentence — found by a mutation that falsified nothing, not by reading.
 `core:default`'s own words — the half a stub that merely omits it never tests. It also keeps
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
-asserts thirty-two clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against thirty-three broken copies
+asserts thirty-four clauses in Playwright's Chromium and WebKit, **both of which must pass, every
+clause a property and none a metric literal**, and is falsified first against thirty-eight broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
-without either being redundant**, and clauses 3, 30 and 31 are where that now stands: `flex-min`
+without either being redundant**, and clauses 3, 30, 31, 32 and 33 are where that now stands: `flex-min`
 reaches the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`
 the header's, a pinned box whose children have left it; `cell-stays-bare` reaches the cell's
 swap and `whole-cut-at-end` its start-cut; `tab-default` reaches the key's swallowing and
-`tab-assigns` its undo. Clause 10 was a third such pair; `views-one-way`
+`tab-assigns` its undo; `autosaved-unheard` and `autosave-failure-unheard` own clause 32, and
+`blur-unflushed`, `dialog-unheld` and `hold-unreleased` clause 33, whose stub dialog can be held
+pending. Clause 10 was a third such pair; `views-one-way`
 went when the header gave its copies up, and `marks-unlit` owns it alone. The error clause stays last and its
 number moves as clauses are added, being the only one that accumulates across the others.
 **The rule also decides what a clause may read**, which clause 18 is the record of: it
