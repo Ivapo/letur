@@ -68,9 +68,9 @@
    now, and it says which of the two a 0 was.                                   */
 
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -955,7 +955,16 @@ const marksInTheEngineThatShips = async (held) => {
       against. It types twenty characters into a buffer Rust holds and no disk
       sees: `edit` sets that buffer and nothing else, `export` and `save` are the
       two writers and neither is on this path, and the run kills the app. */
-const theInkWrapsWhereTheTextareaDoes = async (held) => {
+const theInkWrapsWhereTheTextareaDoes = async (held, scratch) => {
+  /* **A scratch document is opened first, and since Phase 31 that is not
+     optional.** This clause types 300 KB into the pane, and the pane's file is
+     now written after a pause and before the next open: left on
+     `tests/fixtures/panel/book.md` it would have rewritten a tracked fixture
+     and dirtied the tree. The measurement is of a buffer and knows nothing of
+     which file holds it, so it loses nothing. */
+  const opened = await held.async(OPEN_DOCUMENT, [scratch.long])
+  if (opened !== true) throw new Error(`open_document refused ${scratch.long}: ${opened}`)
+
   await held.sync(INK_FILL, [LONG_TEXT])
 
   /* Waited on the ink rather than on a timer, and **against the line count that
@@ -1003,6 +1012,48 @@ const theInkWrapsWhereTheTextareaDoes = async (held) => {
     ]
       .filter(Boolean)
       .join('; ') || `both ${laid.ink} over ${laid.rows} wrapped rows, and remirror at ${median} ms`
+  )
+}
+
+
+/* 7. **The buffer reaches the disk without a save, in the binary that ships.**
+      `mpdf-003` Phase 31. The suite proves `Preview::autosave` and
+      `Session`'s timer in Rust and the page's three listeners and two holds in
+      Playwright; neither can show that the **real window's `input` event, the
+      real IPC and the real 1500 ms timer** end in bytes on a disk. This types,
+      waits past the interval, and requires the file to equal the pane.
+
+      **The file is a scratch copy**, never a fixture: a clause whose subject is
+      a write must not have a tracked file for a target. **It polls the file
+      and never reads the interval**, so retuning `AUTOSAVE_DEBOUNCE` (OQ-C)
+      moves nothing here; the bound is generous and is a bound on wiring.
+      **The file is read before the wait and must still be the original**, so a
+      page that wrote at once, on the input, would not pass for a timer. */
+const theBufferReachesTheDiskWithoutASave = async (held, scratch) => {
+  const opened = await held.async(OPEN_DOCUMENT, [scratch.typed])
+  if (opened !== true) throw new Error(`open_document refused ${scratch.typed}: ${opened}`)
+
+  const TYPED = '# Typed, and never saved\n\nA paragraph the author did not press Cmd+S for.\n'
+  const original = readFileSync(scratch.typed, 'utf8')
+  await held.sync(INK_FILL, [TYPED])
+  await wait(200)
+  const early = readFileSync(scratch.typed, 'utf8')
+
+  let onDisk = early
+  for (let i = 0; i < 40 && onDisk !== TYPED; i++) {
+    await wait(250)
+    onDisk = readFileSync(scratch.typed, 'utf8')
+  }
+  const pane = await held.sync(`return document.getElementById('text').value`)
+
+  note(`the file after 200 ms: ${early === original ? 'unchanged' : 'CHANGED'}; later: ${onDisk === pane ? 'equals the pane' : 'DIFFERS from the pane'}`)
+
+  ok(
+    7,
+    'typing and pausing writes the pane to its file, without a save and not at once',
+    early === original && pane === TYPED && onDisk === pane,
+    `after 200 ms the file ${early === original ? 'was still the original' : 'had already changed'}; ` +
+      `at the end it held ${JSON.stringify(onDisk.slice(0, 40))} against the pane's ${JSON.stringify(pane.slice(0, 40))}`
   )
 }
 
@@ -1123,6 +1174,16 @@ const run = async ({ mutate }) => {
   }
   forgetTheFixtureRoot(sites)
 
+  /* Where the two clauses that type put their files. **Under the system's
+     temporary directory and removed in the `finally`**, and in two folders: a
+     folder holding two masters would make `open_document` choose between them. */
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'letur-drive-'))
+  const scratch = { long: join(scratchRoot, 'long', 'long.md'), typed: join(scratchRoot, 'typed', 'typed.md') }
+  for (const file of Object.values(scratch)) {
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, '# Scratch\n\nBefore anything is typed.\n')
+  }
+
   const server = await imageServer()
   let { app, log } = await launch()
   let fired = null
@@ -1144,9 +1205,10 @@ const run = async ({ mutate }) => {
     await marksAtAWidthTheDriverSet(driven)
     await theInstrumentSeesALoop(driven)
     await marksInTheEngineThatShips(driven)
-    /* Last but one, and its own comment says why: it opens a second document and
-       types into it, and the four above were written against neither. */
-    await theInkWrapsWhereTheTextareaDoes(driven)
+    /* These two open scratch documents and type into them, and the four above
+       were written against neither. Each says why it is not on a fixture. */
+    await theInkWrapsWhereTheTextareaDoes(driven, scratch)
+    await theBufferReachesTheDiskWithoutASave(driven, scratch)
 
     /* **Last, and it quits this window in the middle of itself.** The mutation
        counter is read here, before the process holding it is gone. */
@@ -1162,6 +1224,7 @@ const run = async ({ mutate }) => {
   } finally {
     app.kill('SIGKILL')
     await server.close()
+    rmSync(scratchRoot, { recursive: true, force: true })
     /* The port is the next child's preflight, so it is let go of before this
        process is. */
     await wait(500)

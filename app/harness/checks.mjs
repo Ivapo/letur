@@ -27,7 +27,7 @@
 
    **The suite is falsified before it is trusted.** `--mutate <name>` serves a
    deliberately broken copy and judges that **exactly** the clause that owns it
-   fails; `--falsify` runs all thirty-three. That is the gate's clause 3, run rather
+   fails; `--falsify` runs all thirty-eight. That is the gate's clause 3, run rather
    than read.
 
    **`light` is the default colour scheme and it is written down**, because one
@@ -91,7 +91,12 @@ const OWNS = {
   'cell-stays-bare': 30,
   'whole-cut-at-end': 30,
   'tab-default': 31,
-  'tab-assigns': 31
+  'tab-assigns': 31,
+  'autosaved-unheard': 32,
+  'autosave-failure-unheard': 32,
+  'blur-unflushed': 33,
+  'dialog-unheld': 33,
+  'hold-unreleased': 33
 }
 
 /* **58 characters, and the length is asserted rather than trusted.** The
@@ -2810,6 +2815,177 @@ const tabIndentsAndUndoHolds = async (browser, url) => {
   return errors
 }
 
+/* 32. **The two autosave events reach the page.** `mpdf-003` Phase 31. Rust
+       writes the buffer after a pause and tells the page through two events,
+       and the page places what they carry: `autosaved`'s string in the
+       receipt cell, as a save's is, and `autosave-failed`'s sentence where
+       `fail` puts one.
+
+       **Two halves, one mutation each.** A page that dropped the first
+       listener would still show the failure, and the reverse, so neither half
+       can hide the other's removal. The sentences are the stub's and are
+       asserted whole: a page that worded either itself would look the same in
+       the DOM. */
+const theTwoAutosaveEvents = async (browser, url) => {
+  const page = await opened(browser, url)
+  const SENTENCE = 'cannot write /tmp/notes/text.md: Permission denied (os error 13)'
+
+  const before = await page.evaluate(() => ({
+    receipt: document.getElementById('receipt').textContent,
+    error: document.getElementById('error').hidden
+  }))
+
+  await page.evaluate(() => window.__harness.fire('autosaved', 'saved'))
+  const receipt = await page
+    .waitForFunction(() => document.getElementById('receipt').textContent || null, null, { timeout: 2000 })
+    .then((held) => held.jsonValue())
+    .catch(() => '')
+
+  await page.evaluate((sentence) => window.__harness.fire('autosave-failed', sentence), SENTENCE)
+  const failure = await page
+    .waitForFunction(
+      () => {
+        const bar = document.getElementById('error')
+        return bar.hidden ? null : bar.textContent
+      },
+      null,
+      { timeout: 2000 }
+    )
+    .then((held) => held.jsonValue())
+    .catch(() => null)
+
+  const errors = await drainErrors(page)
+  await page.close()
+
+  note(`the receipt cell: ${JSON.stringify(before.receipt)} → ${JSON.stringify(receipt)}; the error bar → ${JSON.stringify(failure)}`)
+
+  ok(
+    32,
+    'an autosave places its receipt, and a failed one puts its sentence on the page',
+    before.receipt === '' && before.error && receipt === 'saved' && failure === SENTENCE,
+    `receipt ${JSON.stringify(receipt)}, error bar ${JSON.stringify(failure)}`
+  )
+  return errors
+}
+
+/* 33. **A blur flushes, and a dialog holds the timer.** `mpdf-003` Phase 31.
+
+       The blur half is one `autosave` command per blur. The dialog half is the
+       ordering: for each of Open, Save as and Export, with the dialog's answer
+       **pending**, `autosave_hold(true)` has been sent before the dialog opened
+       and `autosave_hold(false)` has not been sent, and once it answers the
+       release follows — **on a path, on a cancel and on a thrown error alike**.
+       Rust's timer settles on its own thread, so a hold sent after the dialog
+       would protect nothing; the stub logs each dialog's position in the same
+       command log, which is what makes "before" a thing to read.
+
+       **Each is driven by its menu event and not its button**, so a mutation
+       that deafens a button (`export-deaf`) cannot reach this clause.
+
+       **Save as's hold also goes before its `edit`**, which nudges the timer.
+
+       **The thrown dialog is an unhandled rejection in the page, as it is in
+       the shipped one**, and clause 34 counts those. The ones this clause threw
+       are taken off the count by their message and no other. */
+const theBlurFlushesAndADialogHolds = async (browser, url) => {
+  const PROBLEM = 'harness: the panel would not open'
+  const KINDS = [
+    ['open', () => window.__harness.fire('open')],
+    ['save as', () => window.__harness.fire('save-as')],
+    ['export', () => window.__harness.fire('export')]
+  ]
+  const report = []
+  const errors = { total: 0, loops: 0, spoken: [] }
+  const take = (seen) => {
+    const mine = seen.spoken.filter((what) => String(what).includes(PROBLEM))
+    errors.total += seen.total - mine.length
+    errors.loops += seen.loops
+    errors.spoken.push(...seen.spoken.filter((what) => !mine.includes(what)))
+  }
+
+  /* The blur, on a page of its own. */
+  {
+    const page = await opened(browser, url)
+    await page.evaluate(() => {
+      window.__harness.forget()
+      const t = document.getElementById('text')
+      t.focus()
+      t.blur()
+    })
+    await settle(page)
+    const blurs = await page.evaluate(
+      () => window.__harness.invokes().filter((i) => i.name === 'autosave').length
+    )
+    if (blurs !== 1) report.push(`a blur invoked autosave ${blurs} times`)
+    take(await drainErrors(page))
+    await page.close()
+  }
+
+  for (const [kind, trigger] of KINDS) {
+    for (const answer of ['cancel', 'error', 'path']) {
+      const page = await opened(browser, url)
+      await page.evaluate(() => {
+        window.__harness.forget()
+        window.__harness.forgetDialogs()
+        window.__harness.pendDialog()
+      })
+      await page.evaluate(trigger)
+      await page
+        .waitForFunction(() => window.__harness.dialogs().length > 0, null, { timeout: 3000 })
+        .catch(() => {})
+
+      const holds = () =>
+        page.evaluate(() =>
+          window.__harness.invokes().flatMap((sent, at) =>
+            sent.name === 'autosave_hold' ? [{ at, held: sent.args.held }] : sent.name === 'edit' ? [{ at, edit: true }] : []
+          )
+        )
+      const opening = await page.evaluate(() => window.__harness.dialogs()[0] ?? null)
+      const during = await holds()
+
+      await page.evaluate(
+        ([answer, problem]) => {
+          if (answer === 'error') window.__harness.failDialog(problem)
+          else window.__harness.answerDialog(answer === 'cancel' ? null : '/tmp/chosen/text.md')
+        },
+        [answer, PROBLEM]
+      )
+      await page
+        .waitForFunction(
+          () => window.__harness.invokes().filter((i) => i.name === 'autosave_hold' && !i.args.held).length > 0,
+          null,
+          { timeout: 3000 }
+        )
+        .catch(() => {})
+      const after = await holds()
+      const answered = await page.evaluate(() => window.__harness.dialogs()[0]?.answered ?? null)
+
+      const held = during.find((h) => h.held === true)
+      const early = held && opening && held.at < opening.asked
+      const stillHeld = during.every((h) => h.held !== false)
+      const released = answered !== null && after.some((h) => h.held === false && h.at >= answered)
+      const beforeEdit = kind !== 'save as' || (held && !after.some((h) => h.edit && h.at < held.at))
+
+      const label = `${kind} / ${answer}`
+      if (!early) report.push(`${label}: no hold before the dialog`)
+      else if (!stillHeld) report.push(`${label}: released while the dialog was open`)
+      if (!released) report.push(`${label}: never released after the dialog answered`)
+      if (early && !beforeEdit) report.push(`${label}: an edit went before the hold`)
+
+      take(await drainErrors(page))
+      await page.close()
+    }
+  }
+
+  ok(
+    33,
+    'a blur invokes autosave once, and Open, Save as and Export hold the timer around their dialogs',
+    report.length === 0,
+    report.join('; ') || 'one autosave per blur; held before and released after, on a path, a cancel and a throw'
+  )
+  return errors
+}
+
 const run = async ({ engine, headed, rev, doc, mutate }) => {
   passed = 0
   failed = 0
@@ -2860,7 +3036,9 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
       theNewItemsReachThePage,
       theNameSaysWhereItIs,
       theNameTurnsIntoItsPath,
-      tabIndentsAndUndoHolds
+      tabIndentsAndUndoHolds,
+      theTwoAutosaveEvents,
+      theBlurFlushesAndADialogHolds
     ]) {
       gather(await check(browser, held.url))
     }
@@ -2875,7 +3053,7 @@ const run = async ({ engine, headed, rev, doc, mutate }) => {
      **It stays last** — it is the only clause that accumulates across every
      other one, so its number moves as clauses are added and theirs do not. */
   ok(
-    32,
+    34,
     'no uncaught error reached the console through any of it',
     errors.total === 0,
     `${errors.total} uncaught, ${errors.loops} of them ResizeObserver` +

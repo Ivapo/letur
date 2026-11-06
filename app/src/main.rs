@@ -19,7 +19,7 @@ use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
-use preview::{Appearance, Compile, OnDisk, Session, Status};
+use preview::{Appearance, AutosaveEvent, Compile, OnDisk, Session, Status};
 
 /// The label of the one window, which `tauri.conf.json` names too.
 const MAIN: &str = "main";
@@ -106,6 +106,14 @@ const RENDERED: &str = "rendered";
 /// of the startup take and this signal's take runs second finds the slot empty
 /// and does nothing, so the document cannot open twice.
 const OPENED: &str = "opened";
+
+/// An autosave wrote, and this is the receipt. A string payload, because the
+/// receipt is an event and not state. `mpdf-003` Phase 31.
+const AUTOSAVED: &str = "autosaved";
+
+/// An autosave failed, and this is the sentence the page puts where `fail`
+/// does.
+const AUTOSAVE_FAILED: &str = "autosave-failed";
 
 /// The document Finder handed over, until the page comes and takes it.
 ///
@@ -213,7 +221,8 @@ fn main() {
             // line that puts `remote::fetch` — the app's only network use, for
             // an image the author allowed — behind the button. `mpdf-003` Phase
             // 25.
-            app.manage(Mutex::new(Session::new(
+            let announcing = handle.clone();
+            let mut session = Session::new(
                 document::store_file(&support),
                 settings,
                 document::sites_file(&support),
@@ -223,7 +232,20 @@ fn main() {
                 move || {
                     let _ = handle.emit(RENDERED, ());
                 },
-            )));
+            );
+            // **Before the first open**, so the closure `Session::arm` builds
+            // can clone it. The receipt rides an event for the reason `save`'s
+            // rides its return: it is an event and not state. `mpdf-003`
+            // Phase 31.
+            session.set_on_autosave(move |event| match event {
+                AutosaveEvent::Wrote(receipt) => {
+                    let _ = announcing.emit(AUTOSAVED, receipt);
+                }
+                AutosaveEvent::Failed(sentence) => {
+                    let _ = announcing.emit(AUTOSAVE_FAILED, sentence);
+                }
+            });
+            app.manage(Mutex::new(session));
 
             Ok(())
         })
@@ -240,6 +262,8 @@ fn main() {
             document_text,
             edit,
             save,
+            autosave,
+            autosave_hold,
             save_as_path,
             save_as,
             current_pdf,
@@ -256,6 +280,17 @@ fn main() {
     // events at all — and a run event is the only way a document opened from
     // Finder reaches the process.
     app.run(|handle, event| {
+        // **A quit flushes**, and does not prevent the exit. `Cmd+Q` and a
+        // last-window close are both assumed to deliver this, and the person's
+        // reading at the window checks it. `mpdf-003` Phase 31.
+        if let tauri::RunEvent::ExitRequested { .. } = event {
+            handle
+                .state::<Mutex<Session>>()
+                .lock()
+                .expect("the session lock was poisoned")
+                .flush();
+            return;
+        }
         if let tauri::RunEvent::Opened { urls } = event {
             // Finder delivers a multiple selection as one event. The app takes
             // the first and ignores the rest, which is Phase 1's "one file at a
@@ -585,6 +620,32 @@ fn save(session: tauri::State<'_, Mutex<Session>>) -> Result<String, String> {
         .lock()
         .expect("the session lock was poisoned")
         .save()
+}
+
+/// Write the buffer now if nothing but the author has touched the file: what a
+/// window `blur` invokes. It answers nothing — an autosave that wrote or failed
+/// says so through [`AUTOSAVED`] and [`AUTOSAVE_FAILED`], and a held or clean
+/// one says nothing. `mpdf-003` Phase 31.
+#[tauri::command]
+fn autosave(session: tauri::State<'_, Mutex<Session>>) {
+    session
+        .lock()
+        .expect("the session lock was poisoned")
+        .autosave();
+}
+
+/// Hold autosave while a native dialog is open, or let it go.
+///
+/// **A native dialog is not a pause in the author's work**, and the timer is
+/// Rust's, not the page's: choosing a path outlasts the interval, so without
+/// this the timer would write the buffer into the very file a Save-as-copy is
+/// meant to leave alone. Releasing nudges the timer. `mpdf-003` Phase 31.
+#[tauri::command]
+fn autosave_hold(session: tauri::State<'_, Mutex<Session>>, held: bool) {
+    session
+        .lock()
+        .expect("the session lock was poisoned")
+        .set_hold(held);
 }
 
 /// Where the Save-as panel should open, or why it should not open.

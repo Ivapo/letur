@@ -103,6 +103,39 @@ const invokes = []
    check arms rather than a standing value another check could inherit. */
 let saveAnswer = null
 
+/* **Every native dialog the page opened, oldest first**, as
+   `{ kind, asked, answered }`, where the two are how many commands the page had
+   sent when the dialog opened and when it answered (`null` while it is
+   pending). A position in the same log `invokes()` reads is what lets a check
+   say *the hold went before the dialog and was let go after it*, which no
+   count could. It is a log of its own and not entries in `invokes`, so the
+   checks that read that one by name are not disturbed. `mpdf-003` Phase 31. */
+const dialogs = []
+
+/* **A pending form for the next dialog.** Until `mpdf-003` Phase 31 a dialog
+   answered at once, and clause 33 has to look at the page *while* one is open:
+   the hold is only worth anything over the interval a real panel takes. Armed
+   by `pendDialog`, settled by `answerDialog` or `failDialog`, and one-shot, as
+   `saveAnswer` is. */
+let pendNext = false
+let waiting = null
+
+const dialog = (kind, standing) => {
+  const entry = { kind, asked: invokes.length, answered: null }
+  dialogs.push(entry)
+  if (pendNext) {
+    pendNext = false
+    return new Promise((resolve, reject) => {
+      waiting = {
+        resolve: (value) => ((entry.answered = invokes.length), resolve(value)),
+        reject: (problem) => ((entry.answered = invokes.length), reject(problem))
+      }
+    })
+  }
+  entry.answered = invokes.length
+  return standing()
+}
+
 /* Every native sheet the page asked for, oldest first, as `{ text, options }`. */
 const messages = []
 
@@ -167,6 +200,13 @@ const invoke = async (name, args = {}) => {
     case 'save':
       return 'saved'
 
+    /* `mpdf-003` Phase 31. The blur's command and the hold's, answered with
+       nothing, as the real ones answer nothing: an autosave that wrote says so
+       through an event, and a held or clean one says nothing at all. */
+    case 'autosave':
+    case 'autosave_hold':
+      return null
+
     /* `app/src/main.rs:create_project` answers the `main.md` it made. **A last
        component of `Exists` is refused** in `document::create_project`'s
        sentence, so a clause can reach the refusal. `mpdf-003` Phase 26. */
@@ -218,12 +258,13 @@ const invoke = async (name, args = {}) => {
 window.__TAURI__ = {
   core: { invoke },
   dialog: {
-    open: async () => null,
-    save: async () => {
-      const answer = saveAnswer
-      saveAnswer = null
-      return answer
-    },
+    open: () => dialog('open', async () => null),
+    save: () =>
+      dialog('save', async () => {
+        const answer = saveAnswer
+        saveAnswer = null
+        return answer
+      }),
     message: async (text, options = {}) => {
       messages.push({ text, options: JSON.parse(JSON.stringify(options)) })
     }
@@ -314,6 +355,25 @@ window.__harness = {
   /** Arm the next `dialog.save` to answer `path` instead of cancelling. */
   answerSave: (path) => {
     saveAnswer = path
+  },
+
+  /** Make the next dialog wait until `answerDialog` or `failDialog`. */
+  pendDialog: () => {
+    pendNext = true
+  },
+
+  /** Answer the pending dialog with `value`: a path, or `null` for a cancel. */
+  answerDialog: (value) => waiting?.resolve(value),
+
+  /** Make the pending dialog throw, as a panel that cannot open does. */
+  failDialog: (problem) => waiting?.reject(new Error(problem)),
+
+  /** Every dialog opened, as a copy. */
+  dialogs: () => JSON.parse(JSON.stringify(dialogs)),
+
+  /** Forget the dialogs seen, leaving `invokes` alone. */
+  forgetDialogs: () => {
+    dialogs.length = 0
   },
 
   /** Every sheet `dialog.message` was asked for, as a copy. */

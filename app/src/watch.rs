@@ -77,6 +77,18 @@ pub const DEBOUNCE: Duration = Duration::from_millis(100);
 /// they had scrolled to inside the section they are working in.
 pub const TYPING_DEBOUNCE: Duration = Duration::from_millis(300);
 
+/// How long the buffer waits after the last keystroke before it is written,
+/// `mpdf-003` Phase 31.
+///
+/// **A third interval, and its own channel**: a compile per pause and a write
+/// per pause answer different questions, so this is not folded into
+/// [`TYPING_DEBOUNCE`]. It is Rust's for that interval's reason — the clock
+/// stays on the testable side of the window. **1500 ms is a guess, not a
+/// measurement** (`specs/desktop_app_spec.md` Phase 31's OQ-C), named in the
+/// one to two seconds the author asked for and tuned at the window; the rule
+/// records the number that shipped.
+pub const AUTOSAVE_DEBOUNCE: Duration = Duration::from_millis(1500);
+
 /// The one directory a document's watch covers.
 ///
 /// Every path the dialect lets a document name resolves under here —
@@ -612,6 +624,28 @@ mod tests {
         assert!(debounce.take(later + TYPING_DEBOUNCE));
         debounce.touch(later + Duration::from_millis(500));
         assert!(debounce.take(later + Duration::from_millis(500) + TYPING_DEBOUNCE));
+    }
+
+    /// The autosave interval folds a burst of typing into one write, and lets
+    /// a pause through. `mpdf-003` Phase 31. Clockless, for the typing
+    /// debounce's reason.
+    #[test]
+    fn the_autosave_debounce_folds_a_burst_into_one_write() {
+        let mut debounce = Debounce::new(AUTOSAVE_DEBOUNCE);
+        let start = Instant::now();
+
+        // Typing for four seconds, a keystroke every second: never a pause
+        // as long as the interval, so never a write.
+        for second in 0..4 {
+            let now = start + Duration::from_secs(second);
+            debounce.touch(now);
+            assert!(!debounce.take(now + Duration::from_millis(1400)));
+        }
+
+        // One pause, one write — and not a second until typing starts again.
+        let last = start + Duration::from_secs(3);
+        assert!(debounce.take(last + AUTOSAVE_DEBOUNCE));
+        assert!(!debounce.take(last + AUTOSAVE_DEBOUNCE * 3));
     }
 
     /// Nothing pending means the loop blocks rather than spins.

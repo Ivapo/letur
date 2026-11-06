@@ -618,6 +618,48 @@ const MUTATIONS = {
     const statement = '        await openInPane(path)\n'
     if (page.split(statement).length !== 2) die('the mutation create-stays-put found no single openInPane after a create')
     return page.replace(statement, '')
+  },
+
+  /* The receipt listener is gone: Rust's `autosaved` reaches a page that never
+     hears it. The failure listener beside it stays, so only the first half of
+     clause 32 fails. `mpdf-003` Phase 31. */
+  'autosaved-unheard': (page) => {
+    const line = "      listen('autosaved', (event) => sayReceipt(event.payload))\n"
+    if (page.split(line).length !== 2) die('the mutation autosaved-unheard found no single autosaved listener')
+    return page.replace(line, '')
+  },
+
+  /* And the other: the failure is never drawn. `mpdf-003` Phase 31. */
+  'autosave-failure-unheard': (page) => {
+    const line = "      listen('autosave-failed', (event) => fail(event.payload))\n"
+    if (page.split(line).length !== 2) die('the mutation autosave-failure-unheard found no single failure listener')
+    return page.replace(line, '')
+  },
+
+  /* A `blur` writes nothing: the handler keeps its `escaped` reset and loses
+     the command. `mpdf-003` Phase 31. */
+  'blur-unflushed': (page) => {
+    const line = "        invoke('autosave').catch(() => {})\n"
+    if (page.split(line).length !== 2) die('the mutation blur-unflushed found no single blur command')
+    return page.replace(line, '')
+  },
+
+  /* **Every `true` is dropped at its one source**: the three dialogs all send
+     it through `holdAutosave`, so one edit there leaves Open, Save as and
+     Export each unheld, which is what clause 33 reads for each. `mpdf-003`
+     Phase 31. */
+  'dialog-unheld': (page) => {
+    const head = '      async function holdAutosave(held) {\n        try {\n'
+    if (page.split(head).length !== 2) die('the mutation dialog-unheld found no single holdAutosave')
+    return page.replace(head, '      async function holdAutosave(held) {\n        if (held) return\n        try {\n')
+  },
+
+  /* The release is dropped at the same source, so a cancel, a throw and a path
+     all leave autosave off for the rest of the session. `mpdf-003` Phase 31. */
+  'hold-unreleased': (page) => {
+    const head = '      async function holdAutosave(held) {\n        try {\n'
+    if (page.split(head).length !== 2) die('the mutation hold-unreleased found no single holdAutosave')
+    return page.replace(head, '      async function holdAutosave(held) {\n        if (!held) return\n        try {\n')
   }
 }
 

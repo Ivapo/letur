@@ -14,11 +14,12 @@
 //! browser's alike.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, Weak};
 use std::time::{Duration, Instant};
 
-pub use letur_project::preview::{Appearance, Asked, External, Status, Trashed};
+pub use letur_project::preview::{Appearance, Asked, Autosave, External, Status, Trashed};
 
 use crate::document::{self, Disk};
 use crate::remote;
@@ -176,6 +177,20 @@ pub struct Session {
     appearance: Appearance,
     watch: Option<Watch>,
     typing: Option<mpsc::Sender<()>>,
+    /// The autosave channel, beside the typing one and dropped with it in
+    /// [`Session::arm`], so opening a document moves both. `mpdf-003` Phase 31.
+    autosave: Option<mpsc::Sender<()>>,
+    /// How long that channel waits. [`watch::AUTOSAVE_DEBOUNCE`] outside a test.
+    autosave_interval: Duration,
+    /// **Set while a native dialog is open.** [`Session::autosave`] returns at
+    /// once while it is, and [`Session::flush`] ignores it. An `Arc` because the
+    /// timer's closure runs on its own thread holding only clones, as
+    /// `recompile_with`'s does.
+    hold: Arc<AtomicBool>,
+    /// Told when an autosave wrote or failed. A setter and not a constructor
+    /// parameter, which would touch every test's `Session::new`; called before
+    /// the first open so [`Session::arm`] can clone it.
+    on_autosave: Option<AutosaveCallback>,
     /// The fetch worker's channel, for the press to send on.
     ///
     /// **The second sender, beside the one the [`Preview`]'s claim callback
@@ -241,6 +256,10 @@ impl Session {
             appearance,
             watch: None,
             typing: None,
+            autosave: None,
+            autosave_interval: watch::AUTOSAVE_DEBOUNCE,
+            hold: Arc::new(AtomicBool::new(false)),
+            on_autosave: None,
             claims,
         }
     }
@@ -319,6 +338,7 @@ impl Session {
     /// The previous document's page and text go with it. A page kept across an
     /// open would belong to a file the window no longer names.
     pub fn open(&mut self, opened: PathBuf) -> Result<(), String> {
+        self.flush();
         let root = document::project_root(&opened);
         let main = document::read_override(&self.store, &root)
             .filter(|main| root.join(main).is_file())
@@ -370,11 +390,16 @@ impl Session {
     fn arm(&mut self, root: PathBuf, main: &str, edited: &str) -> Result<(), String> {
         self.watch = None;
         self.typing = None;
+        self.autosave = None;
 
         let edited = root.join(edited);
         self.typing = Some(watch::debounced(
             watch::TYPING_DEBOUNCE,
             self.recompile(edited.clone()),
+        ));
+        self.autosave = Some(watch::debounced(
+            self.autosave_interval,
+            self.autosaver(edited.clone()),
         ));
         let classify = self.classifier(root.clone(), root.join(main), edited.clone());
         let on_change = self.on_change(edited);
@@ -393,6 +418,7 @@ impl Session {
     /// `letur_project::preview::Preview::ask_main`; the store and the open are
     /// this app's.
     pub fn set_main(&mut self, main: String) -> Result<(), String> {
+        self.flush();
         let asked = self.preview().ask_main(&main)?;
         if asked == Asked::Refused {
             (self.on_render)();
@@ -422,6 +448,7 @@ impl Session {
     /// It confines the path as [`Session::set_main`] does, and refuses on the
     /// same terms while the buffer diverges from the last-saved text.
     pub fn set_edited(&mut self, path: String) -> Result<(), String> {
+        self.flush();
         let (asked, root, main) = {
             let mut preview = self.preview();
             let asked = preview.set_edited(&path)?;
@@ -678,6 +705,75 @@ impl Session {
         if let Some(typing) = &self.typing {
             let _ = typing.send(());
         }
+        self.nudge_autosave();
+    }
+
+    /// Say where the two autosave outcomes go. Called once, before the first
+    /// open, so the closure [`Session::arm`] builds can clone it.
+    pub fn set_on_autosave(&mut self, on_autosave: impl Fn(AutosaveEvent) + Send + Sync + 'static) {
+        self.on_autosave = Some(Arc::new(on_autosave));
+    }
+
+    /// Start the autosave clock over, as a keystroke does.
+    fn nudge_autosave(&self) {
+        if let Some(autosave) = &self.autosave {
+            let _ = autosave.send(());
+        }
+    }
+
+    /// Autosave now, unless a dialog holds it — the blur's entry, and what the
+    /// timer runs. Nothing is sent for `Clean`, `Held` or `Suspended`: a `Held`
+    /// has already drawn the divergence bar. `mpdf-003` Phase 31.
+    pub fn autosave(&self) {
+        if self.hold.load(AtomicOrdering::SeqCst) {
+            return;
+        }
+        self.flush();
+    }
+
+    /// Autosave now, **whatever the hold says**. The flushes before an open, a
+    /// `set_main` and a `set_edited` are deliberate acts, and an Open's own
+    /// dialog is still open when it reaches [`Session::open`].
+    ///
+    /// It lives here and never in the crate, so the browser build does not get
+    /// an autosave nobody decided on.
+    pub fn flush(&self) {
+        let outcome = self.preview().autosave();
+        announce_autosave(outcome, self.on_autosave.as_ref());
+    }
+
+    /// Hold autosave while a dialog is open, or let it go. **Releasing nudges
+    /// the channel**, so a cancelled dialog over a dirty buffer resumes on the
+    /// next quiet interval and a window never typed in again is not left
+    /// unwritten.
+    pub fn set_hold(&self, held: bool) {
+        self.hold.store(held, AtomicOrdering::SeqCst);
+        if !held {
+            self.nudge_autosave();
+        }
+    }
+
+    /// What one settled pause in the typing writes. **Carries
+    /// [`Session::recompile_with`]'s stale-document guard**, so a pause that
+    /// settles after an open writes nothing into the new document.
+    fn autosaver(&self, document: PathBuf) -> impl FnMut() + Send + 'static {
+        let state = Arc::clone(&self.state);
+        let hold = Arc::clone(&self.hold);
+        let on_autosave = self.on_autosave.clone();
+
+        move || {
+            if hold.load(AtomicOrdering::SeqCst) {
+                return;
+            }
+            let outcome = {
+                let mut preview = state.lock().expect("the preview lock was poisoned");
+                if preview.document().as_deref() != Some(document.as_path()) {
+                    return;
+                }
+                preview.autosave()
+            };
+            announce_autosave(outcome, on_autosave.as_ref());
+        }
     }
 
     /// Write the pane's text to the document's own path, and say so.
@@ -887,6 +983,30 @@ impl Session {
 
             on_render();
         }
+    }
+}
+
+/// What an autosave tells the page: it wrote, or it could not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AutosaveEvent {
+    /// The receipt, `letur_project::preview::SAVED`.
+    Wrote(String),
+    /// The sentence the page puts where `fail` does.
+    Failed(String),
+}
+
+type AutosaveCallback = Arc<dyn Fn(AutosaveEvent) + Send + Sync>;
+
+/// Tell the callback what an autosave came to. **`Clean`, `Held` and
+/// `Suspended` say nothing.**
+fn announce_autosave(outcome: Autosave, on_autosave: Option<&AutosaveCallback>) {
+    let event = match outcome {
+        Autosave::Wrote => AutosaveEvent::Wrote(letur_project::preview::SAVED.to_string()),
+        Autosave::Failed(sentence) => AutosaveEvent::Failed(sentence),
+        Autosave::Clean | Autosave::Held | Autosave::Suspended => return,
+    };
+    if let Some(on_autosave) = on_autosave {
+        on_autosave(event);
     }
 }
 
@@ -3046,6 +3166,10 @@ mod tests {
 
         let mine = "# Mine, unsaved\n\nStill being written.\n".to_string();
         session.edit(mine.clone());
+        // **The disk moves under the work**, which is what makes the switch's
+        // flush answer `Held`. Without it the flush writes, the buffer is clean,
+        // and the switch is not refused — `mpdf-003` Phase 31's whole point.
+        std::fs::write(root.join("showcase.md"), "# Theirs\n").unwrap();
         settle();
 
         session
@@ -4879,5 +5003,122 @@ mod tests {
         preview.edit("# Typed again\n".to_string());
         assert_eq!(preview.autosave(), Autosave::Wrote);
         assert_eq!(std::fs::read_to_string(&document).unwrap(), "# Typed again\n");
+    }
+    /// A session with a short autosave interval and a record of what the page
+    /// would have been told. The interval is a field a test sets, the way
+    /// `Debounce` takes one as a parameter, so no case waits 1.5 s.
+    fn autosaving(name: &str) -> (Session, Arc<Mutex<Vec<AutosaveEvent>>>, PathBuf) {
+        let dir = scratch_dir(name);
+        let document = multi_file_in(&dir);
+        let (mut session, _) = counted();
+        session.autosave_interval = Duration::from_millis(80);
+        let told = Arc::new(Mutex::new(Vec::new()));
+        let record = Arc::clone(&told);
+        session.set_on_autosave(move |event| record.lock().unwrap().push(event));
+        session.open(document.clone()).unwrap();
+        (session, told, document)
+    }
+
+    const AUTOSAVE_WAIT: Duration = Duration::from_millis(600);
+
+    #[test]
+    fn the_autosave_callback_fires_on_wrote_and_failed_and_not_on_the_rest() {
+        let (session, told, document) = autosaving("autosave-callback");
+
+        session.flush();
+        assert!(told.lock().unwrap().is_empty(), "a clean buffer said something");
+
+        session.preview().edit("# Typed\n".to_string());
+        session.flush();
+        assert_eq!(
+            *told.lock().unwrap(),
+            [AutosaveEvent::Wrote(SAVED.to_string())]
+        );
+        assert_eq!(std::fs::read_to_string(&document).unwrap(), "# Typed\n");
+
+        // Held: the disk moved under a dirty buffer. Nothing is sent.
+        told.lock().unwrap().clear();
+        session.preview().edit("# Typed, more\n".to_string());
+        std::fs::write(&document, "# Theirs\n").unwrap();
+        session.flush();
+        assert!(told.lock().unwrap().is_empty(), "a held autosave said something");
+        assert_eq!(std::fs::read_to_string(&document).unwrap(), "# Theirs\n");
+    }
+
+    #[test]
+    fn a_suspended_autosave_says_nothing() {
+        let (session, told, document) = autosaving("autosave-suspended-silent");
+        let outside = document.parent().unwrap().parent().unwrap().join("outside-silent.md");
+        let _ = std::fs::remove_file(&outside);
+
+        session.preview().edit("# Typed\n".to_string());
+        session.preview().save_as(&outside.to_string_lossy()).unwrap();
+        session.flush();
+
+        assert!(told.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn open_set_main_and_set_edited_each_flush_first_and_a_flush_ignores_the_hold() {
+        let (mut session, told, document) = autosaving("autosave-flushes");
+        session.set_hold(true);
+
+        // set_edited
+        session.preview().edit("# From set_edited\n".to_string());
+        session.set_edited("sections/method.md".to_string()).unwrap();
+        assert_eq!(std::fs::read_to_string(&document).unwrap(), "# From set_edited\n");
+        assert_eq!(session.preview().edited(), Some("sections/method.md"), "the switch was refused");
+
+        // set_main, from the file the pane now holds
+        session.preview().edit("# From set_main\n".to_string());
+        let method = document.parent().unwrap().join("sections/method.md");
+        session.set_main("sections/results.md".to_string()).unwrap();
+        assert_eq!(std::fs::read_to_string(&method).unwrap(), "# From set_main\n");
+
+        // open: the flush is of the *old* preview
+        session.preview().edit("# From open\n".to_string());
+        let results = document.parent().unwrap().join("sections/results.md");
+        let other = scratch_dir("autosave-flushes-other");
+        let next = article_in(&other);
+        session.open(next).unwrap();
+        assert_eq!(std::fs::read_to_string(&results).unwrap(), "# From open\n");
+
+        assert_eq!(told.lock().unwrap().len(), 3, "each flush wrote and said so");
+    }
+
+    #[test]
+    fn a_pause_writes_and_the_hold_stops_it() {
+        let (session, told, document) = autosaving("autosave-timer");
+        let original = std::fs::read(&document).unwrap();
+
+        session.set_hold(true);
+        session.edit("# Typed under a hold\n".to_string());
+        std::thread::sleep(AUTOSAVE_WAIT);
+        assert_eq!(std::fs::read(&document).unwrap(), original, "the timer wrote under a hold");
+        assert!(told.lock().unwrap().is_empty());
+
+        // Releasing a hold over a dirty, unsuspended buffer writes after the
+        // interval, with nobody typing again.
+        session.set_hold(false);
+        std::thread::sleep(AUTOSAVE_WAIT);
+        assert_eq!(std::fs::read_to_string(&document).unwrap(), "# Typed under a hold\n");
+        assert_eq!(told.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_save_as_outside_then_the_release_leaves_the_original_alone() {
+        let (mut session, _, document) = autosaving("autosave-save-as-timer");
+        let outside = document.parent().unwrap().parent().unwrap().join("outside-timer.md");
+        let _ = std::fs::remove_file(&outside);
+        let original = std::fs::read(&document).unwrap();
+
+        session.set_hold(true);
+        session.edit("# A copy\n".to_string());
+        session.save_as(outside.to_string_lossy().into_owned()).unwrap();
+        session.set_hold(false);
+        std::thread::sleep(AUTOSAVE_WAIT);
+
+        assert_eq!(std::fs::read(&document).unwrap(), original);
+        assert_eq!(std::fs::read_to_string(&outside).unwrap(), "# A copy\n");
     }
 }

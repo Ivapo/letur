@@ -2278,14 +2278,38 @@
       let takenReload = -1
 
       async function openDocument() {
-        const path = await open({
-          multiple: false,
-          directory: false,
-          filters: [{ name: 'Markdown', extensions: ['md'] }]
-        })
-        if (path === null) return // the user cancelled
+        await holdAutosave(true)
+        try {
+          const path = await open({
+            multiple: false,
+            directory: false,
+            filters: [{ name: 'Markdown', extensions: ['md'] }]
+          })
+          if (path === null) return // the user cancelled
 
-        await openAt(path)
+          await openAt(path)
+        } finally {
+          await holdAutosave(false)
+        }
+      }
+
+      /*
+        `mpdf-003` Phase 31. **A native dialog is not a pause in the author's
+        work**, and Rust's autosave timer is not the page's: choosing a path
+        outlasts its interval, so each of Open, Save as and Export holds it for
+        as long as its dialog is up. **The answer and the rejection are both
+        swallowed**, which matters in the browser — `web/host/host.mjs` answers
+        no `autosave_hold`, its `invoke` ends in a throw, and every other
+        command in this page reaches `fail`, which would draw an error bar on
+        every dialog. Set first and cleared in a `finally`, so a cancel and a
+        thrown error both release it.
+
+        @param {boolean} held
+      */
+      async function holdAutosave(held) {
+        try {
+          await invoke('autosave_hold', { held })
+        } catch (ignored) {}
       }
 
       /*
@@ -2415,25 +2439,33 @@
         rather than the first thing a reader meets.
       */
       async function saveDocumentAs() {
-        let defaultPath
+        /* **Held before the `edit` below**, which nudges Rust's autosave timer:
+           the hold is what makes the timer settling under the open panel write
+           nothing. `mpdf-003` Phase 31. */
+        await holdAutosave(true)
         try {
-          await invoke('edit', { text: text.value })
-          defaultPath = await invoke('save_as_path')
-        } catch (problem) {
-          fail(problem)
-          return
-        }
+          let defaultPath
+          try {
+            await invoke('edit', { text: text.value })
+            defaultPath = await invoke('save_as_path')
+          } catch (problem) {
+            fail(problem)
+            return
+          }
 
-        const path = await save({
-          defaultPath,
-          filters: [{ name: 'Markdown and bibliographies', extensions: ['md', 'bib', 'yml', 'yaml'] }]
-        })
-        if (path === null) return // the user cancelled
+          const path = await save({
+            defaultPath,
+            filters: [{ name: 'Markdown and bibliographies', extensions: ['md', 'bib', 'yml', 'yaml'] }]
+          })
+          if (path === null) return // the user cancelled
 
-        try {
-          sayReceipt(await invoke('save_as', { path }))
-        } catch (problem) {
-          fail(problem)
+          try {
+            sayReceipt(await invoke('save_as', { path }))
+          } catch (problem) {
+            fail(problem)
+          }
+        } finally {
+          await holdAutosave(false)
         }
       }
 
@@ -2454,26 +2486,31 @@
         all behave the same. `mpdf-003` Phase 27.
       */
       async function exportDocument() {
-        if (!error.hidden && !refusing) return
-
-        let defaultPath
+        await holdAutosave(true)
         try {
-          defaultPath = await invoke('export_path')
-        } catch (problem) {
-          fail(problem)
-          return
-        }
+          if (!error.hidden && !refusing) return
 
-        const path = await save({
-          defaultPath,
-          filters: [{ name: 'PDF', extensions: ['pdf'] }]
-        })
-        if (path === null) return // the user cancelled
+          let defaultPath
+          try {
+            defaultPath = await invoke('export_path')
+          } catch (problem) {
+            fail(problem)
+            return
+          }
 
-        try {
-          await invoke('export', { path })
-        } catch (problem) {
-          fail(problem)
+          const path = await save({
+            defaultPath,
+            filters: [{ name: 'PDF', extensions: ['pdf'] }]
+          })
+          if (path === null) return // the user cancelled
+
+          try {
+            await invoke('export', { path })
+          } catch (problem) {
+            fail(problem)
+          }
+        } finally {
+          await holdAutosave(false)
         }
       }
 
@@ -6244,7 +6281,14 @@
          stack in both engines, and a multi-line change is a single one, so one
          key is one undo step. `Escape` then `Tab` leaves the pane. */
       const INDENT = '    '
-      text.addEventListener('blur', () => (escaped = false))
+      /* `mpdf-003` Phase 31. A `blur` writes the buffer at once, where the
+         timer would have waited. Rust already holds the pane's text, since
+         every `input` sends it. The answer and the rejection are swallowed for
+         `holdAutosave`'s reason. */
+      text.addEventListener('blur', () => {
+        escaped = false
+        invoke('autosave').catch(() => {})
+      })
       text.addEventListener('keydown', (e) => {
         if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return
         if (e.key === 'Escape') {
@@ -6343,6 +6387,10 @@
       listen('save-as', saveDocumentAs)
       listen('export', exportDocument)
       listen('rendered', refresh)
+      // `mpdf-003` Phase 31. The receipt is placed as a save's is; the failure
+      // is put where `fail` puts a sentence. Both read the event's payload.
+      listen('autosaved', (event) => sayReceipt(event.payload))
+      listen('autosave-failed', (event) => fail(event.payload))
       listen('opened', takePendingOpen)
       // **The page keeps no `keydown` of its own for either**, and the two it
       // has stay what they are — the global `Escape` that closes the figure
