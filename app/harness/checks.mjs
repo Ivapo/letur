@@ -92,6 +92,7 @@ const OWNS = {
   'whole-cut-at-end': 30,
   'tab-default': 31,
   'tab-assigns': 31,
+  'escape-passes': 31,
   'autosaved-unheard': 32,
   'autosave-failure-unheard': 32,
   'blur-unflushed': 33,
@@ -2773,9 +2774,14 @@ const tabIndentsAndUndoHolds = async (browser, url) => {
   const columnZero = await value()
 
   await page.evaluate(() => {
+    window.__escapePrevented = []
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') window.__escapePrevented.push(e.defaultPrevented)
+    })
     document.getElementById('text').focus()
   })
   await page.keyboard.press('Escape')
+  const escapePrevented = await page.evaluate(() => window.__escapePrevented[0])
   await page.keyboard.press('Tab')
   const left = await focusId()
   await page.evaluate(() => document.getElementById('text').focus())
@@ -2802,6 +2808,7 @@ const tabIndentsAndUndoHolds = async (browser, url) => {
     multiCovered === '    x\n    y' ? null : `the selection after it covered ${JSON.stringify(multiCovered)}`,
     undone === 'x\ny\nz' ? null : `one undo gave ${JSON.stringify(undone)}`,
     columnZero === '    x\ny\nz' ? null : `a selection ending at column 0 gave ${JSON.stringify(columnZero)}`,
+    escapePrevented === true ? null : `Escape reached document with defaultPrevented ${escapePrevented}`,
     left !== 'text' ? null : 'Escape then Tab left focus on the text',
     kept === 'text' ? null : `Escape, a, Tab moved focus to ${kept}`
   ].filter(Boolean)

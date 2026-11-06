@@ -421,6 +421,20 @@ const MUTATIONS = {
     return page.replace(call, '        const value = text.value\n')
   },
 
+  /* `Escape` in the text pane is left to the webview, which hands it to the
+     window and leaves fullscreen. **The `preventDefault` and nothing else.**
+     `mpdf-003` Phase 32. */
+  'escape-passes': (page) => {
+    const call =
+      '          escaped = true\n' +
+      '          /* `mpdf-003` Phase 32. An `Escape` the page handled is not passed\n' +
+      '             on to AppKit, which would leave fullscreen. A composing one\n' +
+      "             cancels the input method's composition and is not ours. */\n" +
+      '          if (!e.isComposing) e.preventDefault()\n'
+    if (page.split(call).length !== 2) die('the mutation escape-passes found no single Escape preventDefault')
+    return page.replace(call, '          escaped = true\n')
+  },
+
   /* The change is an assignment to `value`, with `noteEdit` still called after
      it: the text and the one `edit` are right and the undo is not. `mpdf-003`
      Phase 30. */

@@ -6293,6 +6293,10 @@
         if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return
         if (e.key === 'Escape') {
           escaped = true
+          /* `mpdf-003` Phase 32. An `Escape` the page handled is not passed
+             on to AppKit, which would leave fullscreen. A composing one
+             cancels the input method's composition and is not ours. */
+          if (!e.isComposing) e.preventDefault()
           return
         }
         if (e.key !== 'Tab' || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) {
