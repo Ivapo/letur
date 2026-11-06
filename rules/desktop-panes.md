@@ -56,7 +56,7 @@ covers: >
   two declarations it holds to each other, the harness that drives it in two
   engines and the copy it drives rather than the file, the boundary it records
   because the DOM cannot show one, the thirty-four clauses it
-  asserts as properties and the thirty-eight broken pages that falsify them, the rule
+  asserts as properties and the thirty-nine broken pages that falsify them, the rule
   that decides what a clause may read as well as what it may assert, the second
   rig that drives the shipped binary instead and which of the three kinds of
   claim belongs where, and the seven defects none of them reaches
@@ -94,7 +94,8 @@ textarea's undo stack in both engines, so `Cmd+Z` undoes one key. The `input`
 listener's body is `noteEdit`, **still the only caller of `edit`**; `indenting` makes
 the listener skip the events `insertText` fires, and the handler calls `noteEdit`
 once. **`Escape` then `Tab` leaves the pane**: `escaped` lets the next `Tab` through,
-and any key but a bare modifier, or a blur, clears it. A `Shift+Tab` with nothing to
+and any key but a bare modifier, or a blur, clears it. `Escape` calls `preventDefault`
+unless composing, so the window stays in fullscreen. A `Shift+Tab` with nothing to
 remove is swallowed and calls no `noteEdit`.
 
 **The divider's press cancels its own default action, and the capture is not what
@@ -818,7 +819,7 @@ sentence — found by a mutation that falsified nothing, not by reading.
 **a log of every command the page sends**, because a page that did a thing itself and a page
 that asked Rust to are indistinguishable from the DOM. `checks.mjs`
 asserts thirty-four clauses in Playwright's Chromium and WebKit, **both of which must pass, every
-clause a property and none a metric literal**, and is falsified first against thirty-eight broken copies
+clause a property and none a metric literal**, and is falsified first against thirty-nine broken copies
 of the page, each failing exactly the clause it owns. **Two mutations may own one clause
 without either being redundant**, and clauses 3, 30, 31, 32 and 33 are where that now stands: `flex-min`
 reaches the footer's half, the brand pushed out of a bar that holds one line, and `header-wraps`

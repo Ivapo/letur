@@ -165,7 +165,7 @@ phases:
     by: null
   - name: "Phase 32 — Escape in the text pane stays in the pane"
     reviewed: 2026-11-05
-    shipped: null
+    shipped: 2026-11-06
     cut: null
     by: null
 
